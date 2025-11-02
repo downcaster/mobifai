@@ -2,6 +2,10 @@
 
 **Connect your mobile phone to your Mac terminal through an external relay server.** Control your Mac terminal from anywhere in the world!
 
+📦 **GitHub Repository:** https://github.com/patrykk21/mobifai
+📖 **Quick Start:** See [QUICKSTART.md](QUICKSTART.md)
+🏗️ **Architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md)
+
 ## 🏗️ Architecture
 
 ```
@@ -135,6 +139,73 @@ Scan QR code with:
 4. Tap "Connect"
 
 🎉 **You're connected!** Start typing commands!
+
+## 🖥️ Running on MacBook
+
+### Complete Setup Flow
+
+**Terminal 1: Start Relay Server**
+```bash
+cd relay-server
+npm install  # First time only
+npm run dev
+```
+
+Expected output:
+```
+🌐 MobiFai Relay Server
+📡 Running on port 3000
+```
+
+**Terminal 2: Start Mac Client**
+```bash
+cd mac-client
+npm install  # First time only
+npm run dev
+```
+
+Expected output:
+```
+🖥️  MobiFai Mac Client
+================================
+
+📡 Connecting to relay server: http://localhost:3000...
+✅ Connected to relay server
+
+✅ Mac registered. Share this code with your mobile device.
+
+🔑 Pairing Code: 863021
+
+Share this code with your mobile device to connect.
+Code expires in 5 minutes.
+```
+
+**📝 Copy the 6-digit pairing code** - you'll need it on your mobile device!
+
+### Mac Client Configuration
+
+Edit [mac-client/.env](mac-client/.env):
+
+```bash
+# Local testing
+RELAY_SERVER_URL=http://localhost:3000
+
+# Cloud deployment (Railway/Heroku)
+RELAY_SERVER_URL=https://your-relay.railway.app
+```
+
+### Quick Commands
+
+```bash
+# Check relay server health
+curl http://localhost:3000/health
+
+# Stop Mac client (in terminal)
+Ctrl+C
+
+# Restart Mac client
+cd mac-client && npm run dev
+```
 
 ## 🔄 How It Works
 

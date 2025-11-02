@@ -2,6 +2,16 @@
 
 Get your Mac terminal connected to your phone in 5 minutes!
 
+## 📦 GitHub Repository
+
+Clone or fork the project:
+```bash
+git clone git@github.com:patrykk21/mobifai.git
+cd mobifai
+```
+
+Or visit: https://github.com/patrykk21/mobifai
+
 ## What You're Building
 
 ```
@@ -77,15 +87,44 @@ Code expires in 5 minutes.
 
 ## Step 3: Setup Mobile App
 
+### Option A: Use Expo Go on Physical Device (Easiest)
+
 ```bash
 cd mobile
 npm install
 npm start
 ```
 
-A QR code will appear. Scan it:
-- **iOS:** Use Camera app → tap "Open in Expo Go"
-- **Android:** Use Expo Go app to scan
+A QR code will appear:
+1. Install **Expo Go** app from App Store (iOS) or Play Store (Android)
+2. Scan QR code:
+   - **iOS:** Use Camera app → tap "Open in Expo Go"
+   - **Android:** Use Expo Go app to scan
+3. App opens automatically in Expo Go
+
+### Option B: Use iOS Simulator (Requires Xcode)
+
+⚠️ **Requirement:** Xcode must be installed (12+ GB download from Mac App Store)
+
+```bash
+cd mobile
+npm install
+npx expo start --ios
+```
+
+This will launch the iOS Simulator automatically.
+
+### Option C: Use Android Emulator (Requires Android Studio)
+
+⚠️ **Requirement:** Android Studio must be installed
+
+```bash
+cd mobile
+npm install
+npx expo start --android
+```
+
+This will launch the Android Emulator automatically.
 
 ---
 

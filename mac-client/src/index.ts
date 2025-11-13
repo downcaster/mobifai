@@ -212,7 +212,13 @@ function connectToRelay() {
   socket.on('paired_device_disconnected', ({ message }) => {
     console.log(chalk.red(`\n❌ ${message}`));
 
-    // Close terminal session
+    // If WebRTC P2P is connected, ignore Socket.IO disconnection
+    if (isWebRTCConnected && dataChannel && dataChannel.readyState === 'open') {
+      console.log(chalk.yellow('⚠️  Relay server disconnected, but P2P connection is still active'));
+      return;
+    }
+
+    // Close terminal session only if P2P is not connected
     if (terminal) {
       terminal.kill();
       terminal = null;
@@ -296,6 +302,14 @@ function connectToRelay() {
   socket.on('disconnect', (reason) => {
     console.log(chalk.red(`\n❌ Disconnected from relay server: ${reason}`));
 
+    // If WebRTC P2P is connected, keep terminal running
+    if (isWebRTCConnected && dataChannel && dataChannel.readyState === 'open') {
+      console.log(chalk.yellow('⚠️  Relay server disconnected, but P2P connection is still active'));
+      console.log(chalk.green('✅ Terminal continues running via P2P'));
+      return;
+    }
+
+    // Close terminal only if P2P is not connected
     if (terminal) {
       terminal.kill();
       terminal = null;

@@ -495,6 +495,15 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
     });
 
     socket.on('paired_device_disconnected', ({ message }) => {
+      // If WebRTC P2P is connected, ignore Socket.IO disconnection
+      if (webrtcRef.current?.isWebRTCConnected()) {
+        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
+        outputBufferRef.current.push('');
+        outputBufferRef.current.push('⚠️  Relay server disconnected (P2P still active)');
+        setOutput(outputBufferRef.current.join('\n'));
+        return;
+      }
+
       setPaired(false);
       outputBufferRef.current.push('');
       outputBufferRef.current.push(`❌ ${message}`);
@@ -508,6 +517,17 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
     });
 
     socket.on('disconnect', (reason) => {
+      // If WebRTC P2P is connected, keep session active
+      if (webrtcRef.current?.isWebRTCConnected()) {
+        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
+        console.log('✅ Terminal continues via P2P');
+        setConnected(false); // Update UI to show relay is disconnected
+        outputBufferRef.current.push('');
+        outputBufferRef.current.push('⚠️  Relay server disconnected (P2P still active)');
+        setOutput(outputBufferRef.current.join('\n'));
+        return;
+      }
+
       setConnected(false);
       setPaired(false);
       outputBufferRef.current.push('');

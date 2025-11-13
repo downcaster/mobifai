@@ -89,6 +89,11 @@ io.on('connection', (socket) => {
         const device = devices.get(socket.id);
         if (device && !device.pairedWith) {
           console.log(`⏰ Pairing code expired: ${pairingCode}`);
+          // Notify Mac client that code expired so it can get a new one
+          socket.emit('pairing_code_expired', { 
+            message: 'Pairing code expired',
+            expiredCode: pairingCode 
+          });
         }
       }, 5 * 60 * 1000);
     } else {

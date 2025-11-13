@@ -209,6 +209,14 @@ function connectToRelay() {
     setupWebRTC();
   });
 
+  socket.on('pairing_code_expired', ({ message, expiredCode }) => {
+    console.log(chalk.yellow(`\n⏰ ${message}: ${expiredCode}`));
+    console.log(chalk.yellow('🔄 Automatically requesting new pairing code...'));
+    
+    // Automatically request a new code
+    socket.emit('register', { type: 'mac' });
+  });
+
   socket.on('paired_device_disconnected', ({ message }) => {
     console.log(chalk.red(`\n❌ ${message}`));
 

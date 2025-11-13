@@ -1,16 +1,18 @@
-// Load environment variables from .env file
-// In production, these would be set at build time
+// Configuration for mobile app
+// Note: React Native doesn't support .env files without additional libraries
+// 
+// ⚠️ CHANGE THESE VALUES TO MATCH YOUR NETWORK:
+// 1. Find your Mac's local IP: System Settings → Network → Wi-Fi → Details
+// 2. Update MAC_IP and RELAY_SERVER_URL below
+// 3. For iOS Simulator, use 'localhost' (simulator shares host network)
+// 4. For Physical Device, use your Mac's IP address on local network
+
 const getEnvVar = (key: string, defaultValue: string): string => {
-  // For React Native, we can't read .env files at runtime
-  // So we'll use a config file that should match .env
-  // In a real app, you'd use expo-constants or a build-time replacement
-  
-  // Default values matching .env file
-  // For physical devices, use your Mac's local IP address
-  // For iOS Simulator, use 'localhost' (it shares host network)
+  // Configuration values
+  // TODO: Update these to match your network setup
   const envVars: Record<string, string> = {
-    MAC_IP: '192.168.1.102',
-    RELAY_SERVER_URL: 'http://192.168.1.102:3000',
+    MAC_IP: '192.168.1.102',                    // Your Mac's local IP address
+    RELAY_SERVER_URL: 'http://192.168.1.102:3000', // Relay server URL
     DEBUG_MODE: 'true',
   };
   

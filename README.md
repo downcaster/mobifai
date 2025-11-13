@@ -96,7 +96,8 @@ cd mac-client
 npm install
 
 # Configure relay server URL
-echo "RELAY_SERVER_URL=http://your-relay-server.com:3000" > .env
+cp .env.example .env
+# Edit .env and set RELAY_SERVER_URL to your relay server URL
 
 # Start the client
 npm run dev
@@ -124,18 +125,33 @@ Code expires in 5 minutes.
 ```bash
 cd mobile
 npm install
-npm start
+
+# Configure for your network
+# Edit mobile/src/config.ts and update:
+# - MAC_IP: Your Mac's local IP (find in System Settings → Network)
+# - RELAY_SERVER_URL: Your relay server URL
+
+# For iOS Simulator (shares host network)
+# Use: http://localhost:3000
+
+# For Physical Device
+# Use: http://YOUR_MAC_IP:3000 (e.g., http://192.168.1.102:3000)
 ```
 
-Scan QR code with:
-- **iOS**: Camera app → Open in Expo Go
-- **Android**: Expo Go app
+**Build and run:**
+```bash
+# iOS Simulator
+npx react-native run-ios
+
+# Physical iPhone
+npx react-native run-ios --device
+```
 
 ### 4. Connect from Mobile
 
-1. Open the app
-2. Enter relay server URL: `http://your-relay-server.com:3000`
-3. Enter the 6-digit pairing code from Mac
+1. Open the app (make sure Metro bundler is running)
+2. Connection URL is pre-configured in `src/config.ts`
+3. Enter the 4-digit pairing code from Mac
 4. Tap "Connect"
 
 🎉 **You're connected!** Start typing commands!
@@ -184,7 +200,7 @@ Code expires in 5 minutes.
 
 ### Mac Client Configuration
 
-Edit [mac-client/.env](mac-client/.env):
+Edit `mac-client/.env`:
 
 ```bash
 # Local testing
@@ -193,6 +209,22 @@ RELAY_SERVER_URL=http://localhost:3000
 # Cloud deployment (Railway/Heroku)
 RELAY_SERVER_URL=https://your-relay.railway.app
 ```
+
+### Mobile App Configuration
+
+Edit `mobile/src/config.ts`:
+
+```typescript
+const envVars: Record<string, string> = {
+  MAC_IP: '192.168.1.102',                    // Your Mac's IP
+  RELAY_SERVER_URL: 'http://192.168.1.102:3000', // Relay URL
+  DEBUG_MODE: 'true',
+};
+```
+
+**Finding your Mac's IP:**
+- System Settings → Network → Wi-Fi → Details
+- Or run: `ipconfig getifaddr en0` in terminal
 
 ### Quick Commands
 

@@ -813,7 +813,16 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
       <View style={styles.statusBar}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            // Clean up connections before navigating
+            if (webrtcRef.current) {
+              webrtcRef.current.cleanup();
+            }
+            if (socketRef.current) {
+              socketRef.current.disconnect();
+            }
+            navigation.navigate('Connect');
+          }}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>

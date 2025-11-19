@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,30 +7,35 @@ import {
   Alert,
   TouchableOpacity,
   KeyboardAvoidingView,
-} from 'react-native';
-import { WebView } from 'react-native-webview';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../App';
-import { io, Socket } from 'socket.io-client';
-import { WebRTCService } from '../services/WebRTCService';
+} from "react-native";
+import { WebView } from "react-native-webview";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RouteProp } from "@react-navigation/native";
+import { RootStackParamList } from "../../App";
+import { io, Socket } from "socket.io-client";
+import { WebRTCService } from "../services/WebRTCService";
 
 type TerminalScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Terminal'>;
-  route: RouteProp<RootStackParamList, 'Terminal'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, "Terminal">;
+  route: RouteProp<RootStackParamList, "Terminal">;
 };
 
-export default function TerminalScreen({ navigation, route }: TerminalScreenProps) {
+export default function TerminalScreen({
+  navigation,
+  route,
+}: TerminalScreenProps) {
   const { relayServerUrl, pairingCode } = route.params;
   const [connected, setConnected] = useState(false);
   const [paired, setPaired] = useState(false);
   const [terminalReady, setTerminalReady] = useState(false);
   const [webrtcConnected, setWebrtcConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
   const webrtcRef = useRef<WebRTCService | null>(null);
-  const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(null);
+  const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(
+    null
+  );
 
   useEffect(() => {
     connectToRelay();
@@ -53,18 +58,24 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
 
   const handleRefreshDimensions = () => {
     // Trigger fit in terminal
-    sendToTerminal('fit', {});
-    
+    sendToTerminal("fit", {});
+
     // Send current dimensions to Mac if we have them
     if (terminalDimensionsRef.current && paired && socketRef.current) {
-      console.log('📐 Manually refreshing dimensions:', terminalDimensionsRef.current);
-      socketRef.current.emit('terminal:dimensions', terminalDimensionsRef.current);
-      socketRef.current.emit('terminal:resize', terminalDimensionsRef.current);
+      console.log(
+        "📐 Manually refreshing dimensions:",
+        terminalDimensionsRef.current
+      );
+      socketRef.current.emit(
+        "terminal:dimensions",
+        terminalDimensionsRef.current
+      );
+      socketRef.current.emit("terminal:resize", terminalDimensionsRef.current);
     }
   };
 
   const connectToRelay = () => {
-    setConnectionStatus('📡 Connecting to relay server...');
+    setConnectionStatus("📡 Connecting to relay server...");
 
     const socket = io(relayServerUrl, {
       reconnection: true,
@@ -75,176 +86,204 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
 
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       setConnected(true);
-      setConnectionStatus('✅ Connected to relay server');
+      setConnectionStatus("✅ Connected to relay server");
       // Register as mobile device
-      socket.emit('register', { type: 'mobile' });
+      socket.emit("register", { type: "mobile" });
     });
 
-    socket.on('registered', ({ message }) => {
-      setConnectionStatus(`✅ ${message}\n🔗 Pairing with code: ${pairingCode}...`);
-      
+    socket.on("registered", ({ message }) => {
+      setConnectionStatus(
+        `✅ ${message}\n🔗 Pairing with code: ${pairingCode}...`
+      );
+
       // Send pairing code with terminal dimensions (if available)
       const dims = terminalDimensionsRef.current;
       if (dims) {
-        socket.emit('pair', { pairingCode, cols: dims.cols, rows: dims.rows });
+        socket.emit("pair", { pairingCode, cols: dims.cols, rows: dims.rows });
       } else {
         // Pair without dimensions initially, will send later
-        socket.emit('pair', { pairingCode });
+        socket.emit("pair", { pairingCode });
       }
     });
 
-    socket.on('paired', ({ message }) => {
+    socket.on("paired", ({ message }) => {
       setPaired(true);
       console.log(`✅ ${message}`);
-      setConnectionStatus('✅ Paired! Initializing terminal...');
-      
+      setConnectionStatus("✅ Paired! Initializing terminal...");
+
       // Initialize WebRTC P2P connection
-      console.log('🔗 Initializing WebRTC P2P connection...');
+      console.log("🔗 Initializing WebRTC P2P connection...");
       webrtcRef.current = new WebRTCService(socket);
-      
+
       // Handle WebRTC messages
       webrtcRef.current.onMessage((data) => {
-        if (data.type === 'terminal:output') {
+        if (data.type === "terminal:output") {
           // Send terminal output to xterm.js
-          sendToTerminal('output', data.payload);
+          sendToTerminal("output", data.payload);
         }
       });
-      
+
       // Handle WebRTC connection state
       webrtcRef.current.onStateChange((state) => {
-        if (state === 'connected') {
+        if (state === "connected") {
           setWebrtcConnected(true);
-          console.log('🎉 WebRTC P2P connected!');
-        } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+          console.log("🎉 WebRTC P2P connected!");
+        } else if (
+          state === "disconnected" ||
+          state === "failed" ||
+          state === "closed"
+        ) {
           setWebrtcConnected(false);
-          console.log('⚠️  WebRTC disconnected, using relay server fallback');
+          console.log("⚠️  WebRTC disconnected, using relay server fallback");
         }
       });
     });
 
-    socket.on('system:message', (data: { type: string; payload?: unknown }) => {
-      console.log('📨 System message received:', JSON.stringify(data));
-      
-      if (data.type === 'terminal_ready') {
-        console.log('✅ Terminal ready on Mac side');
+    socket.on("system:message", (data: { type: string; payload?: unknown }) => {
+      console.log("📨 System message received:", JSON.stringify(data));
+
+      if (data.type === "terminal_ready") {
+        console.log("✅ Terminal ready on Mac side");
         setTerminalReady(true);
-        setConnectionStatus(''); // Clear connection messages, show terminal
+        setConnectionStatus(""); // Clear connection messages, show terminal
       }
     });
 
     // Listen for terminal output via WebSocket (fallback)
-    socket.on('terminal:output', (data: string) => {
+    socket.on("terminal:output", (data: string) => {
       // Only process via WebSocket if WebRTC is not connected
       if (!webrtcRef.current?.isWebRTCConnected()) {
-        sendToTerminal('output', data);
+        sendToTerminal("output", data);
       }
     });
 
-    socket.on('paired_device_disconnected', ({ message }) => {
+    socket.on("paired_device_disconnected", ({ message }) => {
       // If WebRTC P2P is connected, ignore Socket.IO disconnection
       if (webrtcRef.current?.isWebRTCConnected()) {
-        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
-        sendToTerminal('output', '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n');
+        console.log(
+          "⚠️  Relay server disconnected, but P2P connection is still active"
+        );
+        sendToTerminal(
+          "output",
+          "\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n"
+        );
         return;
       }
 
       setPaired(false);
-      sendToTerminal('output', `\r\n\x1b[31m❌ ${message}\x1b[0m\r\n`);
-      Alert.alert('Disconnected', message, [
+      sendToTerminal("output", `\r\n\x1b[31m❌ ${message}\x1b[0m\r\n`);
+      Alert.alert("Disconnected", message, [
         {
-          text: 'OK',
+          text: "OK",
           onPress: () => navigation.goBack(),
         },
       ]);
     });
 
-    socket.on('disconnect', (reason) => {
+    socket.on("disconnect", (reason) => {
       // If WebRTC P2P is connected, keep session active
       if (webrtcRef.current?.isWebRTCConnected()) {
-        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
+        console.log(
+          "⚠️  Relay server disconnected, but P2P connection is still active"
+        );
         setConnected(false);
-        sendToTerminal('output', '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n');
+        sendToTerminal(
+          "output",
+          "\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n"
+        );
         return;
       }
 
       setConnected(false);
       setPaired(false);
-      sendToTerminal('output', `\r\n\x1b[31m❌ Disconnected: ${reason}\x1b[0m\r\n`);
+      sendToTerminal(
+        "output",
+        `\r\n\x1b[31m❌ Disconnected: ${reason}\x1b[0m\r\n`
+      );
     });
 
-    socket.on('connect_error', (error) => {
-      setConnectionStatus(`❌ Connection error: ${error.message}\nURL: ${relayServerUrl}`);
-      Alert.alert('Connection Error', `Failed to connect to relay server:\n${error.message}\n\nURL: ${relayServerUrl}`, [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+    socket.on("connect_error", (error) => {
+      setConnectionStatus(
+        `❌ Connection error: ${error.message}\nURL: ${relayServerUrl}`
+      );
+      Alert.alert(
+        "Connection Error",
+        `Failed to connect to relay server:\n${error.message}\n\nURL: ${relayServerUrl}`,
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
     });
 
-    socket.on('error', ({ message }) => {
-      sendToTerminal('output', `\r\n\x1b[31m❌ Error: ${message}\x1b[0m\r\n`);
-      Alert.alert('Error', message);
+    socket.on("error", ({ message }) => {
+      sendToTerminal("output", `\r\n\x1b[31m❌ Error: ${message}\x1b[0m\r\n`);
+      Alert.alert("Error", message);
     });
   };
 
   const handleWebViewMessage = (event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      
-      if (message.type === 'ready') {
-        console.log('📱 Terminal WebView ready:', message.data);
+
+      if (message.type === "ready") {
+        console.log("📱 Terminal WebView ready:", message.data);
         terminalDimensionsRef.current = message.data;
-        
+
         // If already paired, send dimensions to Mac
         if (paired && socketRef.current) {
-          console.log('📤 Sending terminal dimensions:', message.data);
-          socketRef.current.emit('terminal:dimensions', message.data);
+          console.log("📤 Sending terminal dimensions:", message.data);
+          socketRef.current.emit("terminal:dimensions", message.data);
         }
-        
+
         // Show connection status in terminal if not ready
         if (!terminalReady) {
-          sendToTerminal('output', connectionStatus + '\r\n');
+          sendToTerminal("output", connectionStatus + "\r\n");
         }
-      } else if (message.type === 'input') {
+      } else if (message.type === "input") {
         // Send input to Mac via WebRTC or WebSocket
         if (paired) {
           const input = message.data;
           if (webrtcRef.current?.isWebRTCConnected()) {
-            const success = webrtcRef.current.sendMessage('terminal:input', input);
+            const success = webrtcRef.current.sendMessage(
+              "terminal:input",
+              input
+            );
             if (!success && socketRef.current) {
-              socketRef.current.emit('terminal:input', input);
+              socketRef.current.emit("terminal:input", input);
             }
           } else if (socketRef.current) {
-            socketRef.current.emit('terminal:input', input);
+            socketRef.current.emit("terminal:input", input);
           }
         }
-      } else if (message.type === 'dimensions') {
-        console.log('📐 Terminal dimensions changed:', message.data);
+      } else if (message.type === "dimensions") {
+        console.log("📐 Terminal dimensions changed:", message.data);
         terminalDimensionsRef.current = message.data;
-        
+
         // Send updated dimensions to Mac
         if (paired && socketRef.current) {
-          socketRef.current.emit('terminal:dimensions', message.data);
+          socketRef.current.emit("terminal:dimensions", message.data);
         }
-      } else if (message.type === 'resize') {
-        console.log('📐 Terminal resized:', message.data);
+      } else if (message.type === "resize") {
+        console.log("📐 Terminal resized:", message.data);
         // Send resize event to Mac
         if (paired && socketRef.current) {
-          socketRef.current.emit('terminal:resize', message.data);
+          socketRef.current.emit("terminal:resize", message.data);
         }
       }
     } catch (error) {
-      console.error('Error handling WebView message:', error);
+      console.error("Error handling WebView message:", error);
     }
   };
 
   // Update connection status in terminal when it changes
   useEffect(() => {
     if (!terminalReady && connectionStatus) {
-      sendToTerminal('output', connectionStatus + '\r\n');
+      sendToTerminal("output", connectionStatus + "\r\n");
     }
   }, [connectionStatus, terminalReady]);
 
@@ -425,19 +464,21 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={100}
     >
       <View style={styles.statusBar}>
-        <View style={[styles.indicator, connected && styles.indicatorConnected]} />
+        <View
+          style={[styles.indicator, connected && styles.indicatorConnected]}
+        />
         <Text style={styles.statusText}>
           {paired && webrtcConnected
-            ? 'P2P Connected ⚡'
+            ? "P2P Connected ⚡"
             : paired
-            ? 'Paired (Relay)'
+            ? "Paired (Relay)"
             : connected
-            ? 'Connected'
-            : 'Disconnected'}
+            ? "Connected"
+            : "Disconnected"}
         </Text>
         <TouchableOpacity
           style={styles.refreshButton}
@@ -447,7 +488,7 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.fitButton}
-          onPress={() => sendToTerminal('fit', {})}
+          onPress={() => sendToTerminal("fit", {})}
         >
           <Text style={styles.fitButtonText}>⇱</Text>
         </TouchableOpacity>
@@ -464,17 +505,17 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
         keyboardDisplayRequiresUserAction={false}
-        originWhitelist={['*']}
+        originWhitelist={["*"]}
         mixedContentMode="always"
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          console.error('WebView error:', nativeEvent);
+          console.error("WebView error:", nativeEvent);
         }}
         onHttpError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          console.error('WebView HTTP error:', nativeEvent);
+          console.error("WebView HTTP error:", nativeEvent);
         }}
       />
     </KeyboardAvoidingView>
@@ -484,62 +525,62 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   statusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: 'rgba(17, 17, 17, 0.9)',
+    backgroundColor: "rgba(17, 17, 17, 0.9)",
   },
   indicator: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#f00',
+    backgroundColor: "#f00",
     marginRight: 6,
   },
   indicatorConnected: {
-    backgroundColor: '#0f0',
+    backgroundColor: "#0f0",
   },
   statusText: {
-    color: '#0f0',
+    color: "#0f0",
     fontSize: 9,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
     flex: 1,
   },
   refreshButton: {
-    backgroundColor: '#0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    backgroundColor: "#0f0",
+    width: 28,
+    height: 24,
     borderRadius: 3,
     marginLeft: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   refreshButtonText: {
-    color: '#000',
+    color: "#000",
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   fitButton: {
-    backgroundColor: '#0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    backgroundColor: "#0f0",
+    width: 28,
+    height: 24,
     borderRadius: 3,
     marginLeft: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   fitButtonText: {
-    color: '#000',
+    color: "#000",
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   webview: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
 });

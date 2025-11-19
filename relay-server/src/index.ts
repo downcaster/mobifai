@@ -290,7 +290,7 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`📡 Running on port ${PORT}`);
   console.log(`🔗 Devices can connect to:`);
   console.log(`   - Local: http://localhost:${PORT}`);
-  console.log(`   - Network: http://192.168.1.9:${PORT}`);
+  console.log(`   - Network: http://192.168.178.72:${PORT}`);
   console.log('');
   console.log('Waiting for devices to connect...');
 });

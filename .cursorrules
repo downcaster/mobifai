@@ -1,0 +1,18 @@
+# Cursor Rules for MobiFai Project
+
+## Git Workflow
+- **NEVER automatically commit changes unless explicitly asked by the user**
+- **NEVER automatically push to master unless explicitly asked by the user**
+- Only stage, commit, and push when the user specifically requests it with commands like:
+  - "commit this"
+  - "push this"
+  - "commit and push"
+  - "save this to git"
+- When making code changes, just make the changes and wait for the user to decide when to commit
+
+## Project Context
+- This is a React Native mobile app that connects to a Mac terminal via WebRTC P2P
+- The relay server facilitates the initial connection
+- Terminal rendering uses xterm.js in a WebView
+- Current network: IP 192.168.178.72 (may change)
+

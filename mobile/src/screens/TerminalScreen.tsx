@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     color: "#000",
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "bold",
     marginTop: 2,
     marginLeft: 3,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     marginTop: 2,
-    marginLeft: 5,
+    marginLeft: 6,
   },
   webview: {
     flex: 1,

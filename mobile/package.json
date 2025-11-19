@@ -9,6 +9,7 @@
     "pod-install": "cd ios && pod install && cd .."
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-clipboard/clipboard": "^1.14.1",
     "@react-navigation/native": "^6.1.9",

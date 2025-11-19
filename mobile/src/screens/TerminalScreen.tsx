@@ -14,7 +14,6 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { io, Socket } from 'socket.io-client';
 import { WebRTCService } from '../services/WebRTCService';
-import { MaterialIcons } from '@expo/vector-icons';
 
 type TerminalScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Terminal'>;
@@ -444,13 +443,13 @@ export default function TerminalScreen({ navigation, route }: TerminalScreenProp
           style={styles.refreshButton}
           onPress={handleRefreshDimensions}
         >
-          <MaterialIcons name="refresh" size={14} color="#000" />
+          <Text style={styles.refreshButtonText}>⟳</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.fitButton}
           onPress={() => sendToTerminal('fit', {})}
         >
-          <MaterialIcons name="fit-screen" size={14} color="#000" />
+          <Text style={styles.fitButtonText}>⇱</Text>
         </TouchableOpacity>
       </View>
 
@@ -520,6 +519,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  refreshButtonText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
   fitButton: {
     backgroundColor: '#0f0',
     paddingHorizontal: 8,
@@ -528,6 +532,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fitButtonText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   webview: {
     flex: 1,

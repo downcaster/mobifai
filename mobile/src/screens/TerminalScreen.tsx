@@ -512,18 +512,16 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     backgroundColor: '#0f0',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 2,
-    marginLeft: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 3,
+    marginLeft: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 20,
-    minHeight: 16,
   },
   refreshButtonText: {
     color: '#000',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   fitButton: {

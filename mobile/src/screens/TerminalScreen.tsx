@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 15,
     fontWeight: "bold",
-    marginTop: 3,
+    marginTop: 2,
     marginLeft: 4,
   },
   webview: {

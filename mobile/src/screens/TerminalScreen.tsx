@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     color: "#000",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "bold",
   },
   fitButton: {

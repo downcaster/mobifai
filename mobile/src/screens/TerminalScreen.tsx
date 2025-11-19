@@ -111,7 +111,7 @@ export default function TerminalScreen({
     socket.on("paired", ({ message }) => {
       setPaired(true);
       console.log(`✅ ${message}`);
-      setConnectionStatus("✅ Paired! Initializing terminal...");
+      setConnectionStatus("Connected!\n");
 
       // Initialize WebRTC P2P connection
       console.log("🔗 Initializing WebRTC P2P connection...");

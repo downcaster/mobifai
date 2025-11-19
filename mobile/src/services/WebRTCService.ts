@@ -50,7 +50,7 @@ export class WebRTCService {
       await this.peerConnection!.setRemoteDescription(
         new RTCSessionDescription({
           sdp: offer.sdp,
-          type: offer.type as RTCSdpType,
+          type: offer.type as any, // Type cast to satisfy TS
         })
       );
 
@@ -122,7 +122,7 @@ export class WebRTCService {
     // Configure for local connections (no STUN needed for same network)
     const configuration = {
       iceServers: [], // Empty for local connections
-      iceTransportPolicy: 'all', // Allow both relay and host candidates
+      iceTransportPolicy: 'all' as 'all', // Allow both relay and host candidates
       iceCandidatePoolSize: 10,
     };
 

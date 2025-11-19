@@ -107,6 +107,6 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`🚀 MobiFai server running on port ${PORT}`);
   console.log(`📱 Devices can connect to:`);
   console.log(`   - Local: http://localhost:${PORT}`);
-  console.log(`   - Network: http://192.168.1.35:${PORT}`);
+  console.log(`   - Network: http://192.168.1.9:${PORT}`);
   console.log(`💻 Terminal sessions ready`);
 });

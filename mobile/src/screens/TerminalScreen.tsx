@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     marginTop: 2,
-    marginLeft: 4,
+    marginLeft: 5,
   },
   webview: {
     flex: 1,

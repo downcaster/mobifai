@@ -38,7 +38,7 @@ export default function TerminalScreen({
   navigation,
   route,
 }: TerminalScreenProps) {
-  const { relayServerUrl } = route.params;
+  const { relayServerUrl, targetDeviceId } = route.params;
   const [connected, setConnected] = useState(false);
   const [paired, setPaired] = useState(false);
   const [terminalReady, setTerminalReady] = useState(false);
@@ -108,6 +108,8 @@ export default function TerminalScreen({
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
+      transports: ["websocket"],
+      auth: { token },
     });
 
     socketRef.current = socket;
@@ -117,6 +119,13 @@ export default function TerminalScreen({
       setConnectionStatus("✅ Connected to relay server");
       // Register as mobile device with token and deviceId
       socket.emit("register", { type: "mobile", token, deviceId });
+      
+      // If we have a specific target, request connection immediately
+      if (targetDeviceId) {
+          console.log('🔌 Requesting connection to:', targetDeviceId);
+          setConnectionStatus("🔗 Requesting connection...");
+          socket.emit('request_connection', { targetDeviceId });
+      }
     });
 
     socket.on("login_required", ({ loginUrl }) => {
@@ -146,8 +155,7 @@ export default function TerminalScreen({
       await AsyncStorage.setItem(TOKEN_KEY, token);
       setConnectionStatus(`✅ Logged in as ${user.email}`);
       
-      // Re-register with new token
-      socket.emit("register", { type: "mobile", token, deviceId });
+      // REMOVED: socket.emit("register", ...) to prevent infinite loop
     });
 
     socket.on("auth_error", async ({ message }) => {
@@ -159,6 +167,11 @@ export default function TerminalScreen({
 
     socket.on("waiting_for_peer", ({ message }) => {
       setConnectionStatus(`⏳ ${message}`);
+    });
+
+    socket.on("available_devices", () => {
+       // Terminal screen received list update - peer might have disconnected/reconnected
+       // We could potentially check if our target is still there, but for now ignore
     });
 
     socket.on("paired", ({ message }) => {

@@ -5,9 +5,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ConnectScreen from './src/screens/ConnectScreen';
 import TerminalScreen from './src/screens/TerminalScreen';
 
+import DeviceListScreen from './src/screens/DeviceListScreen';
+
 export type RootStackParamList = {
   Connect: undefined;
-  Terminal: { relayServerUrl: string };
+  DeviceList: undefined;
+  Terminal: { relayServerUrl: string; targetDeviceId?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -32,6 +35,11 @@ export default function App() {
           name="Connect"
           component={ConnectScreen}
           options={{ title: 'MobiFai - Connect' }}
+        />
+        <Stack.Screen
+          name="DeviceList"
+          component={DeviceListScreen}
+          options={{ title: 'Available Terminals' }}
         />
         <Stack.Screen
           name="Terminal"

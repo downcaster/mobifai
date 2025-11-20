@@ -358,6 +358,22 @@ function startTerminal(cols: number, rows: number, socketConnection: Socket) {
   let initBuffer = "";
   const tempListener = terminal.onData((data) => (initBuffer += data));
 
+  // Inject initialization commands
+  // 1. Set a clean, colorful prompt with git branch support
+  // 2. Clear the screen to remove login banner
+  const initCommands = [
+    "setopt PROMPT_SUBST", // Enable dynamic command substitution in prompt
+    "export PS1='%F{cyan}%~%f %F{green}$(git branch --show-current 2>/dev/null)%f $ '",
+    "clear",
+  ];
+
+  // Send commands with a small delay to ensure shell is ready
+  setTimeout(() => {
+    if (terminal) {
+      initCommands.forEach((cmd) => terminal!.write(cmd + "\r"));
+    }
+  }, 100);
+
   setTimeout(() => {
     tempListener.dispose();
 

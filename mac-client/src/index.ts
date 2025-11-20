@@ -200,7 +200,12 @@ function connectToRelay() {
   socket.on("connect", () => {
     console.log(chalk.green("✅ Connected to relay server"));
     // Register as Mac device
-    socket.emit("register", { type: "mac", token, deviceId });
+    socket.emit("register", {
+      type: "mac",
+      token,
+      deviceId,
+      deviceName: os.hostname(), // Send hostname for identification
+    });
   });
 
   socket.on("login_required", ({ loginUrl }) => {
@@ -218,8 +223,15 @@ function connectToRelay() {
     console.log(chalk.bold.green(`\n✅ Authenticated as ${user.email}`));
     saveToken(token);
 
-    // Re-register with token to proceed
-    socket.emit("register", { type: "mac", token, deviceId });
+    // IMPORTANT: Do NOT re-register here immediately if we just connected.
+    // The 'connect' event handles initial registration.
+    // We only re-register if we are changing credentials or state.
+
+    // However, if the server sends 'authenticated', it means our token was valid.
+    // We don't need to do anything else.
+    // Re-registering creates a loop if the server sends 'authenticated' again on re-register.
+
+    // socket.emit("register", ...); // REMOVED to prevent loop
   });
 
   socket.on("auth_error", ({ message }) => {
@@ -277,7 +289,12 @@ function connectToRelay() {
     }
     // Re-register to wait for connection
     const token = getToken();
-    socket.emit("register", { type: "mac", token, deviceId });
+    socket.emit("register", {
+      type: "mac",
+      token,
+      deviceId,
+      deviceName: os.hostname(),
+    });
   });
 
   // WebRTC handlers
@@ -344,6 +361,10 @@ function startTerminal(cols: number, rows: number, socketConnection: Socket) {
   setTimeout(() => {
     tempListener.dispose();
 
+    if (!terminal) {
+      return;
+    }
+
     // Notify system ready
     socketConnection.emit("system:message", { type: "terminal_ready" });
 
@@ -353,7 +374,7 @@ function startTerminal(cols: number, rows: number, socketConnection: Socket) {
     }
 
     // Main data listener
-    terminal!.onData((data) => {
+    terminal.onData((data) => {
       if (isWebRTCConnected && dataChannel?.readyState === "open") {
         try {
           dataChannel.send(

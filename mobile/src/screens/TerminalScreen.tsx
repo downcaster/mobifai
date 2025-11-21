@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Linking,
+  StatusBar,
 } from "react-native";
+import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RouteProp } from "@react-navigation/native";
@@ -16,6 +18,7 @@ import { RootStackParamList } from "../../App";
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Simple UUID-like generator for device ID
 const generateDeviceId = () => {
@@ -44,6 +47,13 @@ export default function TerminalScreen({
   const [terminalReady, setTerminalReady] = useState(false);
   const [webrtcConnected, setWebrtcConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [terminalSettings, setTerminalSettings] = useState({
+    theme: 'dark',
+    fontSize: 14,
+    cursorStyle: 'block',
+    fontFamily: 'monospace'
+  });
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
   const webrtcRef = useRef<WebRTCService | null>(null);
@@ -126,6 +136,20 @@ export default function TerminalScreen({
           setConnectionStatus("🔗 Requesting connection...");
           socket.emit('request_connection', { targetDeviceId });
       }
+
+      // Fetch settings
+      socket.emit('settings:get');
+    });
+
+    socket.on('settings:updated', (newSettings) => {
+        if (newSettings) {
+            console.log('⚙️ Received settings update:', newSettings);
+            setTerminalSettings(prev => {
+                const merged = { ...prev, ...newSettings };
+                sendToTerminal('settings', merged);
+                return merged;
+            });
+        }
     });
 
     socket.on("login_required", ({ loginUrl }) => {
@@ -294,6 +318,9 @@ export default function TerminalScreen({
         console.log("📱 Terminal WebView ready:", message.data);
         terminalDimensionsRef.current = message.data;
 
+        // Send current settings
+        sendToTerminal('settings', terminalSettings);
+
         if (paired && socketRef.current) {
           console.log("📤 Sending terminal dimensions:", message.data);
           socketRef.current.emit("terminal:dimensions", message.data);
@@ -325,6 +352,12 @@ export default function TerminalScreen({
       } else if (message.type === "resize") {
         if (paired && socketRef.current) {
           socketRef.current.emit("terminal:resize", message.data);
+        }
+      } else if (message.type === "clipboard") {
+        if (message.data) {
+          Clipboard.setString(message.data);
+          setCopyFeedback(true);
+          setTimeout(() => setCopyFeedback(false), 1500);
         }
       }
     } catch (error) {
@@ -478,8 +511,72 @@ export default function TerminalScreen({
             }
         });
         
+        const themes = {
+            light: {
+                background: '#FFFFFF',
+                foreground: '#212121',
+                cursor: '#6200EE',
+                cursorAccent: '#FFFFFF',
+                selection: 'rgba(98, 0, 238, 0.3)',
+                black: '#000000',
+                red: '#B71C1C',
+                green: '#1B5E20',
+                yellow: '#F57F17',
+                blue: '#0D47A1',
+                magenta: '#880E4F',
+                cyan: '#006064',
+                white: '#FFFFFF',
+                brightBlack: '#9E9E9E',
+                brightRed: '#E53935',
+                brightGreen: '#43A047',
+                brightYellow: '#FDD835',
+                brightBlue: '#1E88E5',
+                brightMagenta: '#8E24AA',
+                brightCyan: '#00ACC1',
+                brightWhite: '#FAFAFA'
+            },
+            dark: {
+                background: '#000000',
+                foreground: '#00ff00',
+                cursor: '#00ff00',
+                cursorAccent: '#000000',
+                selection: 'rgba(0, 255, 0, 0.3)',
+                black: '#000000',
+                red: '#cd3131',
+                green: '#0dbc79',
+                yellow: '#e5e510',
+                blue: '#2472c8',
+                magenta: '#bc3fbc',
+                cyan: '#11a8cd',
+                white: '#e5e5e5',
+                brightBlack: '#666666',
+                brightRed: '#f14c4c',
+                brightGreen: '#23d18b',
+                brightYellow: '#f5f543',
+                brightBlue: '#3b8eea',
+                brightMagenta: '#d670d6',
+                brightCyan: '#29b8db',
+                brightWhite: '#ffffff'
+            }
+        };
+
         function handleMessage(message) {
-            if (message.type === 'output') {
+            if (message.type === 'settings') {
+                const s = message.data;
+                if (s.theme && themes[s.theme]) {
+                    terminal.options.theme = themes[s.theme];
+                    document.body.style.backgroundColor = themes[s.theme].background;
+                }
+                if (s.fontSize) terminal.options.fontSize = parseInt(s.fontSize);
+                if (s.cursorStyle) terminal.options.cursorStyle = s.cursorStyle;
+                if (s.fontFamily) {
+                    terminal.options.fontFamily = s.fontFamily === 'monospace' 
+                        ? 'Menlo, Monaco, "Courier New", monospace'
+                        : 'System, sans-serif';
+                }
+                
+                setTimeout(fitTerminal, 50);
+            } else if (message.type === 'output') {
                 terminal.write(message.data);
             } else if (message.type === 'clear') {
                 terminal.clear();
@@ -491,6 +588,19 @@ export default function TerminalScreen({
                 }
             } else if (message.type === 'fit') {
                 fitTerminal();
+            } else if (message.type === 'copy') {
+                const buffer = terminal.buffer.active;
+                let text = '';
+                for (let i = 0; i < buffer.length; i++) {
+                    const line = buffer.getLine(i);
+                    if (line) {
+                        text += line.translateToString(true) + '\\n';
+                    }
+                }
+                window.ReactNativeWebView?.postMessage(JSON.stringify({
+                    type: 'clipboard',
+                    data: text
+                }));
             } else if (message.type === 'focus') {
                 terminal.focus();
             }
@@ -519,32 +629,49 @@ export default function TerminalScreen({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={100}
     >
-      <View style={styles.statusBar}>
-        <View
-          style={[styles.indicator, connected && styles.indicatorConnected]}
-        />
-        <Text style={styles.statusText}>
-          {paired && webrtcConnected
-            ? "P2P Connected ⚡"
-            : paired
-            ? "Paired (Relay)"
-            : connected
-            ? "Connected"
-            : "Disconnected"}
-        </Text>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={handleRefreshDimensions}
-        >
-          <Text style={styles.refreshButtonText}>⟳</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.fitButton}
-          onPress={() => sendToTerminal("fit", {})}
-        >
-          <Text style={styles.fitButtonText}>⇱</Text>
-        </TouchableOpacity>
-      </View>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: "rgba(17, 17, 17, 0.9)" }}>
+        <View style={styles.statusBar}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>{"< Back"}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.statusContainer}>
+            <View
+              style={[styles.indicator, connected && styles.indicatorConnected]}
+            />
+            <Text style={styles.statusText}>
+              {copyFeedback
+                ? "✓ Copied!"
+                : paired && webrtcConnected
+                ? "P2P Connected ⚡"
+                : paired
+                ? "Paired (Relay)"
+                : connected
+                ? "Connected"
+                : "Disconnected"}
+            </Text>
+          </View>
+
+          <View style={styles.rightButtons}>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={handleRefreshDimensions}
+            >
+              <Text style={styles.refreshButtonText}>⟳</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fitButton}
+              onPress={() => sendToTerminal("copy", {})}
+            >
+              <Text style={styles.fitButtonText}>❐</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
 
       <WebView
         ref={webViewRef}
@@ -586,12 +713,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: "rgba(17, 17, 17, 0.9)",
+    height: 40,
+  },
+  backButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    minWidth: 60,
+    justifyContent: "center",
+  },
+  backButtonText: {
+    color: "#0f0",
+    fontSize: 14,
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    lineHeight: 16,
+  },
+  statusContainer: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rightButtons: {
+    flexDirection: "row",
+    minWidth: 60,
+    justifyContent: "flex-end",
+    alignItems: "center",
   },
   indicator: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#f00",
     marginRight: 6,
   },
@@ -600,17 +752,17 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: "#0f0",
-    fontSize: 9,
+    fontSize: 12,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    flex: 1,
+    textAlign: "center",
+    lineHeight: 16,
   },
   refreshButton: {
     backgroundColor: "#0f0",
     width: 24,
     height: 22,
     borderRadius: 2,
-    marginLeft: 4,
-    display: "flex",
+    marginLeft: 8,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -626,14 +778,16 @@ const styles = StyleSheet.create({
     width: 24,
     height: 22,
     borderRadius: 2,
-    marginLeft: 4,
+    marginLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   fitButtonText: {
     color: "#000",
     fontSize: 15,
     fontWeight: "bold",
     marginTop: 2,
-    marginLeft: 6,
+    marginLeft: 2,
   },
   webview: {
     flex: 1,

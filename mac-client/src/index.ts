@@ -40,7 +40,7 @@ async function setupWebRTC() {
 
   try {
     peerConnection = new RTCPeerConnection({
-      iceServers: [],
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
       iceTransportPolicy: "all",
       iceCandidatePoolSize: 10,
       bundlePolicy: "max-bundle",

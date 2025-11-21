@@ -2,6 +2,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { query } from './db/index.js';
 
 dotenv.config();
 
@@ -26,15 +27,33 @@ passport.use(
       clientSecret: GOOGLE_CLIENT_SECRET,
       callbackURL: `${SERVER_URL}/auth/google/callback`,
     },
-    (accessToken, refreshToken, profile, done) => {
-      // Here you would typically find or create a user in your DB
-      // For now, we'll just pass the profile
+    async (accessToken, refreshToken, profile, done) => {
+      // Create user object
       const user = {
         id: profile.id,
         email: profile.emails?.[0].value,
         name: profile.displayName,
         photo: profile.photos?.[0].value,
       };
+
+      // Upsert into DB
+      try {
+        await query(
+          `INSERT INTO users (id, email, name, photo) 
+           VALUES ($1, $2, $3, $4) 
+           ON CONFLICT (id) DO UPDATE SET 
+           email = EXCLUDED.email, 
+           name = EXCLUDED.name, 
+           photo = EXCLUDED.photo,
+           updated_at = CURRENT_TIMESTAMP`,
+          [user.id, user.email, user.name, user.photo]
+        );
+        console.log(`💾 Saved user ${user.email} to DB`);
+      } catch (e) {
+        console.error('❌ Failed to save user to DB:', e);
+        // Continue even if DB fails so login succeeds
+      }
+
       return done(null, user);
     }
   )

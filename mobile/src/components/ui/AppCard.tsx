@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, ViewProps, StyleSheet } from 'react-native';
+import { View, ViewProps, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 export interface AppCardProps extends ViewProps {
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   className?: string;
 }
 

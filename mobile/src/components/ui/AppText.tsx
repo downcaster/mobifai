@@ -1,12 +1,12 @@
 import React from "react";
-import { Text, TextProps, StyleSheet } from "react-native";
+import { Text, TextProps, StyleSheet, StyleProp, TextStyle } from "react-native";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 
 export interface AppTextProps extends TextProps {
   variant?: "h1" | "h2" | "h3" | "body" | "label" | "caption";
   weight?: "regular" | "medium" | "bold";
-  style?: any;
+  style?: StyleProp<TextStyle>;
   className?: string; // Ignored but kept for compatibility during migration
 }
 

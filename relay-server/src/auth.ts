@@ -1,73 +1,80 @@
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
-import { query } from './db/index.js';
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import jwt from "jsonwebtoken";
+import prisma from "./prisma.js";
+import { config } from "./config.js";
 
-dotenv.config();
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET';
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  photo?: string;
+}
 
 // Serialize user to session
-passport.serializeUser((user: any, done) => {
+passport.serializeUser((user: Express.User, done) => {
   done(null, user);
 });
 
-passport.deserializeUser((user: any, done) => {
+passport.deserializeUser((user: Express.User, done) => {
   done(null, user);
 });
 
 passport.use(
   new GoogleStrategy(
     {
-      clientID: GOOGLE_CLIENT_ID,
-      clientSecret: GOOGLE_CLIENT_SECRET,
-      callbackURL: `${SERVER_URL}/auth/google/callback`,
+      clientID: config.GOOGLE_CLIENT_ID,
+      clientSecret: config.GOOGLE_CLIENT_SECRET,
+      callbackURL: `${config.SERVER_URL}/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
-      // Create user object
-      const user = {
-        id: profile.id,
-        email: profile.emails?.[0].value,
-        name: profile.displayName,
-        photo: profile.photos?.[0].value,
-      };
-
-      // Upsert into DB
+      // Upsert user into DB using Prisma
       try {
-        await query(
-          `INSERT INTO users (id, email, name, photo) 
-           VALUES ($1, $2, $3, $4) 
-           ON CONFLICT (id) DO UPDATE SET 
-           email = EXCLUDED.email, 
-           name = EXCLUDED.name, 
-           photo = EXCLUDED.photo,
-           updated_at = CURRENT_TIMESTAMP`,
-          [user.id, user.email, user.name, user.photo]
-        );
-        console.log(`💾 Saved user ${user.email} to DB`);
-      } catch (e) {
-        console.error('❌ Failed to save user to DB:', e);
-        // Continue even if DB fails so login succeeds
-      }
+        const user = await prisma.user.upsert({
+          where: { id: profile.id },
+          update: {
+            email: profile.emails?.[0].value || "",
+            name: profile.displayName,
+            photo: profile.photos?.[0].value,
+          },
+          create: {
+            id: profile.id,
+            email: profile.emails?.[0].value || "",
+            name: profile.displayName,
+            photo: profile.photos?.[0].value,
+          },
+        });
 
-      return done(null, user);
+        console.log(`💾 Saved user ${user.email} to DB`);
+
+        return done(null, {
+          id: user.id,
+          email: user.email,
+          name: user.name || "",
+          photo: user.photo || undefined,
+        });
+      } catch (e) {
+        console.error("❌ Failed to save user to DB:", e);
+        // Return user data even if DB fails so login succeeds
+        return done(null, {
+          id: profile.id,
+          email: profile.emails?.[0].value || "",
+          name: profile.displayName || "",
+          photo: profile.photos?.[0].value,
+        });
+      }
     }
   )
 );
 
-export function generateToken(user: any) {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: '30d' });
+export function generateToken(user: Express.User | AuthUser) {
+  return jwt.sign(user as object, config.JWT_SECRET, { expiresIn: "30d" });
 }
 
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, config.JWT_SECRET);
   } catch (error) {
     return null;
   }
 }
-

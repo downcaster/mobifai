@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, ViewProps, SafeAreaView, StyleSheet } from 'react-native';
+import { View, ViewProps, SafeAreaView, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 
 export interface AppViewProps extends ViewProps {
   safeArea?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   className?: string;
 }
 

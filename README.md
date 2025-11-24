@@ -24,8 +24,43 @@
 - 💻 **Mac Client** - Runs on your Mac, executes terminal commands
 - 📱 **Mobile App** - Bare React Native app for iOS & Android
 - ⚡ **WebRTC P2P** - Direct peer-to-peer connection with automatic relay fallback
-- 🔒 **Simple Pairing** - 4-digit codes that expire after 5 minutes
+- 🔒 **Secure Authentication** - Google OAuth 2.0 login on both devices
+- 🛡️ **Crypto Handshake** - ECDH Key Exchange + HMAC signatures for device verification
 - 🚀 **Real-time** - Full terminal emulation with `node-pty`
+
+## 🔐 Security & Authentication Flow
+
+MobiFai uses a robust security model to ensure only **your** devices can connect to your terminal.
+
+### 1. Identity Verification (Google OAuth)
+Both the Mac Client and Mobile App must authenticate with the same Google Account.
+- **Mac Client:** Opens a browser window to sign in.
+- **Mobile App:** Opens a browser window to sign in.
+- **Relay Server:** Verifies JWT tokens and ensures both devices belong to the same `user.email`.
+
+### 2. Device Registration
+Upon connection, each device registers with the Relay Server:
+- Generates an ephemeral **ECDH Key Pair** (secp256k1).
+- Sends the **Public Key** to the server.
+- Server stores the `publicKey` associated with the authenticated session.
+
+### 3. Secure Handshake (Mutual Authentication)
+When the Mobile App requests a connection to a Mac:
+1. **Initiation:** Server verifies both devices are online and belong to the same user.
+2. **Challenge Generation:** Server generates a random 32-byte challenge for each device.
+3. **Key Exchange:** Server sends the peer's `publicKey` and the challenge to each device.
+4. **Shared Secret Derivation:**
+   - Devices use **ECDH** (Elliptic Curve Diffie-Hellman) to derive a `sharedSecret` using their private key and the peer's public key.
+   - `sharedSecret = ECDH(myPrivateKey, peerPublicKey)`
+5. **Signing:** Each device signs the server's challenge using **HMAC-SHA256** with the `sharedSecret`.
+6. **Verification:**
+   - Device A sends signature to Server.
+   - Server forwards signature to Device B.
+   - Device B verifies signature (proving Device A derived the same secret) and sends confirmation.
+   - (Process repeats for B → A)
+7. **Connection:** Once both devices have confirmed the peer's identity, the server establishes the P2P signaling bridge.
+
+This ensures that even if the Relay Server is compromised, it cannot impersonate a device without the ephemeral private keys (which never leave the device).
 
 ## 📦 Project Structure
 
@@ -51,42 +86,14 @@ mobifai/
 
 ### 1. Deploy Relay Server (One Time)
 
-The relay server can be deployed anywhere. Here are some options:
-
-#### Option A: Run Locally for Testing
+The relay server acts as the secure meeting point.
 
 ```bash
 cd relay-server
 npm install
-npm run dev
-```
-
-Server runs on `http://localhost:3000`
-
-#### Option B: Deploy to Heroku (Free Tier)
-
-```bash
-cd relay-server
-heroku create mobifai-relay
-git push heroku master
-```
-
-Your server URL: `https://mobifai-relay.herokuapp.com`
-
-#### Option C: Deploy to Any VPS
-
-```bash
-# On your VPS (Ubuntu/Debian)
-cd relay-server
-npm install
+# Configure Google OAuth credentials in .env
 npm run build
 npm start
-
-# Keep running with PM2
-npm install -g pm2
-pm2 start dist/index.js --name mobifai-relay
-pm2 save
-pm2 startup
 ```
 
 ### 2. Start Mac Client
@@ -94,67 +101,28 @@ pm2 startup
 ```bash
 cd mac-client
 npm install
-
-# Configure relay server URL
-cp .env.example .env
-# Edit .env and set RELAY_SERVER_URL to your relay server URL
-
-# Start the client
-npm run dev
+# Configure RELAY_SERVER_URL in .env
+npm start
 ```
 
-You'll see:
-```
-🖥️  MobiFai Mac Client
-================================
+1. The client will generate a secure link.
+2. Press `Enter` to open the login page.
+3. Sign in with your Google Account.
+4. "✅ Authenticated" will appear in the terminal.
 
-📡 Connecting to relay server...
-✅ Connected to relay server
-✅ Mac registered. Share this code with your mobile device.
-
-🔑 Pairing Code: 123456
-
-Share this code with your mobile device to connect.
-Code expires in 5 minutes.
-```
-
-**Copy the 6-digit code!**
-
-### 3. Setup Mobile App
+### 3. Connect from Mobile
 
 ```bash
 cd mobile
-npm install
-
-# Configure for your network
-# Edit mobile/src/config.ts and update:
-# - MAC_IP: Your Mac's local IP (find in System Settings → Network)
-# - RELAY_SERVER_URL: Your relay server URL
-
-# For iOS Simulator (shares host network)
-# Use: http://localhost:3000
-
-# For Physical Device
-# Use: http://YOUR_MAC_IP:3000 (e.g., http://192.168.1.102:3000)
-```
-
-**Build and run:**
-```bash
-# iOS Simulator
+# Configure RELAY_SERVER_URL in src/config.ts
 npx react-native run-ios
-
-# Physical iPhone
-npx react-native run-ios --device
 ```
 
-### 4. Connect from Mobile
-
-1. Open the app (make sure Metro bundler is running)
-2. Connection URL is pre-configured in `src/config.ts`
-3. Enter the 4-digit pairing code from Mac
-4. Tap "Connect"
-
-🎉 **You're connected!** Start typing commands!
+1. Open the app.
+2. Tap **"Connect with Google"**.
+3. Sign in with the **SAME** Google Account used on the Mac.
+4. You will see your Mac in the "Terminals" list.
+5. Tap "Connect" to start the secure session!
 
 ## 🖥️ Running on MacBook
 
@@ -163,96 +131,36 @@ npx react-native run-ios --device
 **Terminal 1: Start Relay Server**
 ```bash
 cd relay-server
-npm install  # First time only
-npm run dev
-```
-
-Expected output:
-```
-🌐 MobiFai Relay Server
-📡 Running on port 3000
+npm start
 ```
 
 **Terminal 2: Start Mac Client**
 ```bash
 cd mac-client
-npm install  # First time only
-npm run dev
+npm start
 ```
 
-Expected output:
-```
-🖥️  MobiFai Mac Client
-================================
-
-📡 Connecting to relay server: http://localhost:3000...
-✅ Connected to relay server
-
-✅ Mac registered. Share this code with your mobile device.
-
-🔑 Pairing Code: 863021
-
-Share this code with your mobile device to connect.
-Code expires in 5 minutes.
-```
-
-**📝 Copy the 6-digit pairing code** - you'll need it on your mobile device!
-
-### Mac Client Configuration
-
-Edit `mac-client/.env`:
-
+**Terminal 3: Start Mobile App**
 ```bash
-# Local testing
-RELAY_SERVER_URL=http://localhost:3000
-
-# Cloud deployment (Railway/Heroku)
-RELAY_SERVER_URL=https://your-relay.railway.app
-```
-
-### Mobile App Configuration
-
-Edit `mobile/src/config.ts`:
-
-```typescript
-const envVars: Record<string, string> = {
-  MAC_IP: '192.168.1.102',                    // Your Mac's IP
-  RELAY_SERVER_URL: 'http://192.168.1.102:3000', // Relay URL
-  DEBUG_MODE: 'true',
-};
-```
-
-**Finding your Mac's IP:**
-- System Settings → Network → Wi-Fi → Details
-- Or run: `ipconfig getifaddr en0` in terminal
-
-### Quick Commands
-
-```bash
-# Check relay server health
-curl http://localhost:3000/health
-
-# Stop Mac client (in terminal)
-Ctrl+C
-
-# Restart Mac client
-cd mac-client && npm run dev
+cd mobile
+npx react-native run-ios
 ```
 
 ## 🔄 How It Works
 
-### Pairing & Connection
-1. **Mac Client** connects to relay server, gets 4-digit pairing code
-2. **Mobile App** connects to relay server with pairing code
-3. **Relay Server** pairs the two devices together
-4. **WebRTC P2P** - Clients attempt to establish direct peer-to-peer connection
-5. **Automatic Fallback** - If P2P fails, uses relay server for communication
+### Connection Flow
+1. **Mac Client** connects to relay, authenticates via Google.
+2. **Mobile App** connects to relay, authenticates via Google.
+3. **Relay Server** notifies Mobile App of available Mac devices (matching User ID).
+4. **User** selects Mac device.
+5. **Secure Handshake** ensures devices share cryptographic secrets.
+6. **WebRTC P2P** connection is established for low-latency terminal stream.
 
 ### Communication Flow
 - **P2P Mode** (preferred): Mobile ↔ Mac (direct WebRTC data channel)
 - **Relay Mode** (fallback): Mobile ↔ Relay Server ↔ Mac (Socket.IO)
 
-The relay server acts as a signaling server for WebRTC and provides fallback communication. It ONLY routes messages - it doesn't store or execute anything!
+The relay server acts as a signaling server for WebRTC and provides fallback communication. It routes encrypted messages in fallback mode.
 
 ### iOS Simulator Note
 ⚠️ **WebRTC P2P does not work in iOS Simulator** due to network isolation limitations. The app automatically falls back to relay mode. P2P works perfectly on **real iOS devices**.
@@ -270,28 +178,16 @@ The relay server acts as a signaling server for WebRTC and provides fallback com
 | **AWS EC2** | ⚠️ Free tier | Hard | Enterprise |
 | **Cloudflare Workers** | ✅ Yes | Hard | WebSocket limits |
 
-### Recommended: Railway (Easiest Free Option)
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Deploy
-cd relay-server
-railway login
-railway init
-railway up
-```
-
-Your server will be live at: `https://your-project.railway.app`
-
 ## 🔧 Environment Variables
 
 ### Relay Server (.env)
 
 ```bash
 PORT=3000
-NODE_ENV=production
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+SESSION_SECRET=...
+ALLOWED_EMAILS=... (Optional: restrict access)
 ```
 
 ### Mac Client (.env)
@@ -306,62 +202,52 @@ RELAY_SERVER_URL=https://your-relay-server.com
 
 ```bash
 cd mobile
-npx expo build:ios
+npx react-native run-ios --configuration Release
 ```
 
 ### Android
 
 ```bash
 cd mobile
-npx expo build:android
+npx react-native run-android --variant=release
 ```
 
 ## 🔐 Security Considerations
 
 **Current Implementation:**
-- ✅ Pairing codes expire after 5 minutes
-- ✅ One mobile device per Mac at a time
-- ✅ Codes are single-use
-- ❌ No encryption (use HTTPS/WSS in production!)
-- ❌ No persistent authentication
+- ✅ **Google OAuth 2.0** Authentication
+- ✅ **ECDH Key Exchange** for session security
+- ✅ **HMAC Verification** of handshake challenges
+- ✅ **One-to-One** secure binding
+- ✅ **Ephemeral Keys** (generated per session)
 
 **For Production:**
-1. **Use HTTPS/WSS** - Deploy relay server with SSL
-2. **Add encryption** - Encrypt terminal output end-to-end
-3. **Rate limiting** - Prevent pairing code brute force
-4. **Session tokens** - Add persistent authentication
-5. **Audit logging** - Log all connections and commands
+1. **Use HTTPS/WSS** - Deploy relay server with SSL (Required for production OAuth).
+2. **E2E Encryption** - Use the shared secret to encrypt the actual terminal data stream (currently handshake uses it for verification).
 
 ## 🐛 Troubleshooting
 
 ### Mac Client Won't Connect
-
 ```bash
 # Check relay server is running
 curl https://your-relay-server.com/health
-
-# Should return: {"status":"ok", ...}
 ```
 
-### Mobile App Can't Pair
-
-1. Make sure Mac client is running
-2. Check pairing code hasn't expired (5 minutes)
-3. Generate a new code
-4. Verify relay server URL is correct
+### Mobile App Can't See Mac
+1. Ensure both are logged in with the **SAME** email.
+2. Check Mac client log says `✅ Authenticated`.
+3. Pull down on the device list to refresh.
 
 ### Terminal Not Responding
-
-- Check Mac client terminal logs
-- Ensure Mac client didn't crash
-- Try disconnecting and reconnecting mobile app
+- Check Mac client terminal logs.
+- Ensure Mac client didn't crash.
+- Try disconnecting and reconnecting mobile app.
 
 ### WebRTC P2P Not Connecting
-
-- **iOS Simulator**: P2P doesn't work in simulator - use a real device
-- **Real Device**: Check that both devices are on the same network or have accessible IPs
-- **Fallback**: App automatically uses relay server if P2P fails
-- **Status**: Check mobile app status bar - shows "P2P Connected ⚡" or "Paired (Relay)"
+- **iOS Simulator**: P2P doesn't work in simulator - use a real device.
+- **Real Device**: Check that both devices are on the same network or have accessible IPs.
+- **Fallback**: App automatically uses relay server if P2P fails.
+- **Status**: Check mobile app status bar - shows "P2P Connected ⚡" or "Paired (Relay)".
 
 ## 🎯 Use Cases
 
@@ -371,18 +257,6 @@ curl https://your-relay-server.com/health
 - 🎮 **Gaming** - Start game servers remotely
 - 🤖 **Bot Commands** - Trigger builds, deployments, etc.
 
-## 🚧 Future Improvements
-
-- [ ] End-to-end encryption
-- [ ] Multiple terminal sessions
-- [ ] File upload/download
-- [ ] Command history and autocomplete
-- [ ] Terminal recording and playback
-- [ ] Biometric authentication
-- [ ] Desktop notifications
-- [ ] Custom CLI commands
-- [ ] Team/multi-user support
-
 ## 📄 API Reference
 
 ### Relay Server WebSocket Events
@@ -391,32 +265,30 @@ curl https://your-relay-server.com/health
 
 - `register` - Register device (mac or mobile)
   ```javascript
-  socket.emit('register', { type: 'mac' | 'mobile' });
+  socket.emit('register', { 
+    type: 'mac' | 'mobile', 
+    token: 'JWT...',
+    publicKey: 'hex...' 
+  });
   ```
 
-- `pair` - Pair mobile with Mac using code
+- `request_connection` - Request to connect to a peer
   ```javascript
-  socket.emit('pair', { pairingCode: '123456' });
+  socket.emit('request_connection', { targetDeviceId: '...' });
   ```
 
-- `terminal:input` - Send terminal input (mobile → mac)
+- `handshake:response` - Respond to security challenge
   ```javascript
-  socket.emit('terminal:input', 'ls -la\n');
-  ```
-
-- `terminal:output` - Send terminal output (mac → mobile)
-  ```javascript
-  socket.emit('terminal:output', 'file1.txt\nfile2.txt\n');
+  socket.emit('handshake:response', { signature: 'hex...' });
   ```
 
 #### Server → Client
 
-- `registered` - Device registered successfully
+- `authenticated` - Authentication successful
+- `handshake:initiate` - Start secure handshake
 - `paired` - Devices paired successfully
 - `terminal:output` - Receive terminal output
 - `terminal:input` - Receive terminal input
-- `paired_device_disconnected` - Paired device disconnected
-- `error` - Error occurred
 
 ## 📜 License
 
@@ -426,30 +298,14 @@ MIT
 
 Pull requests are welcome! For major changes, please open an issue first.
 
-## ❓ FAQ
-
-**Q: Does the relay server see my terminal output?**
-A: Yes, currently it relays everything. Add end-to-end encryption for privacy.
-
-**Q: Can multiple people connect to my Mac?**
-A: No, only one mobile device can pair with a Mac at a time.
-
-**Q: What happens if the relay server goes down?**
-A: Connection is lost. Both devices will auto-reconnect when it's back up.
-
-**Q: Can I use this without internet?**
-A: Yes! Run the relay server on your local network and connect to its local IP.
-
-**Q: Is this secure enough for production?**
-A: For personal use, yes. For production, add HTTPS, encryption, and authentication.
-
 ## 🎉 Credits
 
 Built with:
 - [Socket.IO](https://socket.io/) - Real-time communication
 - [node-pty](https://github.com/microsoft/node-pty) - Terminal emulation
 - [React Native](https://reactnative.dev/) - Mobile app
-- [Expo](https://expo.dev/) - React Native tooling
+- [react-native-quick-crypto](https://github.com/margelo/react-native-quick-crypto) - High performance crypto
+- [elliptic](https://github.com/indutny/elliptic) - Elliptic curve cryptography
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 
 ---

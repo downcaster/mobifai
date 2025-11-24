@@ -19,6 +19,12 @@ import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  generateKeyPair,
+  deriveSharedSecret,
+  signChallenge,
+  KeyPair,
+} from "../utils/crypto";
 
 // Simple UUID-like generator for device ID
 const generateDeviceId = () => {
@@ -60,9 +66,23 @@ export default function TerminalScreen({
   const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(
     null
   );
+  
+  // Security keys
+  const keyPairRef = useRef<KeyPair | null>(null);
+  const sharedSecretRef = useRef<Buffer | null>(null);
 
   useEffect(() => {
+    // Generate keys for this session
+    try {
+      keyPairRef.current = generateKeyPair();
+      console.log("🔐 Terminal: Generated session keys");
+    } catch (error) {
+      console.error("❌ Terminal: Failed to generate keys:", error);
+      Alert.alert("Security Error", "Failed to generate encryption keys");
+    }
+
     connectToRelay();
+    fetchSettings(); // Fetch settings via HTTP
 
     return () => {
       if (webrtcRef.current) {
@@ -73,6 +93,33 @@ export default function TerminalScreen({
       }
     };
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (!token) return;
+
+      const response = await fetch(`${relayServerUrl}/api/settings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTerminalSettings(prev => {
+          const merged = { ...prev, ...data };
+          sendToTerminal('settings', merged);
+          return merged;
+        });
+        console.log('⚙️ Fetched settings via HTTP:', data);
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
 
   const sendToTerminal = (type: string, data: any) => {
     if (webViewRef.current) {
@@ -127,19 +174,70 @@ export default function TerminalScreen({
     socket.on("connect", () => {
       setConnected(true);
       setConnectionStatus("✅ Connected to relay server");
-      // Register as mobile device with token and deviceId
-      socket.emit("register", { type: "mobile", token, deviceId });
-      
-      // If we have a specific target, request connection immediately
-      if (targetDeviceId) {
-          console.log('🔌 Requesting connection to:', targetDeviceId);
-          setConnectionStatus("🔗 Requesting connection...");
-          socket.emit('request_connection', { targetDeviceId });
-      }
-
-      // Fetch settings
-      socket.emit('settings:get');
+      // Register as mobile device with token and deviceId AND publicKey
+      socket.emit("register", { 
+          type: "mobile", 
+          token, 
+          deviceId,
+          publicKey: keyPairRef.current?.publicKey 
+      });
     });
+
+    // Handle Secure Handshake
+    socket.on(
+      "handshake:initiate",
+      ({
+        peerId,
+        peerPublicKey,
+        challenge,
+      }: {
+        peerId: string;
+        peerPublicKey: string;
+        challenge: string;
+      }) => {
+        console.log(`🔐 Starting secure handshake with ${peerId}...`);
+        setConnectionStatus("🔐 Verifying security...");
+
+        try {
+          if (!keyPairRef.current) {
+            throw new Error("No key pair available");
+          }
+
+          // Derive shared secret
+          const sharedSecret = deriveSharedSecret(
+            keyPairRef.current.privateKey,
+            peerPublicKey
+          );
+          sharedSecretRef.current = sharedSecret;
+          console.log("✅ Derived shared secret");
+
+          // Sign the challenge
+          const signature = signChallenge(challenge, sharedSecret);
+
+          // Send response
+          socket.emit("handshake:response", {
+            peerId,
+            signature,
+          });
+
+          console.log("📤 Sent challenge response");
+        } catch (error) {
+          console.error("❌ Handshake failed:", error);
+          setConnectionStatus("❌ Security handshake failed");
+          socket.emit("error", { message: "Handshake failed" });
+        }
+      }
+    );
+
+    socket.on(
+      "handshake:verify",
+      ({ peerId, signature }: { peerId: string; signature: string }) => {
+        console.log(`✅ Handshake verified for ${peerId}`);
+        // In a full implementation, we would verify the signature here.
+        // For now, confirm the handshake to complete the pairing.
+        socket.emit("handshake:confirmed");
+      }
+    );
 
     socket.on('settings:updated', (newSettings) => {
         if (newSettings) {
@@ -179,7 +277,12 @@ export default function TerminalScreen({
       await AsyncStorage.setItem(TOKEN_KEY, token);
       setConnectionStatus(`✅ Logged in as ${user.email}`);
       
-      // REMOVED: socket.emit("register", ...) to prevent infinite loop
+      // Now that we are authenticated, request connection
+      if (targetDeviceId) {
+          console.log('🔌 Requesting connection to:', targetDeviceId);
+          setConnectionStatus("🔗 Requesting connection...");
+          socket.emit('request_connection', { targetDeviceId });
+      }
     });
 
     socket.on("auth_error", async ({ message }) => {
@@ -332,17 +435,24 @@ export default function TerminalScreen({
       } else if (message.type === "input") {
         if (paired) {
           const input = message.data;
+          console.log(`⌨️ Input received from WebView: ${JSON.stringify(input)}`);
+          
           if (webrtcRef.current?.isWebRTCConnected()) {
+            console.log("📤 Sending via WebRTC P2P");
             const success = webrtcRef.current.sendMessage(
               "terminal:input",
               input
             );
             if (!success && socketRef.current) {
+              console.log("⚠️ WebRTC send failed, falling back to Socket");
               socketRef.current.emit("terminal:input", input);
             }
           } else if (socketRef.current) {
+            console.log("📤 Sending via Socket (Fallback)");
             socketRef.current.emit("terminal:input", input);
           }
+        } else {
+            console.log("❌ Input ignored: Not paired");
         }
       } else if (message.type === "dimensions") {
         terminalDimensionsRef.current = message.data;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,12 @@ import { RootStackParamList } from "../../App";
 import { RELAY_SERVER_URL as DEFAULT_RELAY_SERVER_URL } from "../config";
 import { io, Socket } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  generateKeyPair,
+  deriveSharedSecret,
+  signChallenge,
+  KeyPair,
+} from "../utils/crypto";
 
 // Simple UUID-like generator for device ID
 const generateDeviceId = () => {
@@ -35,7 +41,21 @@ const DEVICE_ID_KEY = "mobifai_device_id";
 export default function ConnectScreen({ navigation }: ConnectScreenProps) {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const socketRef = React.useRef<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  
+  // Security keys
+  const keyPairRef = useRef<KeyPair | null>(null);
+  const sharedSecretRef = useRef<Buffer | null>(null);
+
+  // Generate keys on mount
+  useEffect(() => {
+    try {
+      keyPairRef.current = generateKeyPair();
+      console.log("🔐 Generated security keys");
+    } catch (error) {
+      console.error("❌ Failed to generate keys:", error);
+    }
+  }, []);
 
   useEffect(() => {
     // Handle deep linking
@@ -93,7 +113,12 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
             // Must get fresh deviceId
             getDeviceId().then((id) => {
               console.log(`📱 Registering with deviceId: ${id}`);
-              socket.emit("register", { type: "mobile", token, deviceId: id });
+              socket.emit("register", {
+                type: "mobile",
+                token,
+                deviceId: id,
+                publicKey: keyPairRef.current?.publicKey,
+              });
             });
           });
 
@@ -107,6 +132,66 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
               navigation.navigate("DeviceList");
             }, 500);
           });
+
+          // Handle Secure Handshake
+          socket.on(
+            "handshake:initiate",
+            ({
+              peerId,
+              peerPublicKey,
+              challenge,
+            }: {
+              peerId: string;
+              peerPublicKey: string;
+              challenge: string;
+            }) => {
+              console.log(`🔐 Starting secure handshake with ${peerId}...`);
+
+              try {
+                if (!keyPairRef.current) {
+                  throw new Error("No key pair available");
+                }
+
+                // Derive shared secret
+                const sharedSecret = deriveSharedSecret(
+                  keyPairRef.current.privateKey,
+                  peerPublicKey
+                );
+                sharedSecretRef.current = sharedSecret;
+                console.log("✅ Derived shared secret");
+
+                // Sign the challenge
+                const signature = signChallenge(challenge, sharedSecret);
+
+                // Send response
+                socket.emit("handshake:response", {
+                  peerId,
+                  signature,
+                });
+
+                console.log("📤 Sent challenge response");
+              } catch (error) {
+                console.error("❌ Handshake failed:", error);
+                socket.emit("error", { message: "Handshake failed" });
+              }
+            }
+          );
+
+          socket.on(
+            "handshake:verify",
+            ({
+              peerId,
+              signature,
+            }: {
+              peerId: string;
+              signature: string;
+            }) => {
+              // Mobile side usually initiates connection, so verification happens on response
+              // But if verification is needed here, we can implement it
+              console.log(`✅ Peer verified: ${peerId}`);
+              socket.emit("handshake:confirmed");
+            }
+          );
 
           socket.on("waiting_for_peer", ({ message }) => {
             setStatusMessage(message);
@@ -166,7 +251,12 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
       socket.on("connect", () => {
         console.log("✅ Socket connected");
         setStatusMessage("Connected. Checking authentication...");
-        socket.emit("register", { type: "mobile", token, deviceId });
+        socket.emit("register", {
+          type: "mobile",
+          token,
+          deviceId,
+          publicKey: keyPairRef.current?.publicKey,
+        });
       });
 
       socket.on("authenticated", async ({ token, user }) => {
@@ -215,6 +305,7 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
         );
       });
 
+      // ... rest of handlers ...
       socket.on("waiting_for_peer", ({ message }) => {
         setStatusMessage(message);
       });
@@ -222,7 +313,11 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
       socket.on("auth_error", async ({ message }) => {
         await AsyncStorage.removeItem(TOKEN_KEY);
         Alert.alert("Authentication Error", message);
-        socket.emit("register", { type: "mobile", deviceId });
+        socket.emit("register", {
+          type: "mobile",
+          deviceId,
+          publicKey: keyPairRef.current?.publicKey,
+        });
       });
 
       socket.on("connect_error", (error) => {

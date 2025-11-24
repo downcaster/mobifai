@@ -28,3 +28,19 @@
   - `AppCard` for containers.
   - `AppView` for layout.
 - **Icons**: Use standard unicode or SVGs if needed. Avoid adding heavy icon libraries unless necessary.
+
+## TypeScript Standards (MANDATORY)
+
+- **NO `any` types allowed**: Replace ALL `any` types with proper TypeScript types
+  - Use specific interfaces, types, or `unknown` when appropriate
+  - Define proper types for function parameters, return values, and variables
+  - Use generic types (`<T>`) when needed for reusable code
+- **Type Safety**: Enable strict TypeScript checking
+  - All functions must have explicit return types
+  - All parameters must have explicit types
+  - No implicit `any` types
+- **Environment Variables**: MUST be validated at startup
+  - Use centralized config files that validate all env vars
+  - Check types (especially numbers) and throw errors if invalid
+  - No default values for critical environment variables
+  - App must not boot if required env vars are missing or invalid

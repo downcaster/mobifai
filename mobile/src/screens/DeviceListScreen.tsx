@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppView, AppText, AppButton, AppCard } from '../components/ui';
 import { spacing } from '../theme/spacing';
 import { colors } from '../theme/colors';
+import { generateKeyPair } from '../utils/crypto';
 
 type DeviceListScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DeviceList'>;
@@ -26,40 +27,76 @@ const DEVICE_ID_KEY = 'mobifai_device_id';
 export default function DeviceListScreen({ navigation }: DeviceListScreenProps) {
   const [devices, setDevices] = useState<AvailableDevice[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
+  
+  // Store session keys
+  const [keyPair, setKeyPair] = useState<{publicKey: string; privateKey: string} | null>(null);
 
   useEffect(() => {
+    let newSocket: Socket | null = null;
+
     const initSocket = async () => {
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      const deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+      try {
+        const token = await AsyncStorage.getItem(TOKEN_KEY);
+        const deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
 
-      if (!token || !deviceId) {
-        Alert.alert('Error', 'Authentication missing');
-        navigation.replace('Connect');
-        return;
+        console.log('📱 DeviceList: Initializing socket...');
+
+        if (!token || !deviceId) {
+          console.log('❌ DeviceList: Missing credentials');
+          Alert.alert('Error', 'Authentication missing');
+          navigation.replace('Connect');
+          return;
+        }
+        
+        // Generate fresh keys for this session
+        const keys = generateKeyPair();
+        setKeyPair(keys);
+        console.log('🔐 DeviceList: Generated session keys');
+
+        newSocket = io(RELAY_SERVER_URL, {
+          transports: ['websocket'],
+          auth: { token },
+          query: { deviceId, type: 'mobile' },
+          forceNew: true, // Ensure fresh connection
+        });
+
+        newSocket.on('connect', () => {
+          console.log('✅ DeviceList: Socket connected', newSocket?.id);
+          newSocket?.emit('register', { 
+              type: 'mobile', 
+              token, 
+              deviceId,
+              publicKey: keys.publicKey // <--- Sending Public Key!
+          });
+        });
+        
+        newSocket.on('error', (err) => {
+             console.error('❌ DeviceList: Server error:', err);
+             Alert.alert('Connection Error', err.message || 'Unknown error');
+        });
+
+        newSocket.on('available_devices', (availableMacs: AvailableDevice[]) => {
+          console.log('📲 DeviceList: Received devices:', JSON.stringify(availableMacs));
+          setDevices(availableMacs);
+        });
+        
+        newSocket.on('disconnect', (reason) => {
+            console.log('❌ DeviceList: Socket disconnected:', reason);
+        });
+
+        setSocket(newSocket);
+      } catch (e) {
+        console.error("❌ DeviceList: Init error", e);
       }
-
-      const newSocket = io(RELAY_SERVER_URL, {
-        transports: ['websocket'],
-        auth: { token },
-        query: { deviceId, type: 'mobile' }
-      });
-
-      newSocket.on('connect', () => {
-        console.log('✅ DeviceList connected');
-        newSocket.emit('register', { type: 'mobile', token, deviceId });
-      });
-
-      newSocket.on('available_devices', (availableMacs: AvailableDevice[]) => {
-        setDevices(availableMacs);
-      });
-
-      setSocket(newSocket);
     };
 
     initSocket();
 
     return () => {
-      socket?.disconnect();
+      console.log('🧹 DeviceList: Cleaning up socket');
+      if (newSocket) {
+        newSocket.disconnect();
+      }
     };
   }, []);
 
@@ -75,11 +112,32 @@ export default function DeviceListScreen({ navigation }: DeviceListScreenProps) 
     <AppView safeArea style={styles.container}>
       <View style={styles.header}>
         <AppText variant="h1" weight="bold">Terminals</AppText>
-        <AppButton 
-            title="⚙️ Settings" 
-            variant="ghost" 
-            onPress={() => navigation.navigate('Settings')} 
-        />
+        <View style={{flexDirection: 'row', gap: 10}}>
+            <AppButton 
+                title="🔄" 
+                variant="ghost" 
+                onPress={() => {
+                    if (socket && keyPair) {
+                        console.log('🔄 Requesting device list...');
+                        AsyncStorage.getItem(DEVICE_ID_KEY).then(did => {
+                             AsyncStorage.getItem(TOKEN_KEY).then(token => {
+                                 socket.emit('register', { 
+                                     type: 'mobile', 
+                                     token, 
+                                     deviceId: did,
+                                     publicKey: keyPair.publicKey
+                                 });
+                             });
+                        });
+                    }
+                }} 
+            />
+            <AppButton 
+                title="⚙️ Settings" 
+                variant="ghost" 
+                onPress={() => navigation.navigate('Settings')} 
+            />
+        </View>
       </View>
 
       {devices.length === 0 ? (

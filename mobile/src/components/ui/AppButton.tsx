@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, TouchableOpacityProps, ActivityIndicator, StyleSheet } from 'react-native';
+import { TouchableOpacity, TouchableOpacityProps, ActivityIndicator, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { AppText } from './AppText';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -8,7 +8,7 @@ export interface AppButtonProps extends TouchableOpacityProps {
   title: string;
   loading?: boolean;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   className?: string;
 }
 

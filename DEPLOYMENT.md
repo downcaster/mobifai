@@ -20,7 +20,7 @@ Since Render's free database expires after 30 days, we'll use Neon for a persist
     ```
     postgres://user:password@ep-cool-frog-123456.us-east-2.aws.neon.tech/neondb?sslmode=require
     ```
-    *Keep this safe, you will need it for the `DATABASE_URL` environment variable.*
+    _Keep this safe, you will need it for the `DATABASE_URL` environment variable._
 
 ---
 
@@ -30,28 +30,29 @@ Since Render's free database expires after 30 days, we'll use Neon for a persist
 2.  Click **New +** -> **Web Service**.
 3.  Connect your GitHub repository `mobifai`.
 4.  Configure the service:
-    *   **Name**: `mobifai-relay` (or similar)
-    *   **Region**: Choose one close to you (e.g., Frankfurt/London for EU).
-    *   **Branch**: `master`
-    *   **Root Directory**: `relay-server` (Important! This tells Render the app is in this subfolder).
-    *   **Runtime**: `Node`
-    *   **Build Command**: `npm install && npm run build`
-        *   *Note: We added a `postinstall` script to run `prisma generate` automatically.*
-    *   **Start Command**: `npm start`
-    *   **Instance Type**: `Free`
+
+    - **Name**: `mobifai-relay` (or similar)
+    - **Region**: Choose one close to you (e.g., Frankfurt/London for EU).
+    - **Branch**: `master`
+    - **Root Directory**: `relay-server` (Important! This tells Render the app is in this subfolder).
+    - **Runtime**: `Node`
+    - **Build Command**: `npm install && npm run build`
+      - _Note: We added a `postinstall` script to run `prisma generate` automatically._
+    - **Start Command**: `npm start`
+    - **Instance Type**: `Free`
 
 5.  **Environment Variables**:
     Scroll down to "Environment Variables" and add the following:
 
-    | Key | Value |
-    | --- | --- |
-    | `NODE_ENV` | `production` |
-    | `DATABASE_URL` | *(Paste your Neon connection string here)* |
-    | `JWT_SECRET` | *(Generate a random string, e.g. `openssl rand -hex 32`)* |
-    | `GOOGLE_CLIENT_ID` | *(Your Google Client ID)* |
-    | `GOOGLE_CLIENT_SECRET` | *(Your Google Client Secret)* |
-    | `GOOGLE_CALLBACK_URL` | `https://<YOUR-RENDER-APP-NAME>.onrender.com/auth/google/callback` |
-    | `CORS_ORIGIN` | `*` (or specific client URL if needed) |
+    | Key                    | Value                                                              |
+    | ---------------------- | ------------------------------------------------------------------ |
+    | `NODE_ENV`             | `production`                                                       |
+    | `DATABASE_URL`         | _(Paste your Neon connection string here)_                         |
+    | `JWT_SECRET`           | _(Generate a random string, e.g. `openssl rand -hex 32`)_          |
+    | `GOOGLE_CLIENT_ID`     | _(Your Google Client ID)_                                          |
+    | `GOOGLE_CLIENT_SECRET` | _(Your Google Client Secret)_                                      |
+    | `SERVER_URL`           | `https://<YOUR-RENDER-APP-NAME>.onrender.com`                      |
+    | `CORS_ORIGIN`          | `*` (or specific client URL if needed)                             |
 
 6.  Click **Create Web Service**.
 
@@ -65,6 +66,7 @@ Once "Live", your server URL will be: `https://<YOUR-RENDER-APP-NAME>.onrender.c
 Your remote database is empty. You need to push your schema to it.
 
 **Option A: Run migration from your local machine (Easiest)**
+
 1.  In your local project, go to `relay-server`.
 2.  Create a `.env.production` file (or just temporarily export the variable) with the Neon connection string:
     ```bash
@@ -78,7 +80,7 @@ Your remote database is empty. You need to push your schema to it.
 **Option B: Add a Build Script**
 Update the Build Command in Render to:
 `npm install && npm run build && npx prisma db push`
-*(Note: `db push` is okay for prototypes, but for production `migrate deploy` is safer).*
+_(Note: `db push` is okay for prototypes, but for production `migrate deploy` is safer)._
 
 ---
 
@@ -102,16 +104,21 @@ Your Google OAuth is currently configured for `localhost` or `nip.io`. You need 
 Now that the server is live, update your clients to point to it.
 
 ### Mac Client (`mac-client/.env`)
+
 ```bash
 RELAY_SERVER_URL=https://<YOUR-RENDER-APP-NAME>.onrender.com
 ```
-*Restart Mac Client.*
+
+_Restart Mac Client._
 
 ### Mobile App (`mobile/.env`)
+
 ```bash
 RELAY_SERVER_URL=https://<YOUR-RENDER-APP-NAME>.onrender.com
 ```
-*Rebuild Mobile App:*
+
+_Rebuild Mobile App:_
+
 ```bash
 cd mobile
 npx react-native run-ios
@@ -121,6 +128,6 @@ npx react-native run-ios
 
 ## 6. Important Notes on Free Tier
 
-*   **Spin Down:** Render's free tier sleeps after 15 minutes of inactivity.
-    *   *Symptom:* When you open the mobile app after a break, it might take **45-60 seconds** to connect while the server wakes up.
-    *   *Solution:* Be patient on the first connect, or upgrade to the $7/mo Starter plan for "Always On".
+- **Spin Down:** Render's free tier sleeps after 15 minutes of inactivity.
+  - _Symptom:_ When you open the mobile app after a break, it might take **45-60 seconds** to connect while the server wakes up.
+  - _Solution:_ Be patient on the first connect, or upgrade to the $7/mo Starter plan for "Always On".

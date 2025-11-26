@@ -501,9 +501,9 @@ function connectToRelay() {
   // Fallback IO - Accept from socket even if WebRTC is active (Mobile decides routing)
   socket.on("terminal:input", (data: string) => {
     if (terminal) {
-        // Optional: Debug log
-        // console.log('Received input via socket'); 
-        terminal.write(data);
+      // Optional: Debug log
+      // console.log('Received input via socket');
+      terminal.write(data);
     }
   });
 

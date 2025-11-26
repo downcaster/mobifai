@@ -44,15 +44,15 @@ Since Render's free database expires after 30 days, we'll use Neon for a persist
 5.  **Environment Variables**:
     Scroll down to "Environment Variables" and add the following:
 
-    | Key                    | Value                                                              |
-    | ---------------------- | ------------------------------------------------------------------ |
-    | `NODE_ENV`             | `production`                                                       |
-    | `DATABASE_URL`         | _(Paste your Neon connection string here)_                         |
-    | `JWT_SECRET`           | _(Generate a random string, e.g. `openssl rand -hex 32`)_          |
-    | `GOOGLE_CLIENT_ID`     | _(Your Google Client ID)_                                          |
-    | `GOOGLE_CLIENT_SECRET` | _(Your Google Client Secret)_                                      |
-    | `SERVER_URL`           | `https://<YOUR-RENDER-APP-NAME>.onrender.com`                      |
-    | `CORS_ORIGIN`          | `*` (or specific client URL if needed)                             |
+    | Key                    | Value                                                     |
+    | ---------------------- | --------------------------------------------------------- |
+    | `NODE_ENV`             | `production`                                              |
+    | `DATABASE_URL`         | _(Paste your Neon connection string here)_                |
+    | `JWT_SECRET`           | _(Generate a random string, e.g. `openssl rand -hex 32`)_ |
+    | `GOOGLE_CLIENT_ID`     | _(Your Google Client ID)_                                 |
+    | `GOOGLE_CLIENT_SECRET` | _(Your Google Client Secret)_                             |
+    | `SERVER_URL`           | `https://<YOUR-RENDER-APP-NAME>.onrender.com`             |
+    | `CORS_ORIGIN`          | `*` (or specific client URL if needed)                    |
 
 6.  Click **Create Web Service**.
 

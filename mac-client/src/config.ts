@@ -9,11 +9,14 @@ import dotenv from "dotenv";
 import path from "path";
 
 // Select environment file
-const envFile = process.env.APP_ENV === "production" ? ".env.production" : ".env";
+const envFile =
+  process.env.APP_ENV === "production" ? ".env.production" : ".env";
 const result = dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 if (result.error && process.env.APP_ENV === "production") {
-  console.warn(`⚠️  Warning: .env.production not found, falling back to process.env`);
+  console.warn(
+    `⚠️  Warning: .env.production not found, falling back to process.env`
+  );
 }
 
 console.log(`🖥️  Mac Client Config: Loading ${envFile}`);

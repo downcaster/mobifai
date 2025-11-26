@@ -96,6 +96,19 @@ npm run build
 npm start
 ```
 
+#### Database Migration
+
+For initial setup or rapid prototyping, we use `db push` (as configured in the Render build command).
+
+For strictly managed production environments, it is recommended to use:
+```bash
+npx prisma migrate deploy
+```
+This ensures safe schema evolution without data loss.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for a comprehensive production deployment guide.
+
+
 ### 2. Start Mac Client
 
 ```bash

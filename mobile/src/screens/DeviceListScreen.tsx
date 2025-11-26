@@ -75,6 +75,18 @@ export default function DeviceListScreen({ navigation }: DeviceListScreenProps) 
              Alert.alert('Connection Error', err.message || 'Unknown error');
         });
 
+        newSocket.on('auth_error', async (err: { message: string }) => {
+             console.error('❌ DeviceList: Auth error:', err);
+             Alert.alert('Session Expired', 'Your session has expired. Please sign in again.');
+             await AsyncStorage.removeItem(TOKEN_KEY);
+             // navigation.replace might not be enough if stack logic differs, but usually it works.
+             // Resetting navigation is safer to clear history.
+             navigation.reset({
+               index: 0,
+               routes: [{ name: 'Connect' }],
+             });
+        });
+
         newSocket.on('available_devices', (availableMacs: AvailableDevice[]) => {
           console.log('📲 DeviceList: Received devices:', JSON.stringify(availableMacs));
           setDevices(availableMacs);

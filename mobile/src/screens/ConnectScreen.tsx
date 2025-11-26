@@ -74,7 +74,8 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
 
           const params: Record<string, string> = {};
           queryString.split("&").forEach((param) => {
-            const [key, value] = param.split("=");
+            const [key, ...values] = param.split("=");
+            const value = values.join("=");
             if (key && value) params[key] = decodeURIComponent(value);
           });
 

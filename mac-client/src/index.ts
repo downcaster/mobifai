@@ -339,7 +339,12 @@ function connectToRelay() {
       fs.unlinkSync(TOKEN_FILE);
     }
     // Will trigger login_required on next register attempt
-    socket.emit("register", { type: "mac", deviceId });
+    socket.emit("register", {
+      type: "mac",
+      deviceId,
+      deviceName: os.hostname(),
+      publicKey: keyPair.publicKey,
+    });
   });
 
   // Store terminal dimensions from mobile

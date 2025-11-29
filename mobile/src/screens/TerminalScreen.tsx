@@ -21,7 +21,7 @@ import { RootStackParamList } from "../../App";
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   generateKeyPair,
   deriveSharedSecret,
@@ -31,9 +31,9 @@ import {
 
 // Simple UUID-like generator for device ID
 const generateDeviceId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
@@ -43,8 +43,8 @@ type TerminalScreenProps = {
   route: RouteProp<RootStackParamList, "Terminal">;
 };
 
-const TOKEN_KEY = 'mobifai_auth_token';
-const DEVICE_ID_KEY = 'mobifai_device_id';
+const TOKEN_KEY = "mobifai_auth_token";
+const DEVICE_ID_KEY = "mobifai_device_id";
 
 export default function TerminalScreen({
   navigation,
@@ -58,24 +58,24 @@ export default function TerminalScreen({
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [terminalSettings, setTerminalSettings] = useState({
-    theme: 'dark',
+    theme: "dark",
     fontSize: 14,
-    cursorStyle: 'block',
-    fontFamily: 'monospace'
+    cursorStyle: "block",
+    fontFamily: "monospace",
   });
-  
+
   // AI Prompt state
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiProcessing, setAiProcessing] = useState(false);
-  
+
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
   const webrtcRef = useRef<WebRTCService | null>(null);
   const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(
     null
   );
-  
+
   // Security keys
   const keyPairRef = useRef<KeyPair | null>(null);
   const sharedSecretRef = useRef<Buffer | null>(null);
@@ -109,24 +109,24 @@ export default function TerminalScreen({
       if (!token) return;
 
       const response = await fetch(`${relayServerUrl}/api/settings`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setTerminalSettings(prev => {
+        setTerminalSettings((prev) => {
           const merged = { ...prev, ...data };
-          sendToTerminal('settings', merged);
+          sendToTerminal("settings", merged);
           return merged;
         });
-        console.log('⚙️ Fetched settings via HTTP:', data);
+        console.log("⚙️ Fetched settings via HTTP:", data);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error("Error fetching settings:", error);
     }
   };
 
@@ -138,7 +138,7 @@ export default function TerminalScreen({
 
   const handleRefreshDimensions = () => {
     sendToTerminal("fit", {});
-    
+
     if (terminalDimensionsRef.current && paired && socketRef.current) {
       console.log(
         "📐 Manually refreshing dimensions:",
@@ -165,7 +165,7 @@ export default function TerminalScreen({
 
     console.log("🤖 Sending AI prompt:", aiPrompt);
     setAiProcessing(true);
-    
+
     const promptData = { prompt: aiPrompt.trim() };
 
     // Send via WebRTC if connected, otherwise use Socket
@@ -190,7 +190,7 @@ export default function TerminalScreen({
     // Close modal and reset
     setAiModalVisible(false);
     setAiPrompt("");
-    
+
     // Reset processing state after a delay (the Mac client will handle the actual processing)
     setTimeout(() => setAiProcessing(false), 2000);
   };
@@ -227,11 +227,11 @@ export default function TerminalScreen({
       setConnected(true);
       setConnectionStatus("✅ Connected to relay server");
       // Register as mobile device with token and deviceId AND publicKey
-      socket.emit("register", { 
-          type: "mobile", 
-          token, 
-          deviceId,
-          publicKey: keyPairRef.current?.publicKey 
+      socket.emit("register", {
+        type: "mobile",
+        token,
+        deviceId,
+        publicKey: keyPairRef.current?.publicKey,
       });
     });
 
@@ -291,19 +291,21 @@ export default function TerminalScreen({
       }
     );
 
-    socket.on('settings:updated', (newSettings) => {
-        if (newSettings) {
-            console.log('⚙️ Received settings update:', newSettings);
-            setTerminalSettings(prev => {
-                const merged = { ...prev, ...newSettings };
-                sendToTerminal('settings', merged);
-                return merged;
-            });
-        }
+    socket.on("settings:updated", (newSettings) => {
+      if (newSettings) {
+        console.log("⚙️ Received settings update:", newSettings);
+        setTerminalSettings((prev) => {
+          const merged = { ...prev, ...newSettings };
+          sendToTerminal("settings", merged);
+          return merged;
+        });
+      }
     });
 
     socket.on("login_required", ({ loginUrl }) => {
-      setConnectionStatus("🔒 Authentication Required\nPlease log in via browser");
+      setConnectionStatus(
+        "🔒 Authentication Required\nPlease log in via browser"
+      );
       Alert.alert(
         "Authentication Required",
         "You need to log in with Google to connect.",
@@ -311,15 +313,15 @@ export default function TerminalScreen({
           {
             text: "Log In",
             onPress: () => {
-               const fullUrl = `${relayServerUrl}${loginUrl}`;
-               Linking.openURL(fullUrl);
-            }
+              const fullUrl = `${relayServerUrl}${loginUrl}`;
+              Linking.openURL(fullUrl);
+            },
           },
           {
             text: "Cancel",
             style: "cancel",
-            onPress: () => navigation.goBack()
-          }
+            onPress: () => navigation.goBack(),
+          },
         ]
       );
     });
@@ -328,12 +330,12 @@ export default function TerminalScreen({
       console.log(`✅ Authenticated as ${user.email}`);
       await AsyncStorage.setItem(TOKEN_KEY, token);
       setConnectionStatus(`✅ Logged in as ${user.email}`);
-      
+
       // Now that we are authenticated, request connection
       if (targetDeviceId) {
-          console.log('🔌 Requesting connection to:', targetDeviceId);
-          setConnectionStatus("🔗 Requesting connection...");
-          socket.emit('request_connection', { targetDeviceId });
+        console.log("🔌 Requesting connection to:", targetDeviceId);
+        setConnectionStatus("🔗 Requesting connection...");
+        socket.emit("request_connection", { targetDeviceId });
       }
     });
 
@@ -349,8 +351,8 @@ export default function TerminalScreen({
     });
 
     socket.on("available_devices", () => {
-       // Terminal screen received list update - peer might have disconnected/reconnected
-       // We could potentially check if our target is still there, but for now ignore
+      // Terminal screen received list update - peer might have disconnected/reconnected
+      // We could potentially check if our target is still there, but for now ignore
     });
 
     socket.on("paired", ({ message }) => {
@@ -389,7 +391,21 @@ export default function TerminalScreen({
       if (data.type === "terminal_ready") {
         console.log("✅ Terminal ready on Mac side");
         setTerminalReady(true);
-        setConnectionStatus(""); 
+        setConnectionStatus("");
+
+        // Send terminal dimensions to Mac client now that it's ready
+        if (terminalDimensionsRef.current) {
+          console.log(
+            "📐 Sending initial dimensions to Mac:",
+            terminalDimensionsRef.current
+          );
+          socket.emit("terminal:dimensions", terminalDimensionsRef.current);
+          socket.emit("terminal:resize", terminalDimensionsRef.current);
+        } else {
+          // Request dimensions from WebView if not yet available
+          console.log("📐 Requesting dimensions from terminal WebView");
+          sendToTerminal("fit", {});
+        }
       }
     });
 
@@ -474,7 +490,7 @@ export default function TerminalScreen({
         terminalDimensionsRef.current = message.data;
 
         // Send current settings
-        sendToTerminal('settings', terminalSettings);
+        sendToTerminal("settings", terminalSettings);
 
         if (paired && socketRef.current) {
           console.log("📤 Sending terminal dimensions:", message.data);
@@ -487,8 +503,10 @@ export default function TerminalScreen({
       } else if (message.type === "input") {
         if (paired) {
           const input = message.data;
-          console.log(`⌨️ Input received from WebView: ${JSON.stringify(input)}`);
-          
+          console.log(
+            `⌨️ Input received from WebView: ${JSON.stringify(input)}`
+          );
+
           if (webrtcRef.current?.isWebRTCConnected()) {
             console.log("📤 Sending via WebRTC P2P");
             const success = webrtcRef.current.sendMessage(
@@ -504,7 +522,7 @@ export default function TerminalScreen({
             socketRef.current.emit("terminal:input", input);
           }
         } else {
-            console.log("❌ Input ignored: Not paired");
+          console.log("❌ Input ignored: Not paired");
         }
       } else if (message.type === "dimensions") {
         terminalDimensionsRef.current = message.data;
@@ -792,7 +810,10 @@ export default function TerminalScreen({
       keyboardVerticalOffset={100}
     >
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      <SafeAreaView edges={['top']} style={{ backgroundColor: "rgba(17, 17, 17, 0.9)" }}>
+      <SafeAreaView
+        edges={["top"]}
+        style={{ backgroundColor: "rgba(17, 17, 17, 0.9)" }}
+      >
         <View style={styles.statusBar}>
           <TouchableOpacity
             style={styles.backButton}
@@ -820,7 +841,10 @@ export default function TerminalScreen({
 
           <View style={styles.rightButtons}>
             <TouchableOpacity
-              style={[styles.aiButton, (!paired || aiProcessing) && styles.buttonDisabled]}
+              style={[
+                styles.aiButton,
+                (!paired || aiProcessing) && styles.buttonDisabled,
+              ]}
               onPress={() => setAiModalVisible(true)}
               disabled={!paired || aiProcessing}
             >
@@ -885,7 +909,7 @@ export default function TerminalScreen({
             <Text style={styles.modalSubtitle}>
               Describe what you want to do in the terminal
             </Text>
-            
+
             <TextInput
               style={styles.modalInput}
               placeholder="e.g., 'Open vim and write hello world'"
@@ -897,7 +921,7 @@ export default function TerminalScreen({
               autoFocus={true}
               textAlignVertical="top"
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
@@ -908,7 +932,7 @@ export default function TerminalScreen({
               >
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[
                   styles.modalSubmitButton,

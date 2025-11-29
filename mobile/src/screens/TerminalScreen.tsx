@@ -9,6 +9,9 @@ import {
   KeyboardAvoidingView,
   Linking,
   StatusBar,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
@@ -60,6 +63,12 @@ export default function TerminalScreen({
     cursorStyle: 'block',
     fontFamily: 'monospace'
   });
+  
+  // AI Prompt state
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiProcessing, setAiProcessing] = useState(false);
+  
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
   const webrtcRef = useRef<WebRTCService | null>(null);
@@ -141,6 +150,49 @@ export default function TerminalScreen({
       );
       socketRef.current.emit("terminal:resize", terminalDimensionsRef.current);
     }
+  };
+
+  const handleAiPromptSubmit = () => {
+    if (!aiPrompt.trim()) {
+      Alert.alert("Error", "Please enter a prompt");
+      return;
+    }
+
+    if (!paired) {
+      Alert.alert("Error", "Not connected to Mac client");
+      return;
+    }
+
+    console.log("🤖 Sending AI prompt:", aiPrompt);
+    setAiProcessing(true);
+    
+    const promptData = { prompt: aiPrompt.trim() };
+
+    // Send via WebRTC if connected, otherwise use Socket
+    if (webrtcRef.current?.isWebRTCConnected()) {
+      console.log("📤 Sending AI prompt via WebRTC P2P");
+      const success = webrtcRef.current.sendMessage("ai:prompt", promptData);
+      if (!success && socketRef.current) {
+        console.log("⚠️ WebRTC send failed, falling back to Socket");
+        socketRef.current.emit("ai:prompt", promptData);
+      }
+    } else if (socketRef.current) {
+      console.log("📤 Sending AI prompt via Socket");
+      socketRef.current.emit("ai:prompt", promptData);
+    }
+
+    // Show feedback in terminal
+    sendToTerminal(
+      "output",
+      `\r\n\x1b[36m🤖 AI Processing: "${aiPrompt.trim()}"\x1b[0m\r\n`
+    );
+
+    // Close modal and reset
+    setAiModalVisible(false);
+    setAiPrompt("");
+    
+    // Reset processing state after a delay (the Mac client will handle the actual processing)
+    setTimeout(() => setAiProcessing(false), 2000);
   };
 
   const getDeviceId = async () => {
@@ -768,6 +820,17 @@ export default function TerminalScreen({
 
           <View style={styles.rightButtons}>
             <TouchableOpacity
+              style={[styles.aiButton, (!paired || aiProcessing) && styles.buttonDisabled]}
+              onPress={() => setAiModalVisible(true)}
+              disabled={!paired || aiProcessing}
+            >
+              {aiProcessing ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <Text style={styles.aiButtonText}>AI</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.refreshButton}
               onPress={handleRefreshDimensions}
             >
@@ -808,6 +871,58 @@ export default function TerminalScreen({
         }}
         hideKeyboardAccessoryView={true}
       />
+
+      {/* AI Prompt Modal */}
+      <Modal
+        visible={aiModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAiModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>AI Assistant</Text>
+            <Text style={styles.modalSubtitle}>
+              Describe what you want to do in the terminal
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., 'Open vim and write hello world'"
+              placeholderTextColor="#666"
+              value={aiPrompt}
+              onChangeText={setAiPrompt}
+              multiline={true}
+              numberOfLines={4}
+              autoFocus={true}
+              textAlignVertical="top"
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setAiModalVisible(false);
+                  setAiPrompt("");
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitButton,
+                  !aiPrompt.trim() && styles.buttonDisabled,
+                ]}
+                onPress={handleAiPromptSubmit}
+                disabled={!aiPrompt.trim()}
+              >
+                <Text style={styles.modalSubmitButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -899,8 +1014,97 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginLeft: 2,
   },
+  aiButton: {
+    backgroundColor: "#00ffff",
+    width: 28,
+    height: 22,
+    borderRadius: 2,
+    marginLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  aiButtonText: {
+    color: "#000",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
   webview: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  // AI Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: "#0f0",
+  },
+  modalTitle: {
+    color: "#0f0",
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 8,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  modalSubtitle: {
+    color: "#888",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: "#000",
+    borderWidth: 1,
+    borderColor: "#333",
+    borderRadius: 8,
+    padding: 12,
+    color: "#fff",
+    fontSize: 16,
+    minHeight: 100,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: "#333",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalCancelButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalSubmitButton: {
+    flex: 1,
+    backgroundColor: "#0f0",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalSubmitButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

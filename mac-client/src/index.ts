@@ -17,6 +17,7 @@ import {
   verifyChallenge,
   KeyPair,
 } from "./crypto.js";
+import { getAIService, AIPromptPayload } from "./ai/index.js";
 
 const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = wrtc;
 
@@ -144,6 +145,11 @@ async function setupWebRTC() {
               `Terminal resized to ${message.payload.cols}x${message.payload.rows}`
             )
           );
+        } else if (message.type === "ai:prompt") {
+          // Handle AI prompt via WebRTC
+          const payload = message.payload as AIPromptPayload;
+          console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${payload.prompt}"`));
+          handleAIPrompt(payload.prompt);
         }
       } catch (error) {
         // Ignore parsing errors
@@ -211,6 +217,43 @@ function getDeviceId(): string {
   const newId = uuidv4();
   fs.writeFileSync(DEVICE_ID_FILE, newId);
   return newId;
+}
+
+/**
+ * Handle AI prompt from mobile client
+ */
+async function handleAIPrompt(prompt: string): Promise<void> {
+  if (!terminal) {
+    console.log(chalk.red("❌ Cannot process AI prompt - terminal not initialized"));
+    return;
+  }
+
+  const aiService = getAIService();
+  
+  // Ensure AI service has the terminal reference
+  aiService.setTerminal(terminal);
+
+  try {
+    await aiService.handlePrompt(prompt, {
+      onActionStart: (action) => {
+        // Log action start
+      },
+      onActionComplete: (action) => {
+        // Log action complete
+      },
+      onTurnComplete: (turnNumber) => {
+        console.log(chalk.gray(`  Turn ${turnNumber} complete`));
+      },
+      onComplete: () => {
+        console.log(chalk.bold.green("\n✅ AI task completed"));
+      },
+      onError: (error) => {
+        console.error(chalk.red("\n❌ AI task failed:"), error.message);
+      },
+    });
+  } catch (error) {
+    console.error(chalk.red("❌ AI prompt handling error:"), error);
+  }
 }
 
 function connectToRelay() {
@@ -356,6 +399,8 @@ function connectToRelay() {
     terminalCols = cols;
     terminalRows = rows;
     if (terminal) terminal.resize(cols, rows);
+    // Update AI service dimensions
+    getAIService().setDimensions(cols, rows);
   });
 
   socket.on("request_dimensions", () => {
@@ -510,6 +555,12 @@ function connectToRelay() {
   socket.on("terminal:resize", ({ cols, rows }) => {
     if (terminal) terminal.resize(cols, rows);
   });
+
+  // Handle AI prompt via Socket
+  socket.on("ai:prompt", (data: AIPromptPayload) => {
+    console.log(chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`));
+    handleAIPrompt(data.prompt);
+  });
 }
 
 function startTerminal(cols: number, rows: number, socketConnection: Socket) {
@@ -532,6 +583,12 @@ function startTerminal(cols: number, rows: number, socketConnection: Socket) {
     cwd: process.env.HOME || process.cwd(),
     env: env as any,
   });
+
+  // Initialize AI service with terminal
+  const aiService = getAIService();
+  aiService.setTerminal(terminal);
+  aiService.setDimensions(cols, rows);
+  console.log(chalk.gray("🤖 AI service initialized"));
 
   // Setup initial output
   let initBuffer = "";
@@ -570,6 +627,9 @@ function startTerminal(cols: number, rows: number, socketConnection: Socket) {
 
     // Main data listener
     terminal.onData((data) => {
+      // Update AI service screen buffer
+      getAIService().updateScreenBuffer(data);
+      
       if (isWebRTCConnected && dataChannel?.readyState === "open") {
         try {
           dataChannel.send(

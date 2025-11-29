@@ -3,11 +3,33 @@
  * 
  * Create a .env file with all required variables.
  * See .env.example for reference.
+ * 
+ * Always loads .env first, then .env.production overrides in production mode.
+ * This ensures keys defined in .env but not in .env.production are still available.
  */
 
 import dotenv from "dotenv";
+import path from "path";
 
-dotenv.config();
+const isProduction = process.env.NODE_ENV === "production";
+
+// Always load .env first as base configuration
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+
+// In production, override with .env.production values
+if (isProduction) {
+  const prodResult = dotenv.config({
+    path: path.resolve(process.cwd(), ".env.production"),
+    override: true,
+  });
+  if (prodResult.error) {
+    console.warn(
+      `⚠️  Warning: .env.production not found, using .env values only`
+    );
+  }
+}
+
+console.log(`🔄 Relay Server Config: ${isProduction ? "Production" : "Development"} mode`);
 
 // Get required values
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;

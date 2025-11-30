@@ -81,6 +81,7 @@ export default function TerminalScreen({
   const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(null);
   const activeProcessUuidRef = useRef<string | null>(null); // Ref to avoid stale closures
   const processCounterRef = useRef(0);
+  const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(new Set());
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -153,6 +154,9 @@ export default function TerminalScreen({
     setActiveProcessUuid(uuid);
     activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
 
+    // Show loading spinner for this process while terminal initializes
+    setLoadingProcesses((prev) => new Set(prev).add(uuid));
+
     // Send create command to Mac
     const payload: ProcessCreatePayload = {
       uuid,
@@ -163,6 +167,15 @@ export default function TerminalScreen({
 
     // Clear terminal for new process
     sendToTerminal("clear", {});
+
+    // Hide loading spinner after shell initialization completes
+    setTimeout(() => {
+      setLoadingProcesses((prev) => {
+        const next = new Set(prev);
+        next.delete(uuid);
+        return next;
+      });
+    }, 800);
 
     return uuid;
   }, [paired, sendToMac]);
@@ -1286,31 +1299,40 @@ export default function TerminalScreen({
       </SafeAreaView>
 
       {processes.length > 0 ? (
-        <WebView
-          ref={webViewRef}
-          source={{ html: terminalHtml }}
-          style={styles.webview}
-          onMessage={handleWebViewMessage}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          scrollEnabled={true}
-          showsVerticalScrollIndicator={true}
-          showsHorizontalScrollIndicator={false}
-          keyboardDisplayRequiresUserAction={false}
-          originWhitelist={["*"]}
-          mixedContentMode="always"
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error("WebView error:", nativeEvent);
-          }}
-          onHttpError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error("WebView HTTP error:", nativeEvent);
-          }}
-          hideKeyboardAccessoryView={true}
-        />
+        <View style={styles.terminalContainer}>
+          <WebView
+            ref={webViewRef}
+            source={{ html: terminalHtml }}
+            style={styles.webview}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={true}
+            showsVerticalScrollIndicator={true}
+            showsHorizontalScrollIndicator={false}
+            keyboardDisplayRequiresUserAction={false}
+            originWhitelist={["*"]}
+            mixedContentMode="always"
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error("WebView error:", nativeEvent);
+            }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error("WebView HTTP error:", nativeEvent);
+            }}
+            hideKeyboardAccessoryView={true}
+          />
+          {/* Loading overlay while terminal initializes - only show for active process */}
+          {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
+            <View style={styles.terminalLoadingOverlay}>
+              <ActivityIndicator size="small" color="#0f0" />
+              <Text style={styles.terminalLoadingText}>Starting terminal...</Text>
+            </View>
+          )}
+        </View>
       ) : (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateIcon}>⌨️</Text>
@@ -1619,9 +1641,29 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     lineHeight: 18,
   },
+  terminalContainer: {
+    flex: 1,
+    position: "relative",
+  },
   webview: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  terminalLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  terminalLoadingText: {
+    color: "#0f0",
+    fontSize: 14,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginTop: 16,
   },
   // AI Toast Notification
   aiToast: {

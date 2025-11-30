@@ -1404,7 +1404,7 @@ export default function TerminalScreen({
       ) : !paired ? (
         // Show connecting state before pairing is complete
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="large" color="#0f0" />
+          <ActivityIndicator size="small" color="#0f0" />
           <Text style={styles.syncingTitle}>Connecting to Mac...</Text>
           <Text style={styles.syncingSubtitle}>
             Establishing secure connection
@@ -1413,7 +1413,7 @@ export default function TerminalScreen({
       ) : syncingTabs ? (
         // Show loading state while waiting for tabs to sync from Mac
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="large" color="#0f0" />
+          <ActivityIndicator size="small" color="#0f0" />
           <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
           <Text style={styles.syncingSubtitle}>
             Loading your terminals from Mac

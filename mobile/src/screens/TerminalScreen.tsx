@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   TextInput,
   ActivityIndicator,
   Animated,
+  ScrollView,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
@@ -29,9 +30,19 @@ import {
   signChallenge,
   KeyPair,
 } from "../utils/crypto";
+import {
+  TerminalProcess,
+  ProcessCreatePayload,
+  ProcessTerminatePayload,
+  ProcessSwitchPayload,
+  TerminalInputPayload,
+  TerminalOutputPayload,
+  ProcessScreenPayload,
+  ProcessExitedPayload,
+} from "../types/process";
 
-// Simple UUID-like generator for device ID
-const generateDeviceId = () => {
+// UUID generator for process IDs
+const generateUUID = (): string => {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -65,6 +76,17 @@ export default function TerminalScreen({
     fontFamily: "monospace",
   });
 
+  // Process management state
+  const [processes, setProcesses] = useState<TerminalProcess[]>([]);
+  const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(null);
+  const activeProcessUuidRef = useRef<string | null>(null); // Ref to avoid stale closures
+  const processCounterRef = useRef(0);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeProcessUuidRef.current = activeProcessUuid;
+  }, [activeProcessUuid]);
+
   // AI Prompt state
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -79,10 +101,125 @@ export default function TerminalScreen({
   const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(
     null
   );
+  const firstProcessCreatedRef = useRef(false);
 
   // Security keys
   const keyPairRef = useRef<KeyPair | null>(null);
   const sharedSecretRef = useRef<Buffer | null>(null);
+
+  /**
+   * Send a message to the Mac client via WebRTC or Socket fallback
+   */
+  const sendToMac = useCallback((type: string, payload: unknown): boolean => {
+    if (webrtcRef.current?.isWebRTCConnected()) {
+      const success = webrtcRef.current.sendMessage(type, payload);
+      if (!success && socketRef.current) {
+        socketRef.current.emit(type, payload);
+      }
+      return success;
+    } else if (socketRef.current) {
+      socketRef.current.emit(type, payload);
+      return true;
+    }
+    return false;
+  }, []);
+
+  /**
+   * Create a new process
+   */
+  const createProcess = useCallback((): string | null => {
+    if (!paired) {
+      console.log("❌ Cannot create process: not paired");
+      return null;
+    }
+
+    // Mark that a process has been created (prevents auto-create from triggering)
+    firstProcessCreatedRef.current = true;
+
+    const uuid = generateUUID();
+    processCounterRef.current += 1;
+    const label = `Tab ${processCounterRef.current}`;
+
+    console.log(`📱 Creating process: ${uuid.substring(0, 8)} (${label})`);
+
+    const newProcess: TerminalProcess = {
+      uuid,
+      createdAt: Date.now(),
+      label,
+    };
+
+    // Add to local state immediately
+    setProcesses((prev) => [...prev, newProcess]);
+    setActiveProcessUuid(uuid);
+    activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
+
+    // Send create command to Mac
+    const payload: ProcessCreatePayload = {
+      uuid,
+      cols: terminalDimensionsRef.current?.cols,
+      rows: terminalDimensionsRef.current?.rows,
+    };
+    sendToMac("process:create", payload);
+
+    // Clear terminal for new process
+    sendToTerminal("clear", {});
+
+    return uuid;
+  }, [paired, sendToMac]);
+
+  /**
+   * Terminate a process
+   */
+  const terminateProcess = useCallback((uuid: string) => {
+    console.log(`📱 Terminating process: ${uuid.substring(0, 8)}`);
+
+    // Send terminate command to Mac
+    const payload: ProcessTerminatePayload = { uuid };
+    sendToMac("process:terminate", payload);
+
+    // Remove from local state
+    setProcesses((prev) => {
+      const newProcesses = prev.filter((p) => p.uuid !== uuid);
+      
+      // If we're terminating the active process, switch to another one
+      // Use ref to get current value inside callback
+      if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
+        // Switch to the most recent remaining process
+        const nextProcess = newProcesses[newProcesses.length - 1];
+        setActiveProcessUuid(nextProcess.uuid);
+        activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
+        
+        // Send switch command
+        const switchPayload: ProcessSwitchPayload = { activeUuids: [nextProcess.uuid] };
+        sendToMac("process:switch", switchPayload);
+      } else if (newProcesses.length === 0) {
+        setActiveProcessUuid(null);
+        activeProcessUuidRef.current = null; // Update ref immediately
+      }
+      
+      return newProcesses;
+    });
+  }, [sendToMac]);
+
+  /**
+   * Switch to a different process
+   */
+  const switchProcess = useCallback((uuid: string) => {
+    // Use ref to check current active process
+    if (uuid === activeProcessUuidRef.current) return;
+
+    console.log(`📱 Switching to process: ${uuid.substring(0, 8)}`);
+    
+    setActiveProcessUuid(uuid);
+    activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
+
+    // Send switch command to Mac
+    const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
+    sendToMac("process:switch", payload);
+
+    // Clear terminal screen - Mac will send the snapshot
+    sendToTerminal("clear", {});
+  }, [sendToMac]);
 
   useEffect(() => {
     // Generate keys for this session
@@ -134,7 +271,7 @@ export default function TerminalScreen({
     }
   };
 
-  const sendToTerminal = (type: string, data: any) => {
+  const sendToTerminal = (type: string, data: unknown) => {
     if (webViewRef.current) {
       webViewRef.current.postMessage(JSON.stringify({ type, data }));
     }
@@ -171,19 +308,7 @@ export default function TerminalScreen({
     setAiProcessing(true);
 
     const promptData = { prompt: aiPrompt.trim() };
-
-    // Send via WebRTC if connected, otherwise use Socket
-    if (webrtcRef.current?.isWebRTCConnected()) {
-      console.log("📤 Sending AI prompt via WebRTC P2P");
-      const success = webrtcRef.current.sendMessage("ai:prompt", promptData);
-      if (!success && socketRef.current) {
-        console.log("⚠️ WebRTC send failed, falling back to Socket");
-        socketRef.current.emit("ai:prompt", promptData);
-      }
-    } else if (socketRef.current) {
-      console.log("📤 Sending AI prompt via Socket");
-      socketRef.current.emit("ai:prompt", promptData);
-    }
+    sendToMac("ai:prompt", promptData);
 
     // Show toast notification instead of terminal output
     const toastMsg = `🤖 AI: "${aiPrompt.trim().substring(0, 50)}${
@@ -205,11 +330,84 @@ export default function TerminalScreen({
   const getDeviceId = async () => {
     let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
     if (!deviceId) {
-      deviceId = generateDeviceId();
+      deviceId = generateUUID();
       await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
     }
     return deviceId;
   };
+
+  /**
+   * Handle process-related messages from Mac
+   * Uses refs to avoid stale closure issues with callbacks
+   */
+  const handleProcessMessage = useCallback((type: string, payload: unknown) => {
+    switch (type) {
+      case "process:created": {
+        const { uuid } = payload as { uuid: string };
+        console.log(`✅ Mac confirmed process created: ${uuid.substring(0, 8)}`);
+        break;
+      }
+      case "process:terminated": {
+        const { uuid } = payload as { uuid: string };
+        console.log(`✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`);
+        break;
+      }
+      case "process:exited": {
+        const { uuid } = payload as ProcessExitedPayload;
+        console.log(`⚠️ Process exited unexpectedly: ${uuid.substring(0, 8)}`);
+        // Remove from local state
+        setProcesses((prev) => {
+          const newProcesses = prev.filter((p) => p.uuid !== uuid);
+          if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
+            const nextProcess = newProcesses[newProcesses.length - 1];
+            setActiveProcessUuid(nextProcess.uuid);
+            activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
+          } else if (newProcesses.length === 0) {
+            setActiveProcessUuid(null);
+            activeProcessUuidRef.current = null; // Update ref immediately
+          }
+          return newProcesses;
+        });
+        break;
+      }
+      case "process:screen": {
+        const { uuid, data } = payload as ProcessScreenPayload;
+        console.log(`📺 Received screen snapshot for ${uuid.substring(0, 8)}`);
+        // Only display if this is the active process (use ref for current value)
+        if (uuid === activeProcessUuidRef.current) {
+          sendToTerminal("output", data);
+        }
+        break;
+      }
+      case "process:error": {
+        const { uuid, error } = payload as { uuid: string; error: string };
+        console.error(`❌ Process error for ${uuid.substring(0, 8)}: ${error}`);
+        Alert.alert("Process Error", error);
+        break;
+      }
+      case "terminal:output": {
+        // Handle output with uuid
+        const outputPayload = payload as TerminalOutputPayload | string;
+        console.log(`📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(0, 8)}`);
+        
+        if (typeof outputPayload === "object" && outputPayload.uuid) {
+          console.log(`   Output from process: ${outputPayload.uuid.substring(0, 8)}, data length: ${outputPayload.data?.length}`);
+          // Only display if from active process (use ref for current value)
+          if (outputPayload.uuid === activeProcessUuidRef.current) {
+            console.log(`   ✅ Displaying output`);
+            sendToTerminal("output", outputPayload.data);
+          } else {
+            console.log(`   🔇 Ignoring output from inactive process ${outputPayload.uuid.substring(0, 8)}`);
+          }
+        } else {
+          // Legacy format (no uuid) - display directly
+          console.log(`   Legacy format, displaying directly`);
+          sendToTerminal("output", outputPayload);
+        }
+        break;
+      }
+    }
+  }, []); // No dependencies - uses refs for mutable values
 
   const connectToRelay = async () => {
     setConnectionStatus("📡 Connecting to relay server...");
@@ -290,7 +488,7 @@ export default function TerminalScreen({
 
     socket.on(
       "handshake:verify",
-      ({ peerId, signature }: { peerId: string; signature: string }) => {
+      ({ peerId }: { peerId: string; signature: string }) => {
         console.log(`✅ Handshake verified for ${peerId}`);
         // In a full implementation, we would verify the signature here.
         // For now, confirm the handshake to complete the pairing.
@@ -371,11 +569,10 @@ export default function TerminalScreen({
       console.log("🔗 Initializing WebRTC P2P connection...");
       webrtcRef.current = new WebRTCService(socket);
 
-      // Handle WebRTC messages
+      // Handle WebRTC messages - now with process support
       webrtcRef.current.onMessage((data) => {
-        if (data.type === "terminal:output") {
-          sendToTerminal("output", data.payload);
-        }
+        console.log(`📡 WebRTC message received: type=${data.type}, hasPayload=${!!data.payload}`);
+        handleProcessMessage(data.type, data.payload ?? data);
       });
 
       // Handle WebRTC connection state
@@ -416,10 +613,17 @@ export default function TerminalScreen({
       }
     });
 
+    // Listen for process-related messages via Socket
+    socket.on("process:created", (payload) => handleProcessMessage("process:created", payload));
+    socket.on("process:terminated", (payload) => handleProcessMessage("process:terminated", payload));
+    socket.on("process:exited", (payload) => handleProcessMessage("process:exited", payload));
+    socket.on("process:screen", (payload) => handleProcessMessage("process:screen", payload));
+    socket.on("process:error", (payload) => handleProcessMessage("process:error", payload));
+
     // Listen for terminal output via WebSocket (fallback)
-    socket.on("terminal:output", (data: string) => {
+    socket.on("terminal:output", (data: TerminalOutputPayload | string) => {
       if (!webrtcRef.current?.isWebRTCConnected()) {
-        sendToTerminal("output", data);
+        handleProcessMessage("terminal:output", data);
       }
     });
 
@@ -436,6 +640,8 @@ export default function TerminalScreen({
       }
 
       setPaired(false);
+      setProcesses([]);
+      setActiveProcessUuid(null);
       sendToTerminal("output", `\r\n\x1b[31m❌ ${message}\x1b[0m\r\n`);
       Alert.alert("Disconnected", message, [
         {
@@ -460,6 +666,8 @@ export default function TerminalScreen({
 
       setConnected(false);
       setPaired(false);
+      setProcesses([]);
+      setActiveProcessUuid(null);
       sendToTerminal(
         "output",
         `\r\n\x1b[31m❌ Disconnected: ${reason}\x1b[0m\r\n`
@@ -488,7 +696,19 @@ export default function TerminalScreen({
     });
   };
 
-  const handleWebViewMessage = (event: any) => {
+  // Auto-create first process after WebRTC is connected
+  useEffect(() => {
+    if (paired && webrtcConnected && !firstProcessCreatedRef.current && terminalDimensionsRef.current) {
+      firstProcessCreatedRef.current = true;
+      console.log("📱 Auto-creating first process after WebRTC connected...");
+      // Small delay to ensure everything is stable
+      setTimeout(() => {
+        createProcess();
+      }, 200);
+    }
+  }, [paired, webrtcConnected, createProcess]);
+
+  const handleWebViewMessage = (event: { nativeEvent: { data: string } }) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
 
@@ -507,29 +727,44 @@ export default function TerminalScreen({
         if (!terminalReady) {
           sendToTerminal("output", connectionStatus + "\r\n");
         }
+
+        // If paired with WebRTC but no process created yet, create first process now
+        if (paired && webrtcConnected && !firstProcessCreatedRef.current) {
+          firstProcessCreatedRef.current = true;
+          console.log("📱 Creating first process (dimensions ready, WebRTC connected)...");
+          setTimeout(() => createProcess(), 100);
+        }
       } else if (message.type === "input") {
-        if (paired) {
+        // Use ref for current active process UUID to avoid stale closure
+        const currentActiveUuid = activeProcessUuidRef.current;
+        if (paired && currentActiveUuid) {
           const input = message.data;
           console.log(
             `⌨️ Input received from WebView: ${JSON.stringify(input)}`
           );
 
+          // Send input with process uuid
+          const payload: TerminalInputPayload = {
+            uuid: currentActiveUuid,
+            data: input,
+          };
+
           if (webrtcRef.current?.isWebRTCConnected()) {
             console.log("📤 Sending via WebRTC P2P");
             const success = webrtcRef.current.sendMessage(
               "terminal:input",
-              input
+              payload
             );
             if (!success && socketRef.current) {
               console.log("⚠️ WebRTC send failed, falling back to Socket");
-              socketRef.current.emit("terminal:input", input);
+              socketRef.current.emit("terminal:input", payload);
             }
           } else if (socketRef.current) {
             console.log("📤 Sending via Socket (Fallback)");
-            socketRef.current.emit("terminal:input", input);
+            socketRef.current.emit("terminal:input", payload);
           }
         } else {
-          console.log("❌ Input ignored: Not paired");
+          console.log("❌ Input ignored: Not paired or no active process");
         }
       } else if (message.type === "dimensions") {
         terminalDimensionsRef.current = message.data;
@@ -571,7 +806,6 @@ export default function TerminalScreen({
     }).start();
   }, [showScrollToBottom, scrollButtonOpacity]);
 
-  // ... (keep existing terminalHtml) ...
   const terminalHtml = `
 <!DOCTYPE html>
 <html>
@@ -799,6 +1033,7 @@ export default function TerminalScreen({
                 terminal.write(message.data);
             } else if (message.type === 'clear') {
                 terminal.clear();
+                terminal.reset();
             } else if (message.type === 'reset') {
                 terminal.reset();
             } else if (message.type === 'resize') {
@@ -931,6 +1166,37 @@ export default function TerminalScreen({
 </html>
   `;
 
+  /**
+   * Render a single tab
+   */
+  const renderTab = (process: TerminalProcess, index: number) => {
+    const isActive = process.uuid === activeProcessUuid;
+    
+    return (
+      <TouchableOpacity
+        key={process.uuid}
+        style={[styles.tab, isActive && styles.tabActive]}
+        onPress={() => switchProcess(process.uuid)}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+          {process.label}
+        </Text>
+        {/* Close button - ghost style, inside tab */}
+        <TouchableOpacity
+          style={styles.tabCloseButton}
+          onPress={(e) => {
+            e.stopPropagation(); // Prevent tab switch when clicking close
+            terminateProcess(process.uuid);
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={styles.tabCloseText}>×</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -942,6 +1208,7 @@ export default function TerminalScreen({
         edges={["top"]}
         style={{ backgroundColor: "rgba(17, 17, 17, 0.9)" }}
       >
+        {/* Header Row */}
         <View style={styles.statusBar}>
           <TouchableOpacity
             style={styles.backButton}
@@ -996,33 +1263,70 @@ export default function TerminalScreen({
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Tabs Row */}
+        <View style={styles.tabsRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabsScrollContent}
+          >
+            {processes.map((process, index) => renderTab(process, index))}
+            
+            {/* Add tab button */}
+            <TouchableOpacity
+              style={[styles.addTabButton, !paired && styles.buttonDisabled]}
+              onPress={createProcess}
+              disabled={!paired}
+            >
+              <Text style={styles.addTabText}>+</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </SafeAreaView>
 
-      <WebView
-        ref={webViewRef}
-        source={{ html: terminalHtml }}
-        style={styles.webview}
-        onMessage={handleWebViewMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={true}
-        showsHorizontalScrollIndicator={false}
-        keyboardDisplayRequiresUserAction={false}
-        originWhitelist={["*"]}
-        mixedContentMode="always"
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error("WebView error:", nativeEvent);
-        }}
-        onHttpError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error("WebView HTTP error:", nativeEvent);
-        }}
-        hideKeyboardAccessoryView={true}
-      />
+      {processes.length > 0 ? (
+        <WebView
+          ref={webViewRef}
+          source={{ html: terminalHtml }}
+          style={styles.webview}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          scrollEnabled={true}
+          showsVerticalScrollIndicator={true}
+          showsHorizontalScrollIndicator={false}
+          keyboardDisplayRequiresUserAction={false}
+          originWhitelist={["*"]}
+          mixedContentMode="always"
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error("WebView error:", nativeEvent);
+          }}
+          onHttpError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error("WebView HTTP error:", nativeEvent);
+          }}
+          hideKeyboardAccessoryView={true}
+        />
+      ) : (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateIcon}>⌨️</Text>
+          <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            Tap the + button above to open a new terminal tab
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyStateButton, !paired && styles.buttonDisabled]}
+            onPress={createProcess}
+            disabled={!paired}
+          >
+            <Text style={styles.emptyStateButtonText}>+ New Terminal</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* AI Toast Notification */}
       {aiToastMessage && (
@@ -1206,6 +1510,115 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
+  // Tabs row styles
+  tabsRow: {
+    height: 32,
+    backgroundColor: "rgba(30, 30, 30, 0.95)",
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+  },
+  tabsScrollContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  tab: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 6,
+    backgroundColor: "transparent",
+    borderRadius: 4,
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: "rgba(0, 255, 0, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 255, 0, 0.3)",
+  },
+  tabText: {
+    color: "#888",
+    fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  tabTextActive: {
+    color: "#0f0",
+    fontWeight: "bold",
+  },
+  tabCloseButton: {
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  tabCloseText: {
+    color: "#ccc",
+    fontSize: 14,
+    fontWeight: "bold",
+    lineHeight: 14,
+  },
+  // Empty state styles
+  emptyStateContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyStateIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    color: "#0f0",
+    fontSize: 20,
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    color: "#666",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: "rgba(0, 255, 0, 0.15)",
+    borderWidth: 1,
+    borderColor: "#0f0",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  emptyStateButtonText: {
+    color: "#0f0",
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  addTabButton: {
+    width: 28,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 4,
+    opacity: 0.6,
+    borderWidth: 1,
+    borderColor: "rgba(0, 255, 0, 0.3)",
+    borderRadius: 4,
+    borderStyle: "dashed",
+  },
+  addTabText: {
+    color: "#0f0",
+    fontSize: 18,
+    fontWeight: "bold",
+    lineHeight: 18,
+  },
   webview: {
     flex: 1,
     backgroundColor: "#000",
@@ -1213,7 +1626,7 @@ const styles = StyleSheet.create({
   // AI Toast Notification
   aiToast: {
     position: "absolute",
-    top: 60,
+    top: 100,
     left: 20,
     right: 20,
     backgroundColor: "rgba(0, 200, 200, 0.95)",

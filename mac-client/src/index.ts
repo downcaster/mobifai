@@ -1,8 +1,6 @@
 import { io, Socket } from "socket.io-client";
-import * as pty from "node-pty";
 import os from "os";
 import chalk from "chalk";
-import stripAnsi from "strip-ansi";
 import wrtc from "@roamhq/wrtc";
 import open from "open";
 import fs from "fs";
@@ -14,10 +12,10 @@ import {
   generateKeyPair,
   deriveSharedSecret,
   signChallenge,
-  verifyChallenge,
   KeyPair,
 } from "./crypto.js";
 import { getAIService, AIPromptPayload } from "./ai/index.js";
+import { ProcessManager } from "./process-manager.js";
 
 const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = wrtc;
 
@@ -36,6 +34,32 @@ interface IceCandidate {
   sdpMLineIndex?: number;
 }
 
+// Process command payloads
+interface ProcessCreatePayload {
+  uuid: string;
+  cols?: number;
+  rows?: number;
+}
+
+interface ProcessTerminatePayload {
+  uuid: string;
+}
+
+interface ProcessSwitchPayload {
+  activeUuids: string[];
+}
+
+interface TerminalInputPayload {
+  uuid: string;
+  data: string;
+}
+
+interface TerminalResizePayload {
+  uuid?: string;
+  cols: number;
+  rows: number;
+}
+
 const TOKEN_FILE = path.join(process.cwd(), ".token");
 const DEVICE_ID_FILE = path.join(process.cwd(), ".device_id");
 
@@ -49,7 +73,6 @@ console.log(chalk.gray("================================\n"));
 
 let socket: Socket;
 let rl: readline.Interface | null = null;
-let terminal: pty.IPty | null = null;
 let peerConnection: InstanceType<typeof RTCPeerConnection> | null = null;
 let dataChannel: RTCDataChannel | null = null;
 let isWebRTCConnected = false;
@@ -59,7 +82,165 @@ let pendingIceCandidates: Array<{
   sdpMLineIndex?: number;
 }> = [];
 
-// ... (WebRTC setup code remains mostly the same, but I'll inline it for completeness) ...
+// Process Manager - replaces single terminal
+const processManager = new ProcessManager();
+
+// Store terminal dimensions from mobile
+let terminalCols = 80;
+let terminalRows = 30;
+
+/**
+ * Send data to iOS client via WebRTC or Socket fallback
+ */
+function sendToClient(type: string, payload: unknown): void {
+  const message = JSON.stringify({ type, payload });
+  
+  if (isWebRTCConnected && dataChannel?.readyState === "open") {
+    try {
+      dataChannel.send(message);
+    } catch (e) {
+      socket.emit(type, payload);
+    }
+  } else {
+    socket.emit(type, payload);
+  }
+}
+
+/**
+ * Set up ProcessManager callbacks
+ */
+function setupProcessManagerCallbacks(): void {
+  // Handle process output - only forward from active processes
+  processManager.onOutput((uuid, data) => {
+    // Update AI service screen buffer for active process
+    const activeProcess = processManager.getFirstActiveProcess();
+    if (activeProcess && activeProcess.uuid === uuid) {
+      getAIService().updateScreenBuffer(data);
+    }
+    
+    // Debug: log output being sent
+    console.log(chalk.gray(`📤 Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
+    
+    // Send output to iOS with uuid
+    sendToClient("terminal:output", { uuid, data });
+  });
+
+  // Handle process exit
+  processManager.onExit((uuid) => {
+    console.log(chalk.gray(`Process ${uuid.substring(0, 8)} exited, notifying iOS`));
+    sendToClient("process:exited", { uuid });
+  });
+}
+
+/**
+ * Handle process:create command from iOS
+ */
+function handleProcessCreate(payload: ProcessCreatePayload): void {
+  const { uuid, cols = terminalCols, rows = terminalRows } = payload;
+  
+  console.log(chalk.cyan(`📱 iOS requested process creation: ${uuid.substring(0, 8)}`));
+  
+  const processInfo = processManager.createProcess(uuid, cols, rows);
+  
+  if (processInfo) {
+    // Set this process as the only active one
+    processManager.switchActiveProcesses([uuid]);
+    
+    // Update AI service with the new terminal
+    const aiService = getAIService();
+    aiService.setTerminal(processInfo.pty);
+    aiService.setDimensions(cols, rows);
+    
+    // Notify iOS that process was created
+    sendToClient("process:created", { uuid });
+    
+    // Send system ready message (for first process)
+    if (processManager.getProcessCount() === 1) {
+      socket.emit("system:message", { type: "terminal_ready" });
+    }
+  } else {
+    sendToClient("process:error", { uuid, error: "Failed to create process" });
+  }
+}
+
+/**
+ * Handle process:terminate command from iOS
+ */
+function handleProcessTerminate(payload: ProcessTerminatePayload): void {
+  const { uuid } = payload;
+  
+  console.log(chalk.cyan(`📱 iOS requested process termination: ${uuid.substring(0, 8)}`));
+  
+  const success = processManager.terminateProcess(uuid);
+  
+  if (success) {
+    sendToClient("process:terminated", { uuid });
+  } else {
+    sendToClient("process:error", { uuid, error: "Failed to terminate process" });
+  }
+}
+
+/**
+ * Handle process:switch command from iOS
+ */
+function handleProcessSwitch(payload: ProcessSwitchPayload): void {
+  const { activeUuids } = payload;
+  
+  console.log(chalk.cyan(`📱 iOS requested process switch: ${activeUuids.map(u => u.substring(0, 8)).join(", ")}`));
+  
+  const snapshots = processManager.switchActiveProcesses(activeUuids);
+  
+  // Update AI service with the first active terminal
+  const activeProcess = processManager.getFirstActiveProcess();
+  if (activeProcess) {
+    const aiService = getAIService();
+    aiService.setTerminal(activeProcess.pty);
+    aiService.setDimensions(activeProcess.cols, activeProcess.rows);
+  }
+  
+  // Send screen snapshots for all newly active processes
+  for (const [uuid, screenData] of snapshots) {
+    sendToClient("process:screen", { uuid, data: screenData });
+  }
+}
+
+/**
+ * Handle terminal:input command from iOS (with uuid)
+ */
+function handleTerminalInput(payload: TerminalInputPayload | string): void {
+  // Support both old format (string) and new format (object with uuid)
+  if (typeof payload === "string") {
+    // Legacy format - write to first active process
+    const activeProcess = processManager.getFirstActiveProcess();
+    if (activeProcess) {
+      processManager.writeToProcess(activeProcess.uuid, payload);
+    }
+  } else {
+    const { uuid, data } = payload;
+    processManager.writeToProcess(uuid, data);
+  }
+}
+
+/**
+ * Handle terminal:resize command from iOS
+ */
+function handleTerminalResize(payload: TerminalResizePayload): void {
+  const { uuid, cols, rows } = payload;
+  
+  terminalCols = cols;
+  terminalRows = rows;
+  
+  if (uuid) {
+    // Resize specific process
+    processManager.resizeProcess(uuid, cols, rows);
+  } else {
+    // Resize all processes (legacy behavior)
+    processManager.resizeAll(cols, rows);
+  }
+  
+  // Update AI service dimensions
+  getAIService().setDimensions(cols, rows);
+}
 
 async function setupWebRTC() {
   console.log(chalk.cyan("\n🔗 Setting up WebRTC P2P connection..."));
@@ -136,21 +317,7 @@ async function setupWebRTC() {
     channel.onmessage = ({ data }: { data: string }) => {
       try {
         const message = JSON.parse(data.toString());
-        if (message.type === "terminal:input" && terminal) {
-          terminal.write(message.payload);
-        } else if (message.type === "terminal:resize" && terminal) {
-          terminal.resize(message.payload.cols, message.payload.rows);
-          console.log(
-            chalk.gray(
-              `Terminal resized to ${message.payload.cols}x${message.payload.rows}`
-            )
-          );
-        } else if (message.type === "ai:prompt") {
-          // Handle AI prompt via WebRTC
-          const payload = message.payload as AIPromptPayload;
-          console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${payload.prompt}"`));
-          handleAIPrompt(payload.prompt);
-        }
+        handleWebRTCMessage(message);
       } catch (error) {
         // Ignore parsing errors
       }
@@ -190,6 +357,36 @@ async function setupWebRTC() {
   }
 }
 
+/**
+ * Handle messages from WebRTC data channel
+ */
+function handleWebRTCMessage(message: { type: string; payload: unknown }): void {
+  switch (message.type) {
+    case "process:create":
+      handleProcessCreate(message.payload as ProcessCreatePayload);
+      break;
+    case "process:terminate":
+      handleProcessTerminate(message.payload as ProcessTerminatePayload);
+      break;
+    case "process:switch":
+      handleProcessSwitch(message.payload as ProcessSwitchPayload);
+      break;
+    case "terminal:input":
+      handleTerminalInput(message.payload as TerminalInputPayload);
+      break;
+    case "terminal:resize":
+      handleTerminalResize(message.payload as TerminalResizePayload);
+      break;
+    case "ai:prompt":
+      const aiPayload = message.payload as AIPromptPayload;
+      console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`));
+      handleAIPrompt(aiPayload.prompt);
+      break;
+    default:
+      console.log(chalk.gray(`Unknown WebRTC message type: ${message.type}`));
+  }
+}
+
 function getToken(): string | undefined {
   try {
     if (fs.existsSync(TOKEN_FILE)) {
@@ -223,22 +420,24 @@ function getDeviceId(): string {
  * Handle AI prompt from mobile client
  */
 async function handleAIPrompt(prompt: string): Promise<void> {
-  if (!terminal) {
-    console.log(chalk.red("❌ Cannot process AI prompt - terminal not initialized"));
+  const activeProcess = processManager.getFirstActiveProcess();
+  
+  if (!activeProcess) {
+    console.log(chalk.red("❌ Cannot process AI prompt - no active terminal"));
     return;
   }
 
   const aiService = getAIService();
   
   // Ensure AI service has the terminal reference
-  aiService.setTerminal(terminal);
+  aiService.setTerminal(activeProcess.pty);
 
   try {
     await aiService.handlePrompt(prompt, {
-      onActionStart: (action) => {
+      onActionStart: () => {
         // Log action start
       },
-      onActionComplete: (action) => {
+      onActionComplete: () => {
         // Log action complete
       },
       onTurnComplete: (turnNumber) => {
@@ -268,6 +467,9 @@ function connectToRelay() {
   keyPair = generateKeyPair();
   console.log(chalk.gray(`Device ID: ${deviceId}`));
   console.log(chalk.gray(`🔐 Generated security keys`));
+
+  // Setup ProcessManager callbacks
+  setupProcessManagerCallbacks();
 
   socket = io(config.RELAY_SERVER_URL, {
     reconnection: true,
@@ -306,8 +508,6 @@ function connectToRelay() {
     process.stdin.resume();
 
     const keyListener = (buffer: Buffer) => {
-      const key = buffer.toString();
-
       // Check for Ctrl+C (0x03)
       if (buffer[0] === 3) {
         console.log(chalk.yellow("\n👋 Bye!"));
@@ -390,17 +590,9 @@ function connectToRelay() {
     });
   });
 
-  // Store terminal dimensions from mobile
-  let terminalCols = 80;
-  let terminalRows = 30;
-
   socket.on("terminal:dimensions", ({ cols, rows }) => {
     console.log(chalk.cyan(`📐 Received terminal dimensions: ${cols}x${rows}`));
-    terminalCols = cols;
-    terminalRows = rows;
-    if (terminal) terminal.resize(cols, rows);
-    // Update AI service dimensions
-    getAIService().setDimensions(cols, rows);
+    handleTerminalResize({ cols, rows });
   });
 
   socket.on("request_dimensions", () => {
@@ -463,11 +655,6 @@ function connectToRelay() {
           throw new Error("No shared secret available");
         }
 
-        // The challenge we sent to the peer should have been signed
-        // We need to get that challenge from somewhere...
-        // Actually, the relay server generates the challenge and sends it to us
-        // Let me reconsider the flow...
-
         // For now, let's just confirm the handshake
         // In a production system, we'd verify the signature properly
         console.log(chalk.green("✅ Peer verified"));
@@ -488,8 +675,11 @@ function connectToRelay() {
         chalk.gray(`🔒 Connection secured with end-to-end encryption\n`)
       );
 
-      // Create terminal session
-      startTerminal(terminalCols, terminalRows, socket);
+      // DON'T auto-create terminal - iOS will send process:create command
+      console.log(chalk.cyan("⏳ Waiting for iOS to create first process..."));
+
+      // Initialize AI service dimensions
+      getAIService().setDimensions(terminalCols, terminalRows);
 
       // Initiate WebRTC
       setupWebRTC();
@@ -502,11 +692,10 @@ function connectToRelay() {
       console.log(chalk.yellow("⚠️  Relay disconnected, but P2P active"));
       return;
     }
-    if (terminal) {
-      terminal.kill();
-      terminal = null;
-      console.log(chalk.gray("Terminal session closed.\n"));
-    }
+    
+    // Clean up all processes
+    processManager.cleanup();
+    
     // Re-register to wait for connection
     const token = getToken();
     socket.emit("register", {
@@ -543,110 +732,32 @@ function connectToRelay() {
     }
   });
 
-  // Fallback IO - Accept from socket even if WebRTC is active (Mobile decides routing)
-  socket.on("terminal:input", (data: string) => {
-    if (terminal) {
-      // Optional: Debug log
-      // console.log('Received input via socket');
-      terminal.write(data);
-    }
+  // Socket handlers for process commands (fallback when WebRTC not available)
+  socket.on("process:create", (payload: ProcessCreatePayload) => {
+    handleProcessCreate(payload);
   });
 
-  socket.on("terminal:resize", ({ cols, rows }) => {
-    if (terminal) terminal.resize(cols, rows);
+  socket.on("process:terminate", (payload: ProcessTerminatePayload) => {
+    handleProcessTerminate(payload);
+  });
+
+  socket.on("process:switch", (payload: ProcessSwitchPayload) => {
+    handleProcessSwitch(payload);
+  });
+
+  // Fallback IO - Accept from socket even if WebRTC is active (Mobile decides routing)
+  socket.on("terminal:input", (data: TerminalInputPayload | string) => {
+    handleTerminalInput(data);
+  });
+
+  socket.on("terminal:resize", (payload: TerminalResizePayload) => {
+    handleTerminalResize(payload);
   });
 
   // Handle AI prompt via Socket
   socket.on("ai:prompt", (data: AIPromptPayload) => {
     console.log(chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`));
     handleAIPrompt(data.prompt);
-  });
-}
-
-function startTerminal(cols: number, rows: number, socketConnection: Socket) {
-  if (terminal) return;
-
-  const shell =
-    os.platform() === "win32" ? "powershell.exe" : process.env.SHELL || "bash";
-  console.log(chalk.cyan(`\n🖥️  Starting terminal session (${shell})...`));
-
-  const env = {
-    ...process.env,
-    TERM: "xterm-256color",
-    COLORTERM: "truecolor",
-  };
-
-  terminal = pty.spawn(shell, [], {
-    name: "xterm-256color",
-    cols,
-    rows,
-    cwd: process.env.HOME || process.cwd(),
-    env: env as any,
-  });
-
-  // Initialize AI service with terminal
-  const aiService = getAIService();
-  aiService.setTerminal(terminal);
-  aiService.setDimensions(cols, rows);
-  console.log(chalk.gray("🤖 AI service initialized"));
-
-  // Setup initial output
-  let initBuffer = "";
-  const tempListener = terminal.onData((data) => (initBuffer += data));
-
-  // Inject initialization commands
-  // 1. Set a clean, colorful prompt with git branch support
-  // 2. Clear the screen to remove login banner
-  const initCommands = [
-    "setopt PROMPT_SUBST", // Enable dynamic command substitution in prompt
-    "export PS1='%F{cyan}%~%f %F{green}$(git branch --show-current 2>/dev/null)%f $ '",
-    "clear",
-  ];
-
-  // Send commands with a small delay to ensure shell is ready
-  setTimeout(() => {
-    if (terminal) {
-      initCommands.forEach((cmd) => terminal!.write(cmd + "\r"));
-    }
-  }, 100);
-
-  setTimeout(() => {
-    tempListener.dispose();
-
-    if (!terminal) {
-      return;
-    }
-
-    // Notify system ready
-    socketConnection.emit("system:message", { type: "terminal_ready" });
-
-    // Send buffered output
-    if (initBuffer) {
-      socketConnection.emit("terminal:output", initBuffer);
-    }
-
-    // Main data listener
-    terminal.onData((data) => {
-      // Update AI service screen buffer
-      getAIService().updateScreenBuffer(data);
-      
-      if (isWebRTCConnected && dataChannel?.readyState === "open") {
-        try {
-          dataChannel.send(
-            JSON.stringify({ type: "terminal:output", payload: data })
-          );
-        } catch (e) {
-          socketConnection.emit("terminal:output", data);
-        }
-      } else {
-        socketConnection.emit("terminal:output", data);
-      }
-    });
-  }, 500);
-
-  terminal.onExit(() => {
-    console.log(chalk.gray("Terminal process exited"));
-    terminal = null;
   });
 }
 
@@ -687,14 +798,8 @@ function handleShutdown(signal: string) {
       // Ignore stdin cleanup errors
     }
 
-    // Kill terminal
-    if (terminal) {
-      try {
-        terminal.kill();
-      } catch (e) {
-        // Ignore
-      }
-    }
+    // Clean up all processes
+    processManager.cleanup();
 
     // Close WebRTC connections
     if (dataChannel) {
@@ -718,7 +823,7 @@ function handleShutdown(signal: string) {
       try {
         socket.removeAllListeners();
         socket.disconnect();
-        (socket as any).close?.(); // Force close the underlying connection
+        (socket as unknown as { close?: () => void }).close?.(); // Force close the underlying connection
       } catch (e) {
         // Ignore
       }

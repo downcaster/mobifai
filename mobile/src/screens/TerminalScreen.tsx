@@ -177,7 +177,7 @@ export default function TerminalScreen({
 
     // Clear terminal for new process and reset cursor visibility
     sendToTerminal("clear", {});
-    sendToTerminal("output", "\x1b[?25h"); // Show cursor (DECTCEM)
+    sendToTerminal("resetCursor", {}); // Reset cursor visibility without triggering responses
 
     // Hide loading spinner after shell initialization completes
     setTimeout(() => {
@@ -249,7 +249,7 @@ export default function TerminalScreen({
 
       // Clear terminal screen and reset cursor visibility - Mac will send the snapshot
       sendToTerminal("clear", {});
-      sendToTerminal("output", "\x1b[?25h"); // Show cursor (DECTCEM)
+      sendToTerminal("resetCursor", {}); // Reset cursor visibility without triggering responses
     },
     [sendToMac]
   );
@@ -1194,6 +1194,14 @@ export default function TerminalScreen({
                 setTimeout(fitTerminal, 50);
             } else if (message.type === 'output') {
                 terminal.write(message.data);
+            } else if (message.type === 'resetCursor') {
+                // Reset cursor visibility by directly manipulating xterm internal state
+                // This avoids triggering onData responses that would be sent to Mac
+                if (terminal._core && terminal._core._coreService) {
+                    terminal._core._coreService.decPrivateModes.cursorHide = false;
+                }
+                // Also ensure cursor blink is enabled
+                terminal.options.cursorBlink = true;
             } else if (message.type === 'clear') {
                 terminal.clear();
                 terminal.reset();

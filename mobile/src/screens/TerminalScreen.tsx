@@ -1095,7 +1095,13 @@ export default function TerminalScreen({
         window.addEventListener('resize', () => setTimeout(fitTerminal, 100));
         window.addEventListener('orientationchange', () => setTimeout(fitTerminal, 200));
         
+        // Flag to temporarily suppress input forwarding (used when resetting cursor)
+        window._suppressInput = false;
+        
         terminal.onData((data) => {
+            // Don't forward input when suppress flag is set (e.g., during cursor reset)
+            if (window._suppressInput) return;
+            
             window.ReactNativeWebView?.postMessage(JSON.stringify({
                 type: 'input',
                 data: data
@@ -1195,11 +1201,12 @@ export default function TerminalScreen({
             } else if (message.type === 'output') {
                 terminal.write(message.data);
             } else if (message.type === 'resetCursor') {
-                // Reset cursor visibility by directly manipulating xterm internal state
-                // This avoids triggering onData responses that would be sent to Mac
-                if (terminal._core && terminal._core._coreService) {
-                    terminal._core._coreService.decPrivateModes.cursorHide = false;
-                }
+                // Reset cursor visibility without triggering onData responses
+                // Temporarily suppress input forwarding while we write cursor control sequences
+                window._suppressInput = true;
+                terminal.write('\\x1b[?25h'); // Show cursor (DECTCEM)
+                // Re-enable input after a small delay to let xterm process the sequence
+                setTimeout(() => { window._suppressInput = false; }, 50);
                 // Also ensure cursor blink is enabled
                 terminal.options.cursorBlink = true;
             } else if (message.type === 'clear') {

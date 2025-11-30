@@ -331,16 +331,14 @@ async function setupWebRTC() {
       console.log(chalk.green("✅ WebRTC data channel opened"));
       isWebRTCConnected = true;
       
-      // Send processes:sync via WebRTC if we have existing processes
+      // Always send processes:sync via WebRTC (even if empty) so iOS knows sync is complete
       const existingProcesses = processManager.getProcessSyncData();
-      if (existingProcesses.length > 0) {
-        console.log(chalk.cyan(`📋 Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
-        const syncPayload = {
-          processes: existingProcesses,
-          activeUuids: processManager.getActiveProcessIds(),
-        };
-        sendToClient("processes:sync", syncPayload);
-      }
+      console.log(chalk.cyan(`📋 Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
+      const syncPayload = {
+        processes: existingProcesses,
+        activeUuids: processManager.getActiveProcessIds(),
+      };
+      sendToClient("processes:sync", syncPayload);
     };
 
     channel.onclose = () => {
@@ -715,25 +713,21 @@ function connectToRelay() {
       // Initialize AI service dimensions
       getAIService().setDimensions(terminalCols, terminalRows);
 
-      // Check if we have existing processes (reconnection scenario)
+      // Always send processes:sync (even if empty) so iOS knows sync is complete
       const existingProcesses = processManager.getProcessSyncData();
+      console.log(chalk.cyan(`📋 Syncing ${existingProcesses.length} process(es) to iOS via socket...`));
+      
+      const syncPayload = {
+        processes: existingProcesses,
+        activeUuids: processManager.getActiveProcessIds(),
+      };
+      
+      // Send via socket as fallback (WebRTC will also send when connected)
+      socket.emit("processes:sync", syncPayload);
+      
       if (existingProcesses.length > 0) {
-        console.log(chalk.cyan(`📋 Syncing ${existingProcesses.length} existing process(es) to iOS...`));
-        
-        // Send processes:sync with existing tabs
-        const syncPayload = {
-          processes: existingProcesses,
-          activeUuids: processManager.getActiveProcessIds(),
-        };
-        
-        // We'll send this after WebRTC connects, so store it
-        // For now, also emit via socket as fallback
-        socket.emit("processes:sync", syncPayload);
-        
         // Send terminal ready since we already have processes
         socket.emit("system:message", { type: "terminal_ready" });
-      } else {
-        console.log(chalk.cyan("⏳ Waiting for iOS to create first process..."));
       }
 
       // Initiate WebRTC

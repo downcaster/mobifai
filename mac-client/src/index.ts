@@ -415,7 +415,7 @@ function handleWebRTCMessage(message: { type: string; payload: unknown }): void 
     case "ai:prompt":
       const aiPayload = message.payload as AIPromptPayload;
       console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`));
-      handleAIPrompt(aiPayload.prompt);
+      handleAIPrompt(aiPayload.prompt, aiPayload.uuid);
       break;
     default:
       console.log(chalk.gray(`Unknown WebRTC message type: ${message.type}`));
@@ -454,18 +454,30 @@ function getDeviceId(): string {
 /**
  * Handle AI prompt from mobile client
  */
-async function handleAIPrompt(prompt: string): Promise<void> {
-  const activeProcess = processManager.getFirstActiveProcess();
+async function handleAIPrompt(prompt: string, uuid?: string): Promise<void> {
+  // Use provided UUID or fall back to first active process
+  let targetProcess;
+  if (uuid) {
+    targetProcess = processManager.getProcess(uuid);
+    if (!targetProcess) {
+      console.log(chalk.yellow(`⚠️  Process ${uuid.substring(0, 8)} not found, falling back to first active`));
+      targetProcess = processManager.getFirstActiveProcess();
+    }
+  } else {
+    targetProcess = processManager.getFirstActiveProcess();
+  }
   
-  if (!activeProcess) {
+  if (!targetProcess) {
     console.log(chalk.red("❌ Cannot process AI prompt - no active terminal"));
     return;
   }
+  
+  console.log(chalk.gray(`   Targeting process: ${targetProcess.uuid.substring(0, 8)}`));
 
   const aiService = getAIService();
   
   // Ensure AI service has the terminal reference
-  aiService.setTerminal(activeProcess.pty);
+  aiService.setTerminal(targetProcess.pty);
 
   try {
     await aiService.handlePrompt(prompt, {
@@ -837,7 +849,7 @@ function connectToRelay() {
   // Handle AI prompt via Socket
   socket.on("ai:prompt", (data: AIPromptPayload) => {
     console.log(chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`));
-    handleAIPrompt(data.prompt);
+    handleAIPrompt(data.prompt, data.uuid);
   });
 }
 

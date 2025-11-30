@@ -81,6 +81,7 @@ export interface AIConversationContext {
 /** AI prompt payload from mobile */
 export interface AIPromptPayload {
   prompt: string;
+  uuid?: string; // Target process UUID (optional, falls back to first active)
 }
 
 /** Terminal screen snapshot */

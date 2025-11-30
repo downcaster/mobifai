@@ -340,7 +340,11 @@ export default function TerminalScreen({
     console.log("🤖 Sending AI prompt:", aiPrompt);
     setAiProcessing(true);
 
-    const promptData = { prompt: aiPrompt.trim() };
+    // Include active process UUID so Mac knows which terminal to target
+    const promptData = { 
+      prompt: aiPrompt.trim(),
+      uuid: activeProcessUuidRef.current 
+    };
     sendToMac("ai:prompt", promptData);
 
     // Show toast notification instead of terminal output

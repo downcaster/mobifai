@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
@@ -69,6 +70,8 @@ export default function TerminalScreen({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiToastMessage, setAiToastMessage] = useState<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const scrollButtonOpacity = useRef(new Animated.Value(0)).current;
 
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -183,9 +186,11 @@ export default function TerminalScreen({
     }
 
     // Show toast notification instead of terminal output
-    const toastMsg = `🤖 AI: "${aiPrompt.trim().substring(0, 50)}${aiPrompt.trim().length > 50 ? '...' : ''}"`;
+    const toastMsg = `🤖 AI: "${aiPrompt.trim().substring(0, 50)}${
+      aiPrompt.trim().length > 50 ? "..." : ""
+    }"`;
     setAiToastMessage(toastMsg);
-    
+
     // Hide toast after 3 seconds
     setTimeout(() => setAiToastMessage(null), 3000);
 
@@ -541,6 +546,10 @@ export default function TerminalScreen({
           setCopyFeedback(true);
           setTimeout(() => setCopyFeedback(false), 1500);
         }
+      } else if (message.type === "scroll") {
+        // Show/hide scroll-to-bottom button based on scroll position
+        const { distanceFromBottom } = message.data;
+        setShowScrollToBottom(distanceFromBottom > 20);
       }
     } catch (error) {
       console.error("Error handling WebView message:", error);
@@ -552,6 +561,15 @@ export default function TerminalScreen({
       sendToTerminal("output", connectionStatus + "\r\n");
     }
   }, [connectionStatus, terminalReady]);
+
+  // Animate scroll to bottom button
+  useEffect(() => {
+    Animated.timing(scrollButtonOpacity, {
+      toValue: showScrollToBottom ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showScrollToBottom, scrollButtonOpacity]);
 
   // ... (keep existing terminalHtml) ...
   const terminalHtml = `
@@ -804,6 +822,10 @@ export default function TerminalScreen({
                 }));
             } else if (message.type === 'focus') {
                 terminal.focus();
+            } else if (message.type === 'scrollToBottom') {
+                if (window.scrollToBottom) {
+                    window.scrollToBottom();
+                }
             }
         }
         
@@ -865,6 +887,35 @@ export default function TerminalScreen({
                 }, 100);
             }
         }, { passive: false });
+        
+        // Track scroll position and notify React Native
+        function checkScrollPosition() {
+            if (viewport) {
+                const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+                window.ReactNativeWebView?.postMessage(JSON.stringify({
+                    type: 'scroll',
+                    data: { distanceFromBottom }
+                }));
+            }
+        }
+        
+        // Check scroll on viewport scroll
+        if (viewport) {
+            viewport.addEventListener('scroll', checkScrollPosition);
+        }
+        
+        // Also check periodically in case content changes
+        setInterval(checkScrollPosition, 500);
+        
+        // Function to scroll to bottom smoothly (called from React Native)
+        window.scrollToBottom = function() {
+            if (viewport) {
+                viewport.scrollTo({
+                    top: viewport.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+        };
         
         setTimeout(() => {
             window.ReactNativeWebView?.postMessage(JSON.stringify({
@@ -979,6 +1030,22 @@ export default function TerminalScreen({
           <Text style={styles.aiToastText}>{aiToastMessage}</Text>
         </View>
       )}
+
+      {/* Scroll to Bottom Button */}
+      <Animated.View
+        style={[
+          styles.scrollToBottomButton,
+          { opacity: scrollButtonOpacity },
+        ]}
+        pointerEvents={showScrollToBottom ? "auto" : "none"}
+      >
+        <TouchableOpacity
+          style={styles.scrollToBottomTouchable}
+          onPress={() => sendToTerminal("scrollToBottom", {})}
+        >
+          <Text style={styles.scrollToBottomText}>↓</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* AI Prompt Modal */}
       <Modal
@@ -1166,6 +1233,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  // Scroll to Bottom Button
+  scrollToBottomButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  scrollToBottomTouchable: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0, 255, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  scrollToBottomText: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 2,
   },
   // AI Modal Styles
   modalOverlay: {

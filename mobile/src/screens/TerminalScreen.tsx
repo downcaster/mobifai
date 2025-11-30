@@ -341,9 +341,9 @@ export default function TerminalScreen({
     setAiProcessing(true);
 
     // Include active process UUID so Mac knows which terminal to target
-    const promptData = { 
+    const promptData = {
       prompt: aiPrompt.trim(),
-      uuid: activeProcessUuidRef.current 
+      uuid: activeProcessUuidRef.current,
     };
     sendToMac("ai:prompt", promptData);
 

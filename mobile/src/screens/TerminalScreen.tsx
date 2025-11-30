@@ -83,6 +83,7 @@ export default function TerminalScreen({
   const activeProcessUuidRef = useRef<string | null>(null); // Ref to avoid stale closures
   const processCounterRef = useRef(0);
   const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(new Set());
+  const [syncingTabs, setSyncingTabs] = useState(false); // True while waiting for processes:sync
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -137,6 +138,9 @@ export default function TerminalScreen({
 
     // Mark that a process has been created (prevents auto-create from triggering)
     firstProcessCreatedRef.current = true;
+    
+    // End syncing state if still active (user manually created a tab)
+    setSyncingTabs(false);
 
     const uuid = generateUUID();
     processCounterRef.current += 1;
@@ -362,6 +366,9 @@ export default function TerminalScreen({
         const syncPayload = payload as ProcessesSyncPayload;
         console.log(`📋 Received processes:sync with ${syncPayload.processes.length} process(es)`);
         
+        // End syncing state - we've received the sync data
+        setSyncingTabs(false);
+        
         if (syncPayload.processes.length > 0) {
           // Mark that processes exist (prevents auto-create)
           firstProcessCreatedRef.current = true;
@@ -399,6 +406,8 @@ export default function TerminalScreen({
           }
           
           console.log(`✅ Restored ${restoredProcesses.length} tab(s) from Mac`);
+        } else {
+          console.log(`📋 No existing tabs on Mac - user can create a new one`);
         }
         break;
       }
@@ -622,6 +631,7 @@ export default function TerminalScreen({
 
     socket.on("paired", ({ message }) => {
       setPaired(true);
+      setSyncingTabs(true); // Start syncing state - waiting for processes:sync from Mac
       console.log(`✅ ${message}`);
       setConnectionStatus("Connected!\n");
 
@@ -704,6 +714,7 @@ export default function TerminalScreen({
       // Processes persist on Mac and will be synced on reconnection
       setPaired(false);
       setWebrtcConnected(false);
+      setSyncingTabs(false); // Reset syncing state
       firstProcessCreatedRef.current = false; // Reset so reconnection can sync or create
       
       // Clear local process state - will be restored on reconnection via processes:sync
@@ -1390,6 +1401,15 @@ export default function TerminalScreen({
             </View>
           )}
         </View>
+      ) : syncingTabs ? (
+        // Show loading state while waiting for tabs to sync from Mac
+        <View style={styles.emptyStateContainer}>
+          <ActivityIndicator size="large" color="#0f0" />
+          <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
+          <Text style={styles.syncingSubtitle}>
+            Loading your terminals from Mac
+          </Text>
+        </View>
       ) : (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateIcon}>⌨️</Text>
@@ -1678,6 +1698,20 @@ const styles = StyleSheet.create({
     color: "#0f0",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  syncingTitle: {
+    color: "#0f0",
+    fontSize: 18,
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  syncingSubtitle: {
+    color: "#666",
+    fontSize: 14,
+    textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   addTabButton: {

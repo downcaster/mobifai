@@ -175,8 +175,9 @@ export default function TerminalScreen({
     };
     sendToMac("process:create", payload);
 
-    // Clear terminal for new process
+    // Clear terminal for new process and reset cursor visibility
     sendToTerminal("clear", {});
+    sendToTerminal("output", "\x1b[?25h"); // Show cursor (DECTCEM)
 
     // Hide loading spinner after shell initialization completes
     setTimeout(() => {
@@ -246,8 +247,9 @@ export default function TerminalScreen({
       const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
       sendToMac("process:switch", payload);
 
-      // Clear terminal screen - Mac will send the snapshot
+      // Clear terminal screen and reset cursor visibility - Mac will send the snapshot
       sendToTerminal("clear", {});
+      sendToTerminal("output", "\x1b[?25h"); // Show cursor (DECTCEM)
     },
     [sendToMac]
   );

@@ -68,6 +68,7 @@ export default function TerminalScreen({
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiToastMessage, setAiToastMessage] = useState<string | null>(null);
 
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -181,11 +182,12 @@ export default function TerminalScreen({
       socketRef.current.emit("ai:prompt", promptData);
     }
 
-    // Show feedback in terminal
-    sendToTerminal(
-      "output",
-      `\r\n\x1b[36m🤖 AI Processing: "${aiPrompt.trim()}"\x1b[0m\r\n`
-    );
+    // Show toast notification instead of terminal output
+    const toastMsg = `🤖 AI: "${aiPrompt.trim().substring(0, 50)}${aiPrompt.trim().length > 50 ? '...' : ''}"`;
+    setAiToastMessage(toastMsg);
+    
+    // Hide toast after 3 seconds
+    setTimeout(() => setAiToastMessage(null), 3000);
 
     // Close modal and reset
     setAiModalVisible(false);
@@ -569,6 +571,7 @@ export default function TerminalScreen({
             -webkit-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
+            touch-action: pan-y;
         }
         #terminal {
             position: absolute;
@@ -578,18 +581,36 @@ export default function TerminalScreen({
             bottom: 0;
             padding: 8px;
         }
+        #touch-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 100;
+            touch-action: pan-y;
+        }
         .xterm {
             height: 100%;
             width: 100%;
+            touch-action: pan-y;
         }
         .xterm-viewport {
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+        }
+        .xterm-screen {
+            touch-action: pan-y;
+        }
+        .xterm-rows {
+            touch-action: pan-y;
         }
     </style>
 </head>
 <body>
     <div id="terminal"></div>
+    <div id="touch-layer"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
@@ -601,7 +622,7 @@ export default function TerminalScreen({
             cursorStyle: 'block',
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             fontSize: 14,
-            lineHeight: 1.2,
+            lineHeight: 1.0,
             theme: {
                 background: '#000000',
                 foreground: '#00ff00',
@@ -789,6 +810,62 @@ export default function TerminalScreen({
         window.term = terminal;
         terminal.focus();
         
+        // Custom touch handling for scroll vs tap using overlay
+        let touchStartY = 0;
+        let touchStartX = 0;
+        let touchStartTime = 0;
+        let isScrolling = false;
+        let lastTouchY = 0;
+        const SCROLL_THRESHOLD = 8; // pixels to determine scroll vs tap
+        const TAP_TIMEOUT = 250; // ms
+        
+        const touchLayer = document.getElementById('touch-layer');
+        const viewport = document.querySelector('.xterm-viewport');
+        
+        touchLayer.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            lastTouchY = touchStartY;
+            touchStartTime = Date.now();
+            isScrolling = false;
+        }, { passive: false });
+        
+        touchLayer.addEventListener('touchmove', (e) => {
+            const currentY = e.touches[0].clientY;
+            const currentX = e.touches[0].clientX;
+            const deltaY = currentY - touchStartY;
+            const deltaX = currentX - touchStartX;
+            
+            // If vertical movement is greater than threshold, it's a scroll
+            if (Math.abs(deltaY) > SCROLL_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+                isScrolling = true;
+                e.preventDefault();
+                
+                // Scroll the viewport based on movement since last frame
+                if (viewport) {
+                    const scrollDelta = lastTouchY - currentY;
+                    viewport.scrollTop += scrollDelta;
+                }
+                lastTouchY = currentY;
+            }
+        }, { passive: false });
+        
+        touchLayer.addEventListener('touchend', (e) => {
+            const touchDuration = Date.now() - touchStartTime;
+            
+            // If it was a quick tap without much movement, focus terminal and simulate tap
+            if (!isScrolling && touchDuration < TAP_TIMEOUT) {
+                // Temporarily hide the touch layer to let tap through
+                touchLayer.style.pointerEvents = 'none';
+                terminal.focus();
+                
+                // Re-enable touch layer after a short delay
+                setTimeout(() => {
+                    touchLayer.style.pointerEvents = 'auto';
+                }, 100);
+            }
+        }, { passive: false });
+        
         setTimeout(() => {
             window.ReactNativeWebView?.postMessage(JSON.stringify({
                 type: 'ready',
@@ -877,8 +954,8 @@ export default function TerminalScreen({
         onMessage={handleWebViewMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        scrollEnabled={false}
-        showsVerticalScrollIndicator={false}
+        scrollEnabled={true}
+        showsVerticalScrollIndicator={true}
         showsHorizontalScrollIndicator={false}
         keyboardDisplayRequiresUserAction={false}
         originWhitelist={["*"]}
@@ -895,6 +972,13 @@ export default function TerminalScreen({
         }}
         hideKeyboardAccessoryView={true}
       />
+
+      {/* AI Toast Notification */}
+      {aiToastMessage && (
+        <View style={styles.aiToast}>
+          <Text style={styles.aiToastText}>{aiToastMessage}</Text>
+        </View>
+      )}
 
       {/* AI Prompt Modal */}
       <Modal
@@ -1058,6 +1142,30 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  // AI Toast Notification
+  aiToast: {
+    position: "absolute",
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(0, 200, 200, 0.95)",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  aiToastText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   // AI Modal Styles
   modalOverlay: {

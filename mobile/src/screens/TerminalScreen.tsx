@@ -79,10 +79,14 @@ export default function TerminalScreen({
 
   // Process management state
   const [processes, setProcesses] = useState<TerminalProcess[]>([]);
-  const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(null);
+  const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(
+    null
+  );
   const activeProcessUuidRef = useRef<string | null>(null); // Ref to avoid stale closures
   const processCounterRef = useRef(0);
-  const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(new Set());
+  const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(
+    new Set()
+  );
   const [syncingTabs, setSyncingTabs] = useState(false); // True while waiting for processes:sync
 
   // Keep ref in sync with state
@@ -138,7 +142,7 @@ export default function TerminalScreen({
 
     // Mark that a process has been created (prevents auto-create from triggering)
     firstProcessCreatedRef.current = true;
-    
+
     // End syncing state if still active (user manually created a tab)
     setSyncingTabs(false);
 
@@ -189,56 +193,64 @@ export default function TerminalScreen({
   /**
    * Terminate a process
    */
-  const terminateProcess = useCallback((uuid: string) => {
-    console.log(`📱 Terminating process: ${uuid.substring(0, 8)}`);
+  const terminateProcess = useCallback(
+    (uuid: string) => {
+      console.log(`📱 Terminating process: ${uuid.substring(0, 8)}`);
 
-    // Send terminate command to Mac
-    const payload: ProcessTerminatePayload = { uuid };
-    sendToMac("process:terminate", payload);
+      // Send terminate command to Mac
+      const payload: ProcessTerminatePayload = { uuid };
+      sendToMac("process:terminate", payload);
 
-    // Remove from local state
-    setProcesses((prev) => {
-      const newProcesses = prev.filter((p) => p.uuid !== uuid);
-      
-      // If we're terminating the active process, switch to another one
-      // Use ref to get current value inside callback
-      if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
-        // Switch to the most recent remaining process
-        const nextProcess = newProcesses[newProcesses.length - 1];
-        setActiveProcessUuid(nextProcess.uuid);
-        activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
-        
-        // Send switch command
-        const switchPayload: ProcessSwitchPayload = { activeUuids: [nextProcess.uuid] };
-        sendToMac("process:switch", switchPayload);
-      } else if (newProcesses.length === 0) {
-        setActiveProcessUuid(null);
-        activeProcessUuidRef.current = null; // Update ref immediately
-      }
-      
-      return newProcesses;
-    });
-  }, [sendToMac]);
+      // Remove from local state
+      setProcesses((prev) => {
+        const newProcesses = prev.filter((p) => p.uuid !== uuid);
+
+        // If we're terminating the active process, switch to another one
+        // Use ref to get current value inside callback
+        if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
+          // Switch to the most recent remaining process
+          const nextProcess = newProcesses[newProcesses.length - 1];
+          setActiveProcessUuid(nextProcess.uuid);
+          activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
+
+          // Send switch command
+          const switchPayload: ProcessSwitchPayload = {
+            activeUuids: [nextProcess.uuid],
+          };
+          sendToMac("process:switch", switchPayload);
+        } else if (newProcesses.length === 0) {
+          setActiveProcessUuid(null);
+          activeProcessUuidRef.current = null; // Update ref immediately
+        }
+
+        return newProcesses;
+      });
+    },
+    [sendToMac]
+  );
 
   /**
    * Switch to a different process
    */
-  const switchProcess = useCallback((uuid: string) => {
-    // Use ref to check current active process
-    if (uuid === activeProcessUuidRef.current) return;
+  const switchProcess = useCallback(
+    (uuid: string) => {
+      // Use ref to check current active process
+      if (uuid === activeProcessUuidRef.current) return;
 
-    console.log(`📱 Switching to process: ${uuid.substring(0, 8)}`);
-    
-    setActiveProcessUuid(uuid);
-    activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
+      console.log(`📱 Switching to process: ${uuid.substring(0, 8)}`);
 
-    // Send switch command to Mac
-    const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
-    sendToMac("process:switch", payload);
+      setActiveProcessUuid(uuid);
+      activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
 
-    // Clear terminal screen - Mac will send the snapshot
-    sendToTerminal("clear", {});
-  }, [sendToMac]);
+      // Send switch command to Mac
+      const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
+      sendToMac("process:switch", payload);
+
+      // Clear terminal screen - Mac will send the snapshot
+      sendToTerminal("clear", {});
+    },
+    [sendToMac]
+  );
 
   useEffect(() => {
     // Generate keys for this session
@@ -359,124 +371,162 @@ export default function TerminalScreen({
    * Handle process-related messages from Mac
    * Uses refs to avoid stale closure issues with callbacks
    */
-  const handleProcessMessage = useCallback((type: string, payload: unknown) => {
-    switch (type) {
-      case "processes:sync": {
-        // Restore tabs from Mac on reconnection
-        const syncPayload = payload as ProcessesSyncPayload;
-        console.log(`📋 Received processes:sync with ${syncPayload.processes.length} process(es)`);
-        
-        // End syncing state - we've received the sync data
-        setSyncingTabs(false);
-        
-        if (syncPayload.processes.length > 0) {
-          // Mark that processes exist (prevents auto-create)
-          firstProcessCreatedRef.current = true;
-          
-          // Restore processes from Mac
-          const restoredProcesses: TerminalProcess[] = syncPayload.processes.map((p) => ({
-            uuid: p.uuid,
-            createdAt: p.createdAt,
-            label: p.name,
-          }));
-          
-          setProcesses(restoredProcesses);
-          
-          // Update process counter to avoid duplicate names
-          const maxTabNumber = restoredProcesses.reduce((max, p) => {
-            const match = p.label.match(/^Tab (\d+)$/);
-            return match ? Math.max(max, parseInt(match[1], 10)) : max;
-          }, 0);
-          processCounterRef.current = maxTabNumber;
-          
-          // Set active process
-          if (syncPayload.activeUuids.length > 0) {
-            const activeUuid = syncPayload.activeUuids[0];
-            setActiveProcessUuid(activeUuid);
-            activeProcessUuidRef.current = activeUuid;
-            
-            // Request screen snapshot for active process
-            sendToMac("process:switch", { activeUuids: [activeUuid] });
-          } else if (restoredProcesses.length > 0) {
-            // Default to first process if none active
-            const firstUuid = restoredProcesses[0].uuid;
-            setActiveProcessUuid(firstUuid);
-            activeProcessUuidRef.current = firstUuid;
-            sendToMac("process:switch", { activeUuids: [firstUuid] });
-          }
-          
-          console.log(`✅ Restored ${restoredProcesses.length} tab(s) from Mac`);
-        } else {
-          console.log(`📋 No existing tabs on Mac - user can create a new one`);
-        }
-        break;
-      }
-      case "process:created": {
-        const { uuid } = payload as { uuid: string };
-        console.log(`✅ Mac confirmed process created: ${uuid.substring(0, 8)}`);
-        break;
-      }
-      case "process:terminated": {
-        const { uuid } = payload as { uuid: string };
-        console.log(`✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`);
-        break;
-      }
-      case "process:exited": {
-        const { uuid } = payload as ProcessExitedPayload;
-        console.log(`⚠️ Process exited unexpectedly: ${uuid.substring(0, 8)}`);
-        // Remove from local state
-        setProcesses((prev) => {
-          const newProcesses = prev.filter((p) => p.uuid !== uuid);
-          if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
-            const nextProcess = newProcesses[newProcesses.length - 1];
-            setActiveProcessUuid(nextProcess.uuid);
-            activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
-          } else if (newProcesses.length === 0) {
-            setActiveProcessUuid(null);
-            activeProcessUuidRef.current = null; // Update ref immediately
-          }
-          return newProcesses;
-        });
-        break;
-      }
-      case "process:screen": {
-        const { uuid, data } = payload as ProcessScreenPayload;
-        console.log(`📺 Received screen snapshot for ${uuid.substring(0, 8)}`);
-        // Only display if this is the active process (use ref for current value)
-        if (uuid === activeProcessUuidRef.current) {
-          sendToTerminal("output", data);
-        }
-        break;
-      }
-      case "process:error": {
-        const { uuid, error } = payload as { uuid: string; error: string };
-        console.error(`❌ Process error for ${uuid.substring(0, 8)}: ${error}`);
-        Alert.alert("Process Error", error);
-        break;
-      }
-      case "terminal:output": {
-        // Handle output with uuid
-        const outputPayload = payload as TerminalOutputPayload | string;
-        console.log(`📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(0, 8)}`);
-        
-        if (typeof outputPayload === "object" && outputPayload.uuid) {
-          console.log(`   Output from process: ${outputPayload.uuid.substring(0, 8)}, data length: ${outputPayload.data?.length}`);
-          // Only display if from active process (use ref for current value)
-          if (outputPayload.uuid === activeProcessUuidRef.current) {
-            console.log(`   ✅ Displaying output`);
-            sendToTerminal("output", outputPayload.data);
+  const handleProcessMessage = useCallback(
+    (type: string, payload: unknown) => {
+      switch (type) {
+        case "processes:sync": {
+          // Restore tabs from Mac on reconnection
+          const syncPayload = payload as ProcessesSyncPayload;
+          console.log(
+            `📋 Received processes:sync with ${syncPayload.processes.length} process(es)`
+          );
+
+          // End syncing state - we've received the sync data
+          setSyncingTabs(false);
+
+          if (syncPayload.processes.length > 0) {
+            // Mark that processes exist (prevents auto-create)
+            firstProcessCreatedRef.current = true;
+
+            // Restore processes from Mac
+            const restoredProcesses: TerminalProcess[] =
+              syncPayload.processes.map((p) => ({
+                uuid: p.uuid,
+                createdAt: p.createdAt,
+                label: p.name,
+              }));
+
+            setProcesses(restoredProcesses);
+
+            // Update process counter to avoid duplicate names
+            const maxTabNumber = restoredProcesses.reduce((max, p) => {
+              const match = p.label.match(/^Tab (\d+)$/);
+              return match ? Math.max(max, parseInt(match[1], 10)) : max;
+            }, 0);
+            processCounterRef.current = maxTabNumber;
+
+            // Set active process
+            if (syncPayload.activeUuids.length > 0) {
+              const activeUuid = syncPayload.activeUuids[0];
+              setActiveProcessUuid(activeUuid);
+              activeProcessUuidRef.current = activeUuid;
+
+              // Request screen snapshot for active process
+              sendToMac("process:switch", { activeUuids: [activeUuid] });
+            } else if (restoredProcesses.length > 0) {
+              // Default to first process if none active
+              const firstUuid = restoredProcesses[0].uuid;
+              setActiveProcessUuid(firstUuid);
+              activeProcessUuidRef.current = firstUuid;
+              sendToMac("process:switch", { activeUuids: [firstUuid] });
+            }
+
+            console.log(
+              `✅ Restored ${restoredProcesses.length} tab(s) from Mac`
+            );
           } else {
-            console.log(`   🔇 Ignoring output from inactive process ${outputPayload.uuid.substring(0, 8)}`);
+            console.log(
+              `📋 No existing tabs on Mac - user can create a new one`
+            );
           }
-        } else {
-          // Legacy format (no uuid) - display directly
-          console.log(`   Legacy format, displaying directly`);
-          sendToTerminal("output", outputPayload);
+          break;
         }
-        break;
+        case "process:created": {
+          const { uuid } = payload as { uuid: string };
+          console.log(
+            `✅ Mac confirmed process created: ${uuid.substring(0, 8)}`
+          );
+          break;
+        }
+        case "process:terminated": {
+          const { uuid } = payload as { uuid: string };
+          console.log(
+            `✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`
+          );
+          break;
+        }
+        case "process:exited": {
+          const { uuid } = payload as ProcessExitedPayload;
+          console.log(
+            `⚠️ Process exited unexpectedly: ${uuid.substring(0, 8)}`
+          );
+          // Remove from local state
+          setProcesses((prev) => {
+            const newProcesses = prev.filter((p) => p.uuid !== uuid);
+            if (
+              activeProcessUuidRef.current === uuid &&
+              newProcesses.length > 0
+            ) {
+              const nextProcess = newProcesses[newProcesses.length - 1];
+              setActiveProcessUuid(nextProcess.uuid);
+              activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
+            } else if (newProcesses.length === 0) {
+              setActiveProcessUuid(null);
+              activeProcessUuidRef.current = null; // Update ref immediately
+            }
+            return newProcesses;
+          });
+          break;
+        }
+        case "process:screen": {
+          const { uuid, data } = payload as ProcessScreenPayload;
+          console.log(
+            `📺 Received screen snapshot for ${uuid.substring(0, 8)}`
+          );
+          // Only display if this is the active process (use ref for current value)
+          if (uuid === activeProcessUuidRef.current) {
+            sendToTerminal("output", data);
+          }
+          break;
+        }
+        case "process:error": {
+          const { uuid, error } = payload as { uuid: string; error: string };
+          console.error(
+            `❌ Process error for ${uuid.substring(0, 8)}: ${error}`
+          );
+          Alert.alert("Process Error", error);
+          break;
+        }
+        case "terminal:output": {
+          // Handle output with uuid
+          const outputPayload = payload as TerminalOutputPayload | string;
+          console.log(
+            `📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(
+              0,
+              8
+            )}`
+          );
+
+          if (typeof outputPayload === "object" && outputPayload.uuid) {
+            console.log(
+              `   Output from process: ${outputPayload.uuid.substring(
+                0,
+                8
+              )}, data length: ${outputPayload.data?.length}`
+            );
+            // Only display if from active process (use ref for current value)
+            if (outputPayload.uuid === activeProcessUuidRef.current) {
+              console.log(`   ✅ Displaying output`);
+              sendToTerminal("output", outputPayload.data);
+            } else {
+              console.log(
+                `   🔇 Ignoring output from inactive process ${outputPayload.uuid.substring(
+                  0,
+                  8
+                )}`
+              );
+            }
+          } else {
+            // Legacy format (no uuid) - display directly
+            console.log(`   Legacy format, displaying directly`);
+            sendToTerminal("output", outputPayload);
+          }
+          break;
+        }
       }
-    }
-  }, [sendToMac]); // Added sendToMac dependency for process:switch call
+    },
+    [sendToMac]
+  ); // Added sendToMac dependency for process:switch call
 
   const connectToRelay = async () => {
     setConnectionStatus("📡 Connecting to relay server...");
@@ -641,7 +691,11 @@ export default function TerminalScreen({
 
       // Handle WebRTC messages - now with process support
       webrtcRef.current.onMessage((data) => {
-        console.log(`📡 WebRTC message received: type=${data.type}, hasPayload=${!!data.payload}`);
+        console.log(
+          `📡 WebRTC message received: type=${
+            data.type
+          }, hasPayload=${!!data.payload}`
+        );
         handleProcessMessage(data.type, data.payload ?? data);
       });
 
@@ -684,12 +738,24 @@ export default function TerminalScreen({
     });
 
     // Listen for process-related messages via Socket
-    socket.on("processes:sync", (payload) => handleProcessMessage("processes:sync", payload));
-    socket.on("process:created", (payload) => handleProcessMessage("process:created", payload));
-    socket.on("process:terminated", (payload) => handleProcessMessage("process:terminated", payload));
-    socket.on("process:exited", (payload) => handleProcessMessage("process:exited", payload));
-    socket.on("process:screen", (payload) => handleProcessMessage("process:screen", payload));
-    socket.on("process:error", (payload) => handleProcessMessage("process:error", payload));
+    socket.on("processes:sync", (payload) =>
+      handleProcessMessage("processes:sync", payload)
+    );
+    socket.on("process:created", (payload) =>
+      handleProcessMessage("process:created", payload)
+    );
+    socket.on("process:terminated", (payload) =>
+      handleProcessMessage("process:terminated", payload)
+    );
+    socket.on("process:exited", (payload) =>
+      handleProcessMessage("process:exited", payload)
+    );
+    socket.on("process:screen", (payload) =>
+      handleProcessMessage("process:screen", payload)
+    );
+    socket.on("process:error", (payload) =>
+      handleProcessMessage("process:error", payload)
+    );
 
     // Listen for terminal output via WebSocket (fallback)
     socket.on("terminal:output", (data: TerminalOutputPayload | string) => {
@@ -716,20 +782,27 @@ export default function TerminalScreen({
       setWebrtcConnected(false);
       setSyncingTabs(false); // Reset syncing state
       firstProcessCreatedRef.current = false; // Reset so reconnection can sync or create
-      
+
       // Clear local process state - will be restored on reconnection via processes:sync
       setProcesses([]);
       setActiveProcessUuid(null);
       activeProcessUuidRef.current = null;
-      
+
       sendToTerminal("output", `\r\n\x1b[33m⚠️ ${message}\x1b[0m\r\n`);
-      sendToTerminal("output", `\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n`);
-      Alert.alert("Disconnected", `${message}\n\nYour terminals are still running on the Mac. Reconnect to restore them.`, [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      sendToTerminal(
+        "output",
+        `\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n`
+      );
+      Alert.alert(
+        "Disconnected",
+        `${message}\n\nYour terminals are still running on the Mac. Reconnect to restore them.`,
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
     });
 
     socket.on("disconnect", (reason) => {
@@ -779,7 +852,12 @@ export default function TerminalScreen({
 
   // Auto-create first process after WebRTC is connected
   useEffect(() => {
-    if (paired && webrtcConnected && !firstProcessCreatedRef.current && terminalDimensionsRef.current) {
+    if (
+      paired &&
+      webrtcConnected &&
+      !firstProcessCreatedRef.current &&
+      terminalDimensionsRef.current
+    ) {
       firstProcessCreatedRef.current = true;
       console.log("📱 Auto-creating first process after WebRTC connected...");
       // Small delay to ensure everything is stable
@@ -812,7 +890,9 @@ export default function TerminalScreen({
         // If paired with WebRTC but no process created yet, create first process now
         if (paired && webrtcConnected && !firstProcessCreatedRef.current) {
           firstProcessCreatedRef.current = true;
-          console.log("📱 Creating first process (dimensions ready, WebRTC connected)...");
+          console.log(
+            "📱 Creating first process (dimensions ready, WebRTC connected)..."
+          );
           setTimeout(() => createProcess(), 100);
         }
       } else if (message.type === "input") {
@@ -1252,7 +1332,7 @@ export default function TerminalScreen({
    */
   const renderTab = (process: TerminalProcess, index: number) => {
     const isActive = process.uuid === activeProcessUuid;
-    
+
     return (
       <TouchableOpacity
         key={process.uuid}
@@ -1353,7 +1433,7 @@ export default function TerminalScreen({
             contentContainerStyle={styles.tabsScrollContent}
           >
             {processes.map((process, index) => renderTab(process, index))}
-            
+
             {/* Add tab button */}
             <TouchableOpacity
               style={[styles.addTabButton, !paired && styles.buttonDisabled]}
@@ -1397,7 +1477,9 @@ export default function TerminalScreen({
           {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
             <View style={styles.terminalLoadingOverlay}>
               <ActivityIndicator size="small" color="#0f0" />
-              <Text style={styles.terminalLoadingText}>Starting terminal...</Text>
+              <Text style={styles.terminalLoadingText}>
+                Starting terminal...
+              </Text>
             </View>
           )}
         </View>
@@ -1445,10 +1527,7 @@ export default function TerminalScreen({
 
       {/* Scroll to Bottom Button */}
       <Animated.View
-        style={[
-          styles.scrollToBottomButton,
-          { opacity: scrollButtonOpacity },
-        ]}
+        style={[styles.scrollToBottomButton, { opacity: scrollButtonOpacity }]}
         pointerEvents={showScrollToBottom ? "auto" : "none"}
       >
         <TouchableOpacity

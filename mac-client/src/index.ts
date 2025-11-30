@@ -37,6 +37,7 @@ interface IceCandidate {
 // Process command payloads
 interface ProcessCreatePayload {
   uuid: string;
+  name?: string;
   cols?: number;
   rows?: number;
 }
@@ -47,6 +48,11 @@ interface ProcessTerminatePayload {
 
 interface ProcessSwitchPayload {
   activeUuids: string[];
+}
+
+interface ProcessRenamePayload {
+  uuid: string;
+  name: string;
 }
 
 interface TerminalInputPayload {
@@ -136,11 +142,11 @@ function setupProcessManagerCallbacks(): void {
  * Handle process:create command from iOS
  */
 function handleProcessCreate(payload: ProcessCreatePayload): void {
-  const { uuid, cols = terminalCols, rows = terminalRows } = payload;
+  const { uuid, name, cols = terminalCols, rows = terminalRows } = payload;
   
-  console.log(chalk.cyan(`📱 iOS requested process creation: ${uuid.substring(0, 8)}`));
+  console.log(chalk.cyan(`📱 iOS requested process creation: ${uuid.substring(0, 8)} "${name || 'unnamed'}"`));
   
-  const processInfo = processManager.createProcess(uuid, cols, rows);
+  const processInfo = processManager.createProcess(uuid, cols, rows, name);
   
   if (processInfo) {
     // Set this process as the only active one
@@ -151,8 +157,8 @@ function handleProcessCreate(payload: ProcessCreatePayload): void {
     aiService.setTerminal(processInfo.pty);
     aiService.setDimensions(cols, rows);
     
-    // Notify iOS that process was created
-    sendToClient("process:created", { uuid });
+    // Notify iOS that process was created (include the name that was assigned)
+    sendToClient("process:created", { uuid, name: processInfo.name });
     
     // Send system ready message (for first process)
     if (processManager.getProcessCount() === 1) {
@@ -160,6 +166,23 @@ function handleProcessCreate(payload: ProcessCreatePayload): void {
     }
   } else {
     sendToClient("process:error", { uuid, error: "Failed to create process" });
+  }
+}
+
+/**
+ * Handle process:rename command from iOS
+ */
+function handleProcessRename(payload: ProcessRenamePayload): void {
+  const { uuid, name } = payload;
+  
+  console.log(chalk.cyan(`📱 iOS requested process rename: ${uuid.substring(0, 8)} -> "${name}"`));
+  
+  const success = processManager.renameProcess(uuid, name);
+  
+  if (success) {
+    sendToClient("process:renamed", { uuid, name });
+  } else {
+    sendToClient("process:error", { uuid, error: "Failed to rename process" });
   }
 }
 
@@ -307,6 +330,17 @@ async function setupWebRTC() {
     channel.onopen = () => {
       console.log(chalk.green("✅ WebRTC data channel opened"));
       isWebRTCConnected = true;
+      
+      // Send processes:sync via WebRTC if we have existing processes
+      const existingProcesses = processManager.getProcessSyncData();
+      if (existingProcesses.length > 0) {
+        console.log(chalk.cyan(`📋 Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
+        const syncPayload = {
+          processes: existingProcesses,
+          activeUuids: processManager.getActiveProcessIds(),
+        };
+        sendToClient("processes:sync", syncPayload);
+      }
     };
 
     channel.onclose = () => {
@@ -370,6 +404,9 @@ function handleWebRTCMessage(message: { type: string; payload: unknown }): void 
       break;
     case "process:switch":
       handleProcessSwitch(message.payload as ProcessSwitchPayload);
+      break;
+    case "process:rename":
+      handleProcessRename(message.payload as ProcessRenamePayload);
       break;
     case "terminal:input":
       handleTerminalInput(message.payload as TerminalInputPayload);
@@ -675,11 +712,29 @@ function connectToRelay() {
         chalk.gray(`🔒 Connection secured with end-to-end encryption\n`)
       );
 
-      // DON'T auto-create terminal - iOS will send process:create command
-      console.log(chalk.cyan("⏳ Waiting for iOS to create first process..."));
-
       // Initialize AI service dimensions
       getAIService().setDimensions(terminalCols, terminalRows);
+
+      // Check if we have existing processes (reconnection scenario)
+      const existingProcesses = processManager.getProcessSyncData();
+      if (existingProcesses.length > 0) {
+        console.log(chalk.cyan(`📋 Syncing ${existingProcesses.length} existing process(es) to iOS...`));
+        
+        // Send processes:sync with existing tabs
+        const syncPayload = {
+          processes: existingProcesses,
+          activeUuids: processManager.getActiveProcessIds(),
+        };
+        
+        // We'll send this after WebRTC connects, so store it
+        // For now, also emit via socket as fallback
+        socket.emit("processes:sync", syncPayload);
+        
+        // Send terminal ready since we already have processes
+        socket.emit("system:message", { type: "terminal_ready" });
+      } else {
+        console.log(chalk.cyan("⏳ Waiting for iOS to create first process..."));
+      }
 
       // Initiate WebRTC
       setupWebRTC();
@@ -687,23 +742,50 @@ function connectToRelay() {
   );
 
   socket.on("paired_device_disconnected", ({ message }) => {
-    console.log(chalk.red(`\n❌ ${message}`));
+    console.log(chalk.yellow(`\n⚠️  ${message}`));
+    
+    // Check if WebRTC P2P is still active
     if (isWebRTCConnected && dataChannel?.readyState === "open") {
       console.log(chalk.yellow("⚠️  Relay disconnected, but P2P active"));
       return;
     }
     
-    // Clean up all processes
-    processManager.cleanup();
+    // Close WebRTC connection but DON'T cleanup processes
+    // Processes will persist for reconnection
+    console.log(chalk.cyan(`📋 Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`));
     
-    // Re-register to wait for connection
+    // Close WebRTC
+    if (dataChannel) {
+      try {
+        dataChannel.close();
+      } catch (e) {
+        // Ignore
+      }
+      dataChannel = null;
+    }
+    
+    if (peerConnection) {
+      try {
+        peerConnection.close();
+      } catch (e) {
+        // Ignore
+      }
+      peerConnection = null;
+    }
+    isWebRTCConnected = false;
+    pendingIceCandidates = [];
+    
+    // Re-register to wait for reconnection
     const token = getToken();
     socket.emit("register", {
       type: "mac",
       token,
       deviceId,
       deviceName: os.hostname(),
+      publicKey: keyPair.publicKey,
     });
+    
+    console.log(chalk.cyan("⏳ Waiting for iOS to reconnect..."));
   });
 
   // WebRTC handlers
@@ -743,6 +825,10 @@ function connectToRelay() {
 
   socket.on("process:switch", (payload: ProcessSwitchPayload) => {
     handleProcessSwitch(payload);
+  });
+
+  socket.on("process:rename", (payload: ProcessRenamePayload) => {
+    handleProcessRename(payload);
   });
 
   // Fallback IO - Accept from socket even if WebRTC is active (Mobile decides routing)

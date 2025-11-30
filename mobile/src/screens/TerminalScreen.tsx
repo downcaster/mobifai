@@ -39,6 +39,7 @@ import {
   TerminalOutputPayload,
   ProcessScreenPayload,
   ProcessExitedPayload,
+  ProcessesSyncPayload,
 } from "../types/process";
 
 // UUID generator for process IDs
@@ -157,9 +158,10 @@ export default function TerminalScreen({
     // Show loading spinner for this process while terminal initializes
     setLoadingProcesses((prev) => new Set(prev).add(uuid));
 
-    // Send create command to Mac
+    // Send create command to Mac (include name)
     const payload: ProcessCreatePayload = {
       uuid,
+      name: label,
       cols: terminalDimensionsRef.current?.cols,
       rows: terminalDimensionsRef.current?.rows,
     };
@@ -355,6 +357,51 @@ export default function TerminalScreen({
    */
   const handleProcessMessage = useCallback((type: string, payload: unknown) => {
     switch (type) {
+      case "processes:sync": {
+        // Restore tabs from Mac on reconnection
+        const syncPayload = payload as ProcessesSyncPayload;
+        console.log(`📋 Received processes:sync with ${syncPayload.processes.length} process(es)`);
+        
+        if (syncPayload.processes.length > 0) {
+          // Mark that processes exist (prevents auto-create)
+          firstProcessCreatedRef.current = true;
+          
+          // Restore processes from Mac
+          const restoredProcesses: TerminalProcess[] = syncPayload.processes.map((p) => ({
+            uuid: p.uuid,
+            createdAt: p.createdAt,
+            label: p.name,
+          }));
+          
+          setProcesses(restoredProcesses);
+          
+          // Update process counter to avoid duplicate names
+          const maxTabNumber = restoredProcesses.reduce((max, p) => {
+            const match = p.label.match(/^Tab (\d+)$/);
+            return match ? Math.max(max, parseInt(match[1], 10)) : max;
+          }, 0);
+          processCounterRef.current = maxTabNumber;
+          
+          // Set active process
+          if (syncPayload.activeUuids.length > 0) {
+            const activeUuid = syncPayload.activeUuids[0];
+            setActiveProcessUuid(activeUuid);
+            activeProcessUuidRef.current = activeUuid;
+            
+            // Request screen snapshot for active process
+            sendToMac("process:switch", { activeUuids: [activeUuid] });
+          } else if (restoredProcesses.length > 0) {
+            // Default to first process if none active
+            const firstUuid = restoredProcesses[0].uuid;
+            setActiveProcessUuid(firstUuid);
+            activeProcessUuidRef.current = firstUuid;
+            sendToMac("process:switch", { activeUuids: [firstUuid] });
+          }
+          
+          console.log(`✅ Restored ${restoredProcesses.length} tab(s) from Mac`);
+        }
+        break;
+      }
       case "process:created": {
         const { uuid } = payload as { uuid: string };
         console.log(`✅ Mac confirmed process created: ${uuid.substring(0, 8)}`);
@@ -420,7 +467,7 @@ export default function TerminalScreen({
         break;
       }
     }
-  }, []); // No dependencies - uses refs for mutable values
+  }, [sendToMac]); // Added sendToMac dependency for process:switch call
 
   const connectToRelay = async () => {
     setConnectionStatus("📡 Connecting to relay server...");
@@ -627,6 +674,7 @@ export default function TerminalScreen({
     });
 
     // Listen for process-related messages via Socket
+    socket.on("processes:sync", (payload) => handleProcessMessage("processes:sync", payload));
     socket.on("process:created", (payload) => handleProcessMessage("process:created", payload));
     socket.on("process:terminated", (payload) => handleProcessMessage("process:terminated", payload));
     socket.on("process:exited", (payload) => handleProcessMessage("process:exited", payload));
@@ -652,11 +700,20 @@ export default function TerminalScreen({
         return;
       }
 
+      // Reset connection state but DON'T clear processes
+      // Processes persist on Mac and will be synced on reconnection
       setPaired(false);
+      setWebrtcConnected(false);
+      firstProcessCreatedRef.current = false; // Reset so reconnection can sync or create
+      
+      // Clear local process state - will be restored on reconnection via processes:sync
       setProcesses([]);
       setActiveProcessUuid(null);
-      sendToTerminal("output", `\r\n\x1b[31m❌ ${message}\x1b[0m\r\n`);
-      Alert.alert("Disconnected", message, [
+      activeProcessUuidRef.current = null;
+      
+      sendToTerminal("output", `\r\n\x1b[33m⚠️ ${message}\x1b[0m\r\n`);
+      sendToTerminal("output", `\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n`);
+      Alert.alert("Disconnected", `${message}\n\nYour terminals are still running on the Mac. Reconnect to restore them.`, [
         {
           text: "OK",
           onPress: () => navigation.goBack(),

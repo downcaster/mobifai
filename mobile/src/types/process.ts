@@ -19,6 +19,7 @@ export interface TerminalProcess {
  */
 export interface ProcessCreatePayload {
   uuid: string;
+  name?: string;
   cols?: number;
   rows?: number;
 }
@@ -42,6 +43,41 @@ export interface ProcessSwitchPayload {
  */
 export interface ProcessCreatedPayload {
   uuid: string;
+  name?: string;
+}
+
+/**
+ * Payload for process:rename command (iOS -> Mac)
+ */
+export interface ProcessRenamePayload {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * Payload for process:renamed event (Mac -> iOS)
+ */
+export interface ProcessRenamedPayload {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * Process data for sync (Mac -> iOS on reconnection)
+ */
+export interface ProcessSyncData {
+  uuid: string;
+  name: string;
+  createdAt: number;
+}
+
+/**
+ * Payload for processes:sync event (Mac -> iOS)
+ * Sent on reconnection to restore existing tabs
+ */
+export interface ProcessesSyncPayload {
+  processes: ProcessSyncData[];
+  activeUuids: string[];
 }
 
 /**

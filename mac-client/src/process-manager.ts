@@ -7,11 +7,21 @@ import chalk from "chalk";
  */
 export interface ProcessInfo {
   uuid: string;
+  name: string;
   pty: pty.IPty;
   screenBuffer: string;
   createdAt: number;
   cols: number;
   rows: number;
+}
+
+/**
+ * Sync data for a process (sent to iOS on reconnection)
+ */
+export interface ProcessSyncData {
+  uuid: string;
+  name: string;
+  createdAt: number;
 }
 
 /**
@@ -59,9 +69,10 @@ export class ProcessManager {
    * @param uuid - Unique identifier from iOS client
    * @param cols - Terminal columns
    * @param rows - Terminal rows
+   * @param name - Optional display name for the tab
    * @returns The created ProcessInfo or null on failure
    */
-  public createProcess(uuid: string, cols: number, rows: number): ProcessInfo | null {
+  public createProcess(uuid: string, cols: number, rows: number, name?: string): ProcessInfo | null {
     if (this.processMap.has(uuid)) {
       console.log(chalk.yellow(`⚠️  Process ${uuid} already exists`));
       return this.processMap.get(uuid) || null;
@@ -71,7 +82,10 @@ export class ProcessManager {
       ? "powershell.exe" 
       : process.env.SHELL || "bash";
 
-    console.log(chalk.cyan(`\n🖥️  Creating process ${uuid.substring(0, 8)}... (${shell})`));
+    // Generate default name if not provided
+    const processName = name || `Tab ${this.processMap.size + 1}`;
+
+    console.log(chalk.cyan(`\n🖥️  Creating process ${uuid.substring(0, 8)} "${processName}"... (${shell})`));
 
     const env = {
       ...process.env,
@@ -90,6 +104,7 @@ export class ProcessManager {
 
       const processInfo: ProcessInfo = {
         uuid,
+        name: processName,
         pty: ptyProcess,
         screenBuffer: "",
         createdAt: Date.now(),
@@ -295,6 +310,41 @@ export class ProcessManager {
    */
   public getProcessCount(): number {
     return this.processMap.size;
+  }
+
+  /**
+   * Get sync data for all processes (for sending to iOS on reconnection)
+   */
+  public getProcessSyncData(): ProcessSyncData[] {
+    const syncData: ProcessSyncData[] = [];
+    for (const [uuid, processInfo] of this.processMap) {
+      syncData.push({
+        uuid,
+        name: processInfo.name,
+        createdAt: processInfo.createdAt,
+      });
+    }
+    // Sort by creation time
+    syncData.sort((a, b) => a.createdAt - b.createdAt);
+    return syncData;
+  }
+
+  /**
+   * Rename a process
+   * @param uuid - Process UUID
+   * @param name - New name for the process
+   * @returns true if renamed successfully, false if process not found
+   */
+  public renameProcess(uuid: string, name: string): boolean {
+    const processInfo = this.processMap.get(uuid);
+    if (!processInfo) {
+      console.log(chalk.yellow(`⚠️  Cannot rename process ${uuid}: not found`));
+      return false;
+    }
+
+    console.log(chalk.cyan(`📝 Renaming process ${uuid.substring(0, 8)} to "${name}"`));
+    processInfo.name = name;
+    return true;
   }
 
   /**

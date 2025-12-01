@@ -72,6 +72,22 @@ export const terminalThemes: TerminalTheme[] = [
     cursor: "#88c0d0",
     cursorAccent: "#2e3440",
   },
+  {
+    id: "tokyo-night",
+    name: "Tokyo Night",
+    background: "#1a1b26",
+    foreground: "#c0caf5",
+    cursor: "#c0caf5",
+    cursorAccent: "#1a1b26",
+  },
+  {
+    id: "catppuccin",
+    name: "Catppuccin",
+    background: "#1e1e2e",
+    foreground: "#cdd6f4",
+    cursor: "#f5e0dc",
+    cursorAccent: "#1e1e2e",
+  },
 ];
 
 export const getThemeById = (id: string): TerminalTheme => {

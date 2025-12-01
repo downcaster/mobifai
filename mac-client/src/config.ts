@@ -31,7 +31,7 @@ if (isProduction) {
 }
 
 console.log(
-  `🖥️  Mac Client Config: ${isProduction ? "Production" : "Development"} mode`
+  `Mac Client Config: ${isProduction ? "Production" : "Development"} mode`
 );
 
 // Get values

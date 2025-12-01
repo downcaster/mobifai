@@ -74,7 +74,7 @@ let keyPair: KeyPair;
 let peerPublicKey: string | null = null;
 let sharedSecret: Buffer | null = null;
 
-console.log(chalk.bold.cyan("\n🖥️  MobiFai Mac Client"));
+console.log(chalk.bold.cyan("\nMobiFai Mac Client"));
 console.log(chalk.gray("================================\n"));
 
 let socket: Socket;
@@ -125,7 +125,7 @@ function setupProcessManagerCallbacks(): void {
     }
     
     // Debug: log output being sent
-    console.log(chalk.gray(`📤 Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
+    console.log(chalk.gray(`→ Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
     
     // Send output to iOS with uuid
     sendToClient("terminal:output", { uuid, data });
@@ -144,7 +144,7 @@ function setupProcessManagerCallbacks(): void {
 function handleProcessCreate(payload: ProcessCreatePayload): void {
   const { uuid, name, cols = terminalCols, rows = terminalRows } = payload;
   
-  console.log(chalk.cyan(`📱 iOS requested process creation: ${uuid.substring(0, 8)} "${name || 'unnamed'}"`));
+  console.log(chalk.cyan(`[iOS] Process creation: ${uuid.substring(0, 8)} "${name || 'unnamed'}"`));
   
   const processInfo = processManager.createProcess(uuid, cols, rows, name);
   
@@ -175,7 +175,7 @@ function handleProcessCreate(payload: ProcessCreatePayload): void {
 function handleProcessRename(payload: ProcessRenamePayload): void {
   const { uuid, name } = payload;
   
-  console.log(chalk.cyan(`📱 iOS requested process rename: ${uuid.substring(0, 8)} -> "${name}"`));
+  console.log(chalk.cyan(`[iOS] Process rename: ${uuid.substring(0, 8)} -> "${name}"`));
   
   const success = processManager.renameProcess(uuid, name);
   
@@ -192,7 +192,7 @@ function handleProcessRename(payload: ProcessRenamePayload): void {
 function handleProcessTerminate(payload: ProcessTerminatePayload): void {
   const { uuid } = payload;
   
-  console.log(chalk.cyan(`📱 iOS requested process termination: ${uuid.substring(0, 8)}`));
+  console.log(chalk.cyan(`[iOS] Process termination: ${uuid.substring(0, 8)}`));
   
   const success = processManager.terminateProcess(uuid);
   
@@ -209,7 +209,7 @@ function handleProcessTerminate(payload: ProcessTerminatePayload): void {
 function handleProcessSwitch(payload: ProcessSwitchPayload): void {
   const { activeUuids } = payload;
   
-  console.log(chalk.cyan(`📱 iOS requested process switch: ${activeUuids.map(u => u.substring(0, 8)).join(", ")}`));
+  console.log(chalk.cyan(`[iOS] Process switch: ${activeUuids.map(u => u.substring(0, 8)).join(", ")}`));
   
   const snapshots = processManager.switchActiveProcesses(activeUuids);
   
@@ -266,7 +266,7 @@ function handleTerminalResize(payload: TerminalResizePayload): void {
 }
 
 async function setupWebRTC() {
-  console.log(chalk.cyan("\n🔗 Setting up WebRTC P2P connection..."));
+  console.log(chalk.cyan("\n→ Setting up WebRTC P2P connection..."));
 
   try {
     peerConnection = new RTCPeerConnection({
@@ -284,9 +284,9 @@ async function setupWebRTC() {
     }) => {
       const candidate = event.candidate;
       if (candidate) {
-        console.log(
-          chalk.gray("🧊 Generated ICE candidate, sending to mobile")
-        );
+        if (config.DEBUG) {
+          console.log(chalk.gray("ICE candidate generated, sending to mobile"));
+        }
         socket.emit("webrtc:ice-candidate", {
           candidate: {
             candidate: candidate.candidate,
@@ -304,7 +304,7 @@ async function setupWebRTC() {
       if (state === "connected") {
         isWebRTCConnected = true;
         console.log(
-          chalk.bold.green("\n🎉 WebRTC P2P connection established!")
+          chalk.bold.green("\n✅ WebRTC P2P connection established!")
         );
         console.log(
           chalk.gray(
@@ -333,7 +333,7 @@ async function setupWebRTC() {
       
       // Always send processes:sync via WebRTC (even if empty) so iOS knows sync is complete
       const existingProcesses = processManager.getProcessSyncData();
-      console.log(chalk.cyan(`📋 Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
+      console.log(chalk.cyan(`→ Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
       const syncPayload = {
         processes: existingProcesses,
         activeUuids: processManager.getActiveProcessIds(),
@@ -377,7 +377,7 @@ async function setupWebRTC() {
       }
     });
 
-    console.log(chalk.cyan("📡 Sending offer to mobile via relay server"));
+    console.log(chalk.cyan("→ Sending offer to mobile via relay server"));
     socket.emit("webrtc:offer", {
       offer: {
         sdp: peerConnection.localDescription!.sdp,
@@ -504,7 +504,7 @@ async function handleAIPrompt(prompt: string, uuid?: string): Promise<void> {
 
 function connectToRelay() {
   console.log(
-    chalk.yellow(`📡 Connecting to relay server: ${config.RELAY_SERVER_URL}...`)
+    chalk.yellow(`→ Connecting to relay server: ${config.RELAY_SERVER_URL}...`)
   );
 
   const token = getToken();
@@ -557,7 +557,7 @@ function connectToRelay() {
     const keyListener = (buffer: Buffer) => {
       // Check for Ctrl+C (0x03)
       if (buffer[0] === 3) {
-        console.log(chalk.yellow("\n👋 Bye!"));
+        console.log(chalk.yellow("\nBye!"));
 
         // EMERGENCY EXIT - cleanup EVERYTHING
         try {
@@ -683,7 +683,7 @@ function connectToRelay() {
           signature,
         });
 
-        console.log(chalk.gray("📤 Sent challenge response"));
+        console.log(chalk.gray("→ Sent challenge response"));
       } catch (error) {
         console.error(chalk.red("❌ Handshake failed:"), error);
         socket.emit("error", { message: "Handshake failed" });
@@ -727,7 +727,7 @@ function connectToRelay() {
 
       // Always send processes:sync (even if empty) so iOS knows sync is complete
       const existingProcesses = processManager.getProcessSyncData();
-      console.log(chalk.cyan(`📋 Syncing ${existingProcesses.length} process(es) to iOS via socket...`));
+      console.log(chalk.cyan(`→ Syncing ${existingProcesses.length} process(es) to iOS via socket...`));
       
       const syncPayload = {
         processes: existingProcesses,
@@ -758,7 +758,7 @@ function connectToRelay() {
     
     // Close WebRTC connection but DON'T cleanup processes
     // Processes will persist for reconnection
-    console.log(chalk.cyan(`📋 Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`));
+    console.log(chalk.cyan(`→ Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`));
     
     // Close WebRTC
     if (dataChannel) {
@@ -796,7 +796,7 @@ function connectToRelay() {
 
   // WebRTC handlers
   socket.on("webrtc:answer", async ({ answer }) => {
-    console.log(chalk.cyan("📡 Received WebRTC answer"));
+    console.log(chalk.cyan("← Received WebRTC answer"));
     if (peerConnection) {
       await peerConnection.setRemoteDescription(answer);
 
@@ -855,7 +855,7 @@ function connectToRelay() {
 
 // Handle graceful shutdown
 function handleShutdown(signal: string) {
-  console.log(chalk.yellow(`\n\n👋 Shutting down Mac client (${signal})...`));
+  console.log(chalk.yellow(`\n\nShutting down Mac client (${signal})...`));
 
   // Set a timeout to FORCE exit if cleanup takes too long
   const forceExitTimeout = setTimeout(() => {

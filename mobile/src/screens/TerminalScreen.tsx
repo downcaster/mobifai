@@ -1694,6 +1694,9 @@ export default function TerminalScreen({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <Text style={styles.modalIcon}>✨</Text>
+            </View>
             <Text style={styles.modalTitle}>AI Assistant</Text>
             <Text style={styles.modalSubtitle}>
               Describe what you want to do in the terminal
@@ -1702,7 +1705,7 @@ export default function TerminalScreen({
             <TextInput
               style={styles.modalInput}
               placeholder="e.g., 'Open vim and write hello world'"
-              placeholderTextColor="#666"
+              placeholderTextColor="#555566"
               value={aiPrompt}
               onChangeText={setAiPrompt}
               multiline={true}
@@ -2049,20 +2052,22 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   scrollToBottomTouchable: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(0, 255, 0, 0.85)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#6200EE",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    shadowColor: "#6200EE",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#BB86FC",
   },
   scrollToBottomText: {
-    color: "#000",
+    color: "#ffffff",
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 2,
@@ -2070,74 +2075,99 @@ const styles = StyleSheet.create({
   // AI Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    backgroundColor: "rgba(10, 10, 15, 0.95)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: "#12121a",
+    borderRadius: 20,
+    padding: 24,
     width: "100%",
     maxWidth: 400,
-    borderWidth: 1,
-    borderColor: "#0f0",
+    borderWidth: 1.5,
+    borderColor: "#6200EE",
+    shadowColor: "#6200EE",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#6200EE",
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginBottom: 16,
+    shadowColor: "#6200EE",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalIcon: {
+    fontSize: 32,
   },
   modalTitle: {
-    color: "#0f0",
-    fontSize: 20,
-    fontWeight: "bold",
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "700",
     textAlign: "center",
     marginBottom: 8,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   modalSubtitle: {
-    color: "#888",
+    color: "#8888aa",
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   modalInput: {
-    backgroundColor: "#000",
+    backgroundColor: "#1a1a25",
     borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 8,
-    padding: 12,
-    color: "#fff",
-    fontSize: 16,
-    minHeight: 100,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    borderColor: "#2a2a3a",
+    borderRadius: 12,
+    padding: 16,
+    color: "#ffffff",
+    fontSize: 15,
+    minHeight: 120,
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
   },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: 20,
     gap: 12,
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: "#333",
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: "#1a1a25",
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
   },
   modalCancelButtonText: {
-    color: "#fff",
+    color: "#8888aa",
     fontSize: 16,
     fontWeight: "600",
   },
   modalSubmitButton: {
     flex: 1,
-    backgroundColor: "#0f0",
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: "#6200EE",
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
   },
   modalSubmitButtonText: {
-    color: "#000",
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
 });
 

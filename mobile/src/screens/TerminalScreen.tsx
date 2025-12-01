@@ -44,6 +44,7 @@ import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { AppView, AppText, AppButton, AppCard } from "../components/ui";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
+import { getThemeById } from "../theme/terminalThemes";
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -88,6 +89,7 @@ export default function TerminalScreen({
     fontSize: 14,
     cursorStyle: "block",
     fontFamily: "monospace",
+    terminalTheme: "default",
   });
 
   // Process management state
@@ -308,6 +310,19 @@ export default function TerminalScreen({
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
     };
   }, [hasConnectionParams]);
+
+  // Apply terminal theme when it changes
+  useEffect(() => {
+    if (terminalSettings.terminalTheme) {
+      const theme = getThemeById(terminalSettings.terminalTheme);
+      sendToTerminal("theme", {
+        background: theme.background,
+        foreground: theme.foreground,
+        cursor: theme.cursor,
+        cursorAccent: theme.cursorAccent,
+      });
+    }
+  }, [terminalSettings.terminalTheme]);
 
   const fetchSettings = async () => {
     try {
@@ -1265,6 +1280,16 @@ export default function TerminalScreen({
                 }
                 
                 setTimeout(fitTerminal, 50);
+            } else if (message.type === 'theme') {
+                // Apply terminal theme
+                const themeData = message.data;
+                terminal.options.theme = {
+                    background: themeData.background,
+                    foreground: themeData.foreground,
+                    cursor: themeData.cursor,
+                    cursorAccent: themeData.cursorAccent || themeData.background,
+                };
+                document.body.style.backgroundColor = themeData.background;
             } else if (message.type === 'output') {
                 terminal.write(message.data);
             } else if (message.type === 'resetCursor') {
@@ -1447,7 +1472,9 @@ export default function TerminalScreen({
     return (
       <AppView safeArea style={notConnectedStyles.container}>
         <View style={notConnectedStyles.content}>
-          <Text style={notConnectedStyles.icon}>▣</Text>
+          <View style={notConnectedStyles.iconContainer}>
+            <Text style={notConnectedStyles.icon}>◎</Text>
+          </View>
           <AppText variant="h2" weight="bold" style={notConnectedStyles.title}>
             No Active Connection
           </AppText>
@@ -1470,10 +1497,10 @@ export default function TerminalScreen({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={100}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
       <SafeAreaView
         edges={["top"]}
-        style={{ backgroundColor: "rgba(17, 17, 17, 0.9)" }}
+        style={{ backgroundColor: "#0a0a0f" }}
       >
         {/* Header Row */}
         <View style={styles.statusBar}>
@@ -1481,23 +1508,32 @@ export default function TerminalScreen({
             style={styles.backButton}
             onPress={() => navigation.navigate("Connections")}
           >
-            <Text style={styles.backButtonText}>{"< Back"}</Text>
+            <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
 
           <View style={styles.statusContainer}>
-            <View
-              style={[styles.indicator, connected && styles.indicatorConnected]}
-            />
+            {/* Status indicator with glow */}
+            <View style={styles.indicatorContainer}>
+              {(paired && webrtcConnected) && (
+                <View style={styles.indicatorGlow} />
+              )}
+              <View
+                style={[
+                  styles.indicator,
+                  (paired && webrtcConnected) && styles.indicatorConnected,
+                ]}
+              />
+            </View>
             <Text style={styles.statusText}>
               {copyFeedback
                 ? "✓ Copied!"
                 : paired && webrtcConnected
-                ? "P2P Connected ⚡"
-                : paired
-                ? "Paired (Relay)"
-                : connected
                 ? "Connected"
-                : "Disconnected"}
+                : paired
+                ? "Connecting"
+                : connected
+                ? "Relay"
+                : "Offline"}
             </Text>
           </View>
 
@@ -1511,9 +1547,9 @@ export default function TerminalScreen({
               disabled={!paired || aiProcessing}
             >
               {aiProcessing ? (
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color="#6200EE" />
               ) : (
-                <Text style={styles.aiButtonText}>AI</Text>
+                <Text style={styles.aiButtonText}>✨</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -1582,7 +1618,8 @@ export default function TerminalScreen({
           {/* Loading overlay while terminal initializes - only show for active process */}
           {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
             <View style={styles.terminalLoadingOverlay}>
-              <ActivityIndicator size="small" color="#0f0" />
+              <View style={styles.loadingGlow} />
+              <ActivityIndicator size="small" color="#6200EE" />
               <Text style={styles.terminalLoadingText}>
                 Starting terminal...
               </Text>
@@ -1592,7 +1629,8 @@ export default function TerminalScreen({
       ) : !paired ? (
         // Show connecting state before pairing is complete
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="small" color="#0f0" />
+          <View style={styles.loadingGlow} />
+          <ActivityIndicator size="large" color="#6200EE" />
           <Text style={styles.syncingTitle}>Connecting to Mac...</Text>
           <Text style={styles.syncingSubtitle}>
             Establishing secure connection
@@ -1601,7 +1639,8 @@ export default function TerminalScreen({
       ) : syncingTabs ? (
         // Show loading state while waiting for tabs to sync from Mac
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="small" color="#0f0" />
+          <View style={styles.loadingGlow} />
+          <ActivityIndicator size="large" color="#6200EE" />
           <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
           <Text style={styles.syncingSubtitle}>
             Loading your terminals from Mac
@@ -1609,7 +1648,9 @@ export default function TerminalScreen({
         </View>
       ) : (
         <View style={styles.emptyStateContainer}>
-          <Text style={styles.emptyStateIcon}>⌨️</Text>
+          <View style={notConnectedStyles.iconContainer}>
+            <Text style={styles.emptyStateIcon}>⌨️</Text>
+          </View>
           <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
           <Text style={styles.emptyStateSubtitle}>
             Tap the + button above to open a new terminal tab
@@ -1702,28 +1743,33 @@ export default function TerminalScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0a0a0f",
   },
   statusBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    height: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    height: 56,
+    backgroundColor: "#0a0a0f",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a2a3a",
   },
   backButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    minWidth: 60,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1a1a25",
     justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
   },
   backButtonText: {
-    color: "#0f0",
-    fontSize: 14,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    lineHeight: 16,
+    color: "#BB86FC",
+    fontSize: 20,
+    lineHeight: 20,
   },
   statusContainer: {
     flex: 1,
@@ -1736,195 +1782,208 @@ const styles = StyleSheet.create({
     minWidth: 60,
     justifyContent: "flex-end",
     alignItems: "center",
+    gap: 8,
+  },
+  indicatorContainer: {
+    position: "relative",
+    marginRight: 8,
+  },
+  indicatorGlow: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(98, 0, 238, 0.4)",
+    top: -5,
+    left: -5,
   },
   indicator: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#f00",
-    marginRight: 6,
+    backgroundColor: "#555566",
   },
   indicatorConnected: {
-    backgroundColor: "#0f0",
+    backgroundColor: "#6200EE",
   },
   statusText: {
-    color: "#0f0",
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    color: "#8888aa",
+    fontSize: 13,
+    fontWeight: "600",
     textAlign: "center",
-    lineHeight: 16,
   },
   refreshButton: {
-    backgroundColor: "#0f0",
-    width: 24,
-    height: 22,
-    borderRadius: 2,
-    marginLeft: 8,
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
   },
   refreshButtonText: {
-    color: "#000",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 2,
-    marginLeft: 3,
+    color: "#BB86FC",
+    fontSize: 18,
   },
   fitButton: {
-    backgroundColor: "#0f0",
-    width: 24,
-    height: 22,
-    borderRadius: 2,
-    marginLeft: 8,
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
   },
   fitButtonText: {
-    color: "#000",
-    fontSize: 15,
-    fontWeight: "bold",
-    marginTop: 2,
-    marginLeft: 2,
+    color: "#BB86FC",
+    fontSize: 14,
+    fontWeight: "600",
   },
   aiButton: {
-    backgroundColor: "#00ffff",
-    width: 28,
-    height: 22,
-    borderRadius: 2,
-    marginLeft: 8,
+    backgroundColor: "#6200EE",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
   },
   aiButtonText: {
-    color: "#000",
-    fontSize: 11,
-    fontWeight: "bold",
+    color: "#ffffff",
+    fontSize: 16,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   // Tabs row styles
   tabsRow: {
-    height: 32,
-    backgroundColor: "rgba(30, 30, 30, 0.95)",
+    height: 44,
+    backgroundColor: "#12121a",
     borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    borderBottomColor: "#2a2a3a",
   },
   tabsScrollContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 4,
-    gap: 4,
+    paddingHorizontal: 12,
+    gap: 8,
+    paddingVertical: 6,
   },
   tab: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 12,
-    paddingRight: 6,
-    paddingVertical: 6,
-    backgroundColor: "transparent",
-    borderRadius: 4,
-    gap: 6,
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 8,
+    backgroundColor: "#1a1a25",
+    borderRadius: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+    minHeight: 32,
   },
   tabActive: {
-    backgroundColor: "rgba(0, 255, 0, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(0, 255, 0, 0.3)",
+    backgroundColor: "rgba(98, 0, 238, 0.15)",
+    borderWidth: 1.5,
+    borderColor: "#6200EE",
+    shadowColor: "#6200EE",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   tabText: {
-    color: "#888",
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    color: "#8888aa",
+    fontSize: 13,
+    fontWeight: "500",
   },
   tabTextActive: {
-    color: "#0f0",
-    fontWeight: "bold",
+    color: "#BB86FC",
+    fontWeight: "600",
   },
   tabCloseButton: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 9,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   tabCloseText: {
-    color: "#ccc",
-    fontSize: 14,
-    fontWeight: "bold",
-    lineHeight: 14,
+    color: "#8888aa",
+    fontSize: 16,
+    fontWeight: "300",
+    lineHeight: 16,
   },
   // Empty state styles
   emptyStateContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0a0a0f",
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
   },
   emptyStateIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+    fontSize: 64,
+    marginBottom: 24,
   },
   emptyStateTitle: {
-    color: "#0f0",
-    fontSize: 20,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    marginBottom: 8,
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
   },
   emptyStateSubtitle: {
-    color: "#666",
-    fontSize: 14,
+    color: "#8888aa",
+    fontSize: 15,
     textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    marginBottom: 24,
-    lineHeight: 20,
+    marginBottom: 32,
+    lineHeight: 22,
   },
   emptyStateButton: {
-    backgroundColor: "rgba(0, 255, 0, 0.15)",
-    borderWidth: 1,
-    borderColor: "#0f0",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: "#6200EE",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    minWidth: 200,
+    alignItems: "center",
   },
   emptyStateButtonText: {
-    color: "#0f0",
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: "600",
   },
   syncingTitle: {
-    color: "#0f0",
-    fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    marginTop: 16,
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: 20,
     marginBottom: 8,
+    textAlign: "center",
   },
   syncingSubtitle: {
-    color: "#666",
+    color: "#8888aa",
     fontSize: 14,
     textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   addTabButton: {
-    width: 28,
-    height: 24,
+    width: 32,
+    height: 32,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 4,
-    opacity: 0.6,
+    backgroundColor: "#6200EE",
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(0, 255, 0, 0.3)",
-    borderRadius: 4,
-    borderStyle: "dashed",
+    borderColor: "#BB86FC",
   },
   addTabText: {
-    color: "#0f0",
-    fontSize: 18,
-    fontWeight: "bold",
-    lineHeight: 18,
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 20,
   },
   terminalContainer: {
     flex: 1,
@@ -1940,15 +1999,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#000",
+    backgroundColor: "#0a0a0f",
     justifyContent: "center",
     alignItems: "center",
   },
   terminalLoadingText: {
-    color: "#0f0",
+    color: "#8888aa",
     fontSize: 14,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: "500",
     marginTop: 16,
+  },
+  loadingGlow: {
+    position: "absolute",
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(98, 0, 238, 0.3)",
+    opacity: 0.5,
   },
   // AI Toast Notification
   aiToast: {
@@ -2078,7 +2145,7 @@ const styles = StyleSheet.create({
 const notConnectedStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0a0a0f",
   },
   content: {
     flex: 1,
@@ -2086,21 +2153,34 @@ const notConnectedStyles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xl,
   },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#1a1a25",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+  },
   icon: {
-    fontSize: 64,
-    color: colors.primary,
-    marginBottom: spacing.l,
+    fontSize: 48,
+    color: "#8888aa",
   },
   title: {
     textAlign: "center",
     marginBottom: spacing.s,
-    color: "#fff",
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "600",
   },
   subtitle: {
     textAlign: "center",
-    color: "#888",
+    color: "#8888aa",
     marginBottom: spacing.xl,
     lineHeight: 22,
+    fontSize: 14,
   },
   button: {
     paddingHorizontal: spacing.xl,

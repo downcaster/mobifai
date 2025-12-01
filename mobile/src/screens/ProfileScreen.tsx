@@ -14,6 +14,7 @@ import { AppText, Slider } from "../components/ui";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RELAY_SERVER_URL } from "../config";
 import { useNavigation, CommonActions } from "@react-navigation/native";
+import { terminalThemes, TerminalTheme } from "../theme/terminalThemes";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -31,6 +32,7 @@ interface TerminalSettings {
   fontSize: number;
   cursorStyle: string;
   fontFamily: string;
+  terminalTheme?: string;
 }
 
 // Design tokens for the futuristic theme
@@ -65,6 +67,7 @@ export default function ProfileScreen(): React.ReactElement {
     fontSize: 14,
     cursorStyle: "block",
     fontFamily: "monospace",
+    terminalTheme: "default",
   });
   const [loading, setLoading] = useState(true);
 
@@ -234,43 +237,49 @@ export default function ProfileScreen(): React.ReactElement {
 
               <View style={styles.divider} />
 
-              {/* Theme Toggle */}
+              {/* Terminal Theme Picker */}
               <View style={styles.settingItem}>
-                <AppText style={styles.settingLabel}>Theme</AppText>
-                <View style={styles.toggleGroup}>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleButton,
-                      settings.theme === "light" && styles.toggleButtonActive,
-                    ]}
-                    onPress={() => updateSetting("theme", "light")}
-                  >
-                    <AppText
-                      style={[
-                        styles.toggleText,
-                        settings.theme === "light" && styles.toggleTextActive,
-                      ]}
-                    >
-                      Light
-                    </AppText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleButton,
-                      settings.theme === "dark" && styles.toggleButtonActive,
-                    ]}
-                    onPress={() => updateSetting("theme", "dark")}
-                  >
-                    <AppText
-                      style={[
-                        styles.toggleText,
-                        settings.theme === "dark" && styles.toggleTextActive,
-                      ]}
-                    >
-                      Dark
-                    </AppText>
-                  </TouchableOpacity>
-                </View>
+                <AppText style={styles.settingLabel}>Terminal Theme</AppText>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.themesContainer}
+                >
+                  {terminalThemes.map((terminalTheme) => {
+                    const isSelected = settings.terminalTheme === terminalTheme.id;
+                    return (
+                      <TouchableOpacity
+                        key={terminalTheme.id}
+                        style={[
+                          styles.themePreview,
+                          isSelected && styles.themePreviewSelected,
+                        ]}
+                        onPress={() => updateSetting("terminalTheme", terminalTheme.id)}
+                      >
+                        {isSelected && <View style={styles.themePreviewGlow} />}
+                        <View
+                          style={[
+                            styles.themePreviewInner,
+                            { backgroundColor: terminalTheme.background },
+                            isSelected && { borderColor: theme.accent.primary, borderWidth: 2.5 },
+                          ]}
+                        >
+                          <AppText
+                            style={[
+                              styles.themePreviewText,
+                              { color: terminalTheme.foreground },
+                            ]}
+                          >
+                            $ ls
+                          </AppText>
+                        </View>
+                        <AppText style={styles.themePreviewName}>
+                          {terminalTheme.name}
+                        </AppText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
             </View>
           </View>
@@ -502,6 +511,48 @@ const styles = StyleSheet.create({
   },
   toggleTextActive: {
     color: theme.text.primary,
+  },
+
+  // Terminal Theme Picker
+  themesContainer: {
+    paddingVertical: 8,
+    gap: 12,
+  },
+  themePreview: {
+    position: "relative",
+    alignItems: "center",
+  },
+  themePreviewSelected: {
+    // Selected state handled by glow
+  },
+  themePreviewGlow: {
+    position: "absolute",
+    width: 88,
+    height: 88,
+    borderRadius: 16,
+    backgroundColor: theme.accent.glow,
+    top: -4,
+    left: -4,
+  },
+  themePreviewInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  themePreviewText: {
+    fontSize: 13,
+    fontFamily: "monospace",
+    fontWeight: "600",
+  },
+  themePreviewName: {
+    fontSize: 11,
+    color: theme.text.secondary,
+    marginTop: 6,
+    fontWeight: "500",
   },
 
   // Cursor Options

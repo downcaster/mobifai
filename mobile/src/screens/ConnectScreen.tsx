@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../App";
+
+const USER_INFO_KEY = "mobifai_user_info";
 import { RELAY_SERVER_URL as DEFAULT_RELAY_SERVER_URL } from "../config";
 import { io, Socket } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -127,10 +129,20 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
             console.log("✅ Server confirmed authentication");
             setStatusMessage(`Connected as ${user.email}`);
 
-            // Navigate to device list immediately
+            // Store user info for profile screen
+            await AsyncStorage.setItem(USER_INFO_KEY, JSON.stringify({
+              email: user.email,
+              name: user.name,
+              picture: user.picture,
+            }));
+
+            // Navigate to main tabs
             setTimeout(() => {
               socket.disconnect();
-              navigation.navigate("DeviceList");
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Main" }],
+              });
             }, 500);
           });
 
@@ -265,10 +277,20 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
         await AsyncStorage.setItem(TOKEN_KEY, token);
         setStatusMessage(`Authenticated as ${user.email}`);
 
-        // Navigate to device list immediately
+        // Store user info for profile screen
+        await AsyncStorage.setItem(USER_INFO_KEY, JSON.stringify({
+          email: user.email,
+          name: user.name,
+          picture: user.picture,
+        }));
+
+        // Navigate to main tabs
         setTimeout(() => {
           socket.disconnect();
-          navigation.navigate("DeviceList");
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Main" }],
+          });
         }, 500);
       });
 
@@ -343,8 +365,11 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>MobiFai</Text>
-      <Text style={styles.subtitle}>Mobile Terminal Access</Text>
+      <View style={styles.logoContainer}>
+        <Text style={styles.logoIcon}>▣</Text>
+        <Text style={styles.title}>MobiFai</Text>
+        <Text style={styles.subtitle}>Mobile Terminal Access</Text>
+      </View>
 
       <View style={styles.form}>
         <TouchableOpacity
@@ -353,9 +378,9 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Connect with Google</Text>
+            <Text style={styles.buttonText}>Sign in with Google</Text>
           )}
         </TouchableOpacity>
 
@@ -368,6 +393,8 @@ export default function ConnectScreen({ navigation }: ConnectScreenProps) {
           </Text>
         )}
       </View>
+
+      <Text style={styles.footer}>Secure P2P Terminal Connection</Text>
     </View>
   );
 }
@@ -376,74 +403,68 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
-    padding: 20,
+    padding: 24,
     justifyContent: "center",
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 48,
+  },
+  logoIcon: {
+    fontSize: 64,
+    color: "#6200EE",
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "bold",
-    color: "#0f0",
+    color: "#fff",
     textAlign: "center",
-    marginBottom: 10,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#0f0",
+    color: "#888",
     textAlign: "center",
-    marginBottom: 40,
-    opacity: 0.7,
   },
   form: {
     width: "100%",
   },
-  label: {
-    fontSize: 14,
-    color: "#0f0",
-    marginBottom: 8,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
-  input: {
-    backgroundColor: "#111",
-    borderWidth: 1,
-    borderColor: "#0f0",
-    borderRadius: 8,
-    padding: 15,
-    color: "#0f0",
-    fontSize: 16,
-    marginBottom: 20,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
   button: {
-    backgroundColor: "#0f0",
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: "#6200EE",
+    padding: 16,
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   buttonText: {
-    color: "#000",
+    color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: "600",
   },
   status: {
-    marginTop: 20,
-    fontSize: 13,
-    color: "#0f0",
+    marginTop: 24,
+    fontSize: 14,
+    color: "#6200EE",
     textAlign: "center",
-    lineHeight: 20,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    lineHeight: 22,
   },
   hint: {
-    marginTop: 30,
-    fontSize: 12,
+    marginTop: 24,
+    fontSize: 13,
     color: "#666",
     textAlign: "center",
     lineHeight: 20,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 48,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 12,
+    color: "#444",
   },
 });

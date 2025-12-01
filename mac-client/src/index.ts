@@ -528,13 +528,14 @@ function connectToRelay() {
 
   socket.on("connect", () => {
     console.log(chalk.green("✅ Connected to relay server"));
-    // Register as Mac device with public key
+    // Register as Mac device with public key and tab count
     socket.emit("register", {
       type: "mac",
       token,
       deviceId,
       deviceName: os.hostname(),
       publicKey: keyPair.publicKey,
+      tabCount: processManager.getProcessCount(),
     });
   });
 
@@ -634,6 +635,7 @@ function connectToRelay() {
       deviceId,
       deviceName: os.hostname(),
       publicKey: keyPair.publicKey,
+      tabCount: processManager.getProcessCount(),
     });
   });
 
@@ -789,6 +791,7 @@ function connectToRelay() {
       deviceId,
       deviceName: os.hostname(),
       publicKey: keyPair.publicKey,
+      tabCount: processManager.getProcessCount(),
     });
     
     console.log(chalk.cyan("⏳ Waiting for iOS to reconnect..."));

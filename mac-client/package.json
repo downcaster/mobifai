@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsc && node dist/index.js",
+    "dev": "tsc && caffeinate -i node dist/index.js",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "caffeinate -i node dist/index.js",
     "package": "npm run build && pkg ."
   },
   "bin": "dist/index.js",

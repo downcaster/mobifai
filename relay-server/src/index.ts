@@ -86,6 +86,7 @@ interface Device {
   publicKey?: string; // ECDH public key for secure handshake
   challenge?: string; // Random challenge for authentication
   verified?: boolean; // Whether peer has been verified
+  tabCount?: number; // Number of active terminal tabs (Mac only)
 }
 
 interface UserProfile {
@@ -112,6 +113,7 @@ function getAvailableMacs(userId: string) {
       deviceId: d.deviceId,
       deviceName: d.deviceName || "Unknown Mac",
       status: "available",
+      tabCount: d.tabCount ?? 0,
     }));
 }
 
@@ -460,12 +462,14 @@ io.on("connection", (socket) => {
       deviceId,
       deviceName,
       publicKey,
+      tabCount,
     }: {
       type: "mac" | "mobile";
       token?: string;
       deviceId: string;
       deviceName?: string;
       publicKey?: string;
+      tabCount?: number;
     }) => {
       if (!deviceId) {
         socket.emit("error", { message: "deviceId required" });
@@ -540,6 +544,7 @@ io.on("connection", (socket) => {
           deviceName || (type === "mac" ? "Mac Terminal" : "Mobile Device"),
         publicKey,
         verified: false,
+        tabCount: type === "mac" ? (tabCount ?? 0) : undefined,
       };
 
       // Store device info

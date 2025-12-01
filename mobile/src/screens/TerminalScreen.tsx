@@ -17,9 +17,7 @@ import {
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RouteProp } from "@react-navigation/native";
-import { RootStackParamList } from "../../App";
+import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -41,6 +39,11 @@ import {
   ProcessExitedPayload,
   ProcessesSyncPayload,
 } from "../types/process";
+import { MainTabParamList } from "../navigation/MainTabNavigator";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { AppView, AppText, AppButton, AppCard } from "../components/ui";
+import { colors } from "../theme/colors";
+import { spacing } from "../theme/spacing";
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -52,18 +55,28 @@ const generateUUID = (): string => {
 };
 
 type TerminalScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, "Terminal">;
-  route: RouteProp<RootStackParamList, "Terminal">;
+  navigation?: BottomTabNavigationProp<MainTabParamList, "Terminal">;
+  route?: RouteProp<MainTabParamList, "Terminal">;
 };
 
 const TOKEN_KEY = "mobifai_auth_token";
 const DEVICE_ID_KEY = "mobifai_device_id";
+const CONNECTION_STATUS_KEY = "mobifai_connection_status";
 
 export default function TerminalScreen({
-  navigation,
-  route,
-}: TerminalScreenProps) {
-  const { relayServerUrl, targetDeviceId } = route.params;
+  navigation: propNavigation,
+  route: propRoute,
+}: TerminalScreenProps): React.ReactElement {
+  const navigation = propNavigation || useNavigation<BottomTabNavigationProp<MainTabParamList, "Terminal">>();
+  const route = propRoute || useRoute<RouteProp<MainTabParamList, "Terminal">>();
+  const isFocused = useIsFocused();
+  
+  // Get params from route - may be undefined when accessed from tab
+  const relayServerUrl = route.params?.relayServerUrl;
+  const targetDeviceId = route.params?.targetDeviceId;
+  
+  // Check if we have connection params
+  const hasConnectionParams = !!relayServerUrl;
   const [connected, setConnected] = useState(false);
   const [paired, setPaired] = useState(false);
   const [terminalReady, setTerminalReady] = useState(false);
@@ -254,7 +267,23 @@ export default function TerminalScreen({
     [sendToMac]
   );
 
+  // Clear connection status when screen loses focus and not connected
   useEffect(() => {
+    if (!isFocused && !webrtcConnected) {
+      console.log("🔄 Terminal screen unfocused and not connected, clearing status");
+      AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
+    }
+  }, [isFocused, webrtcConnected]);
+
+  useEffect(() => {
+    // Only connect if we have connection params
+    if (!hasConnectionParams) {
+      console.log("⚠️  No connection params, skipping relay connection");
+      // Clear any stale connection status
+      AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
+      return;
+    }
+
     // Generate keys for this session
     try {
       keyPairRef.current = generateKeyPair();
@@ -268,17 +297,22 @@ export default function TerminalScreen({
     fetchSettings(); // Fetch settings via HTTP
 
     return () => {
+      // Clean up WebRTC and socket connections
       if (webrtcRef.current) {
         webrtcRef.current.cleanup();
       }
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
+      // Clear connection status when leaving the screen
+      AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
     };
-  }, []);
+  }, [hasConnectionParams]);
 
   const fetchSettings = async () => {
     try {
+      if (!relayServerUrl) return;
+      
       const token = await AsyncStorage.getItem(TOKEN_KEY);
       if (!token) return;
 
@@ -693,6 +727,15 @@ export default function TerminalScreen({
 
       // Initialize WebRTC P2P connection
       console.log("🔗 Initializing WebRTC P2P connection...");
+      
+      // Store connecting status
+      if (targetDeviceId) {
+        AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
+          deviceId: targetDeviceId,
+          status: "connecting",
+        }));
+      }
+      
       webrtcRef.current = new WebRTCService(socket);
 
       // Handle WebRTC messages - now with process support
@@ -706,16 +749,33 @@ export default function TerminalScreen({
       });
 
       // Handle WebRTC connection state
-      webrtcRef.current.onStateChange((state) => {
+      webrtcRef.current.onStateChange(async (state) => {
         if (state === "connected") {
           setWebrtcConnected(true);
+          // Store connected status with device ID
+          if (targetDeviceId) {
+            await AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
+              deviceId: targetDeviceId,
+              status: "connected",
+            }));
+          }
           console.log("🎉 WebRTC P2P connected!");
+        } else if (state === "connecting") {
+          // Store connecting status
+          if (targetDeviceId) {
+            AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
+              deviceId: targetDeviceId,
+              status: "connecting",
+            }));
+          }
         } else if (
           state === "disconnected" ||
           state === "failed" ||
           state === "closed"
         ) {
           setWebrtcConnected(false);
+          // Clear connection status
+          AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
           console.log("⚠️  WebRTC disconnected, using relay server fallback");
         }
       });
@@ -788,6 +848,9 @@ export default function TerminalScreen({
       setWebrtcConnected(false);
       setSyncingTabs(false); // Reset syncing state
       firstProcessCreatedRef.current = false; // Reset so reconnection can sync or create
+      
+      // Clear connection status
+      AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
 
       // Clear local process state - will be restored on reconnection via processes:sync
       setProcesses([]);
@@ -1379,6 +1442,28 @@ export default function TerminalScreen({
     );
   };
 
+  // Show "not connected" state when accessed from tab without connection params
+  if (!hasConnectionParams) {
+    return (
+      <AppView safeArea style={notConnectedStyles.container}>
+        <View style={notConnectedStyles.content}>
+          <Text style={notConnectedStyles.icon}>▣</Text>
+          <AppText variant="h2" weight="bold" style={notConnectedStyles.title}>
+            No Active Connection
+          </AppText>
+          <AppText style={notConnectedStyles.subtitle}>
+            Connect to a Mac client to start using the terminal
+          </AppText>
+          <AppButton
+            title="Go to Connections"
+            onPress={() => navigation.navigate("Connections")}
+            style={notConnectedStyles.button}
+          />
+        </View>
+      </AppView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -1394,7 +1479,7 @@ export default function TerminalScreen({
         <View style={styles.statusBar}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate("Connections")}
           >
             <Text style={styles.backButtonText}>{"< Back"}</Text>
           </TouchableOpacity>
@@ -1986,5 +2071,38 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "bold",
+  },
+});
+
+// Styles for "not connected" empty state
+const notConnectedStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xl,
+  },
+  icon: {
+    fontSize: 64,
+    color: colors.primary,
+    marginBottom: spacing.l,
+  },
+  title: {
+    textAlign: "center",
+    marginBottom: spacing.s,
+    color: "#fff",
+  },
+  subtitle: {
+    textAlign: "center",
+    color: "#888",
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+  button: {
+    paddingHorizontal: spacing.xl,
   },
 });

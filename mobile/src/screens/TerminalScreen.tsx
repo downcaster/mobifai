@@ -1252,7 +1252,7 @@ export default function TerminalScreen({
                 
                 // Calculate how many columns actually fit (subtract columns for safety margin)
                 const maxCols = Math.floor(container.clientWidth / actualCharWidth);
-                const properCols = Math.max(10, maxCols - 5); // Subtract 5 columns buffer
+                const properCols = Math.max(10, maxCols - 7); // Subtract 7 columns buffer
                 
                 // Calculate rows using actual rendered line height with safety margin
                 const maxRows = Math.floor(container.clientHeight / actualLineHeight);

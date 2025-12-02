@@ -748,7 +748,7 @@ export default function TerminalScreen({
       setPaired(true);
       setSyncingTabs(true); // Start syncing state - waiting for processes:sync from Mac
       console.log(`✅ ${message}`);
-      setConnectionStatus("Connected!\n");
+      setConnectionStatus("");
 
       // Initialize WebRTC P2P connection
       console.log("🔗 Initializing WebRTC P2P connection...");
@@ -978,16 +978,23 @@ export default function TerminalScreen({
         console.log("📱 Terminal WebView ready:", message.data);
         terminalDimensionsRef.current = message.data;
 
-        // Send current settings
+        // Send current settings (without theme - theme handled separately)
         sendToTerminal("settings", terminalSettings);
+
+        // Apply terminal theme if set
+        if (terminalSettings.terminalTheme) {
+          const theme = getThemeById(terminalSettings.terminalTheme);
+          sendToTerminal("theme", {
+            background: theme.background,
+            foreground: theme.foreground,
+            cursor: theme.cursor,
+            cursorAccent: theme.cursorAccent,
+          });
+        }
 
         if (paired && socketRef.current) {
           console.log("📤 Sending terminal dimensions:", message.data);
           socketRef.current.emit("terminal:dimensions", message.data);
-        }
-
-        if (!terminalReady) {
-          sendToTerminal("output", connectionStatus + "\r\n");
         }
 
         // If paired with WebRTC but no process created yet, create first process now
@@ -1286,10 +1293,8 @@ export default function TerminalScreen({
         function handleMessage(message) {
             if (message.type === 'settings') {
                 const s = message.data;
-                if (s.theme && themes[s.theme]) {
-                    terminal.options.theme = themes[s.theme];
-                    document.body.style.backgroundColor = themes[s.theme].background;
-                }
+                // Note: Theme is now handled by separate 'theme' message type
+                // Old theme system (light/dark) is deprecated
                 if (s.fontSize) terminal.options.fontSize = parseInt(s.fontSize);
                 if (s.cursorStyle) terminal.options.cursorStyle = s.cursorStyle;
                 if (s.fontFamily) {

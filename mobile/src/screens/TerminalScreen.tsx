@@ -1255,7 +1255,7 @@ export default function TerminalScreen({
                 
                 // Calculate rows with safety margin
                 const maxRows = Math.floor(container.clientHeight / (terminal.options.fontSize * terminal.options.lineHeight));
-                const properRows = Math.max(5, maxRows - 3); // Subtract 3 rows buffer
+                const properRows = Math.max(5, maxRows - 2); // Subtract 2 rows buffer
                 
                 console.log('Fit calculation:', {
                     containerWidth: container.clientWidth,

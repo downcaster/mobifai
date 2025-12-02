@@ -4,8 +4,8 @@ import {
   StyleSheet,
   LayoutChangeEvent,
   Text,
+  GestureResponderEvent,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 interface SliderProps {
   value: number;
@@ -45,49 +45,27 @@ export function Slider({
     return ((val - min) / (max - min)) * trackWidth;
   };
 
-  const positionToValue = (x: number): number => {
+  const positionToValue = (pageX: number): number => {
     if (trackWidth === 0) return min;
-    const relativeX = x - trackX.current;
+    const relativeX = pageX - trackX.current;
     const ratio = Math.max(0, Math.min(1, relativeX / trackWidth));
     return snapToStep(min + ratio * (max - min));
   };
 
   const handleLayout = (event: LayoutChangeEvent): void => {
-    event.target.measure((_x, _y, width, _height, pageX, _pageY) => {
+    const target = event.target as any;
+    target.measure((_x: number, _y: number, width: number, _height: number, pageX: number) => {
       trackX.current = pageX;
       setTrackWidth(width);
     });
   };
 
-  const pan = Gesture.Pan()
-    .onBegin((e) => {
-      const newValue = positionToValue(e.absoluteX);
-      if (newValue !== value) {
-        onValueChange(newValue);
-      }
-    })
-    .onUpdate((e) => {
-      const newValue = positionToValue(e.absoluteX);
-      if (newValue !== value) {
-        onValueChange(newValue);
-      }
-    })
-    .onEnd(() => {
-      // Ensure final snap
-      const snapped = snapToStep(value);
-      if (snapped !== value) {
-        onValueChange(snapped);
-      }
-    });
-
-  const tap = Gesture.Tap().onStart((e) => {
-    const newValue = positionToValue(e.absoluteX);
+  const handleTouch = (evt: GestureResponderEvent): void => {
+    const newValue = positionToValue(evt.nativeEvent.pageX);
     if (newValue !== value) {
       onValueChange(newValue);
     }
-  });
-
-  const composed = Gesture.Race(pan, tap);
+  };
 
   const thumbX = valueToPosition(value);
   const progressPercent = ((value - min) / (max - min)) * 100;
@@ -95,63 +73,68 @@ export function Slider({
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={composed}>
-        <View style={styles.trackContainer} onLayout={handleLayout}>
-          {/* Track background */}
-          <View style={[styles.track, { backgroundColor: trackColor }]} />
+      <View
+        style={styles.trackContainer}
+        onLayout={handleLayout}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={handleTouch}
+        onResponderMove={handleTouch}
+      >
+        {/* Track background */}
+        <View style={[styles.track, { backgroundColor: trackColor }]} />
 
-          {/* Active track */}
+        {/* Active track */}
+        <View
+          style={[
+            styles.activeTrack,
+            {
+              backgroundColor: activeTrackColor,
+              width: `${progressPercent}%`,
+            },
+          ]}
+        />
+
+        {/* Tick marks */}
+        <View style={styles.tickContainer} pointerEvents="none">
+          {Array.from({ length: numSteps }).map((_, i) => {
+            const tickValue = min + i * step;
+            const tickPercent = ((tickValue - min) / (max - min)) * 100;
+            const isActive = tickValue <= value;
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.tick,
+                  {
+                    left: `${tickPercent}%`,
+                    backgroundColor: isActive ? activeTrackColor : trackColor,
+                    opacity: isActive ? 1 : 0.5,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
+
+        {/* Thumb */}
+        {trackWidth > 0 && (
           <View
+            pointerEvents="none"
             style={[
-              styles.activeTrack,
+              styles.thumb,
               {
-                backgroundColor: activeTrackColor,
-                width: `${progressPercent}%`,
+                left: thumbX - 12,
+                backgroundColor: thumbColor,
               },
             ]}
-          />
-
-          {/* Tick marks */}
-          <View style={styles.tickContainer} pointerEvents="none">
-            {Array.from({ length: numSteps }).map((_, i) => {
-              const tickValue = min + i * step;
-              const tickPercent = ((tickValue - min) / (max - min)) * 100;
-              const isActive = tickValue <= value;
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.tick,
-                    {
-                      left: `${tickPercent}%`,
-                      backgroundColor: isActive ? activeTrackColor : trackColor,
-                      opacity: isActive ? 1 : 0.5,
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          {/* Thumb */}
-          {trackWidth > 0 && (
+          >
             <View
-              pointerEvents="none"
-              style={[
-                styles.thumb,
-                {
-                  left: thumbX - 12,
-                  backgroundColor: thumbColor,
-                },
-              ]}
-            >
-              <View
-                style={[styles.thumbInner, { backgroundColor: activeTrackColor }]}
-              />
-            </View>
-          )}
-        </View>
-      </GestureDetector>
+              style={[styles.thumbInner, { backgroundColor: activeTrackColor }]}
+            />
+          </View>
+        )}
+      </View>
 
       {/* Labels */}
       <View style={styles.labelContainer}>

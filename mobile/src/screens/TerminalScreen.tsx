@@ -17,7 +17,12 @@ import {
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
-import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+  useIsFocused,
+} from "@react-navigation/native";
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -68,14 +73,17 @@ export default function TerminalScreen({
   navigation: propNavigation,
   route: propRoute,
 }: TerminalScreenProps): React.ReactElement {
-  const navigation = propNavigation || useNavigation<BottomTabNavigationProp<MainTabParamList, "Terminal">>();
-  const route = propRoute || useRoute<RouteProp<MainTabParamList, "Terminal">>();
+  const navigation =
+    propNavigation ||
+    useNavigation<BottomTabNavigationProp<MainTabParamList, "Terminal">>();
+  const route =
+    propRoute || useRoute<RouteProp<MainTabParamList, "Terminal">>();
   const isFocused = useIsFocused();
-  
+
   // Get params from route - may be undefined when accessed from tab
   const relayServerUrl = route.params?.relayServerUrl;
   const targetDeviceId = route.params?.targetDeviceId;
-  
+
   // Check if we have connection params
   const hasConnectionParams = !!relayServerUrl;
   const [connected, setConnected] = useState(false);
@@ -272,7 +280,9 @@ export default function TerminalScreen({
   // Clear connection status when screen loses focus and not connected
   useEffect(() => {
     if (!isFocused && !webrtcConnected) {
-      console.log("🔄 Terminal screen unfocused and not connected, clearing status");
+      console.log(
+        "🔄 Terminal screen unfocused and not connected, clearing status"
+      );
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
     }
   }, [isFocused, webrtcConnected]);
@@ -327,7 +337,7 @@ export default function TerminalScreen({
   const fetchSettings = async () => {
     try {
       if (!relayServerUrl) return;
-      
+
       const token = await AsyncStorage.getItem(TOKEN_KEY);
       if (!token) return;
 
@@ -742,15 +752,18 @@ export default function TerminalScreen({
 
       // Initialize WebRTC P2P connection
       console.log("🔗 Initializing WebRTC P2P connection...");
-      
+
       // Store connecting status
       if (targetDeviceId) {
-        AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
-          deviceId: targetDeviceId,
-          status: "connecting",
-        }));
+        AsyncStorage.setItem(
+          CONNECTION_STATUS_KEY,
+          JSON.stringify({
+            deviceId: targetDeviceId,
+            status: "connecting",
+          })
+        );
       }
-      
+
       webrtcRef.current = new WebRTCService(socket);
 
       // Handle WebRTC messages - now with process support
@@ -769,19 +782,25 @@ export default function TerminalScreen({
           setWebrtcConnected(true);
           // Store connected status with device ID
           if (targetDeviceId) {
-            await AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
-              deviceId: targetDeviceId,
-              status: "connected",
-            }));
+            await AsyncStorage.setItem(
+              CONNECTION_STATUS_KEY,
+              JSON.stringify({
+                deviceId: targetDeviceId,
+                status: "connected",
+              })
+            );
           }
           console.log("🎉 WebRTC P2P connected!");
         } else if (state === "connecting") {
           // Store connecting status
           if (targetDeviceId) {
-            AsyncStorage.setItem(CONNECTION_STATUS_KEY, JSON.stringify({
-              deviceId: targetDeviceId,
-              status: "connecting",
-            }));
+            AsyncStorage.setItem(
+              CONNECTION_STATUS_KEY,
+              JSON.stringify({
+                deviceId: targetDeviceId,
+                status: "connecting",
+              })
+            );
           }
         } else if (
           state === "disconnected" ||
@@ -863,7 +882,7 @@ export default function TerminalScreen({
       setWebrtcConnected(false);
       setSyncingTabs(false); // Reset syncing state
       firstProcessCreatedRef.current = false; // Reset so reconnection can sync or create
-      
+
       // Clear connection status
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
 
@@ -1498,10 +1517,7 @@ export default function TerminalScreen({
       keyboardVerticalOffset={100}
     >
       <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
-      <SafeAreaView
-        edges={["top"]}
-        style={{ backgroundColor: "#0a0a0f" }}
-      >
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#0a0a0f" }}>
         {/* Header Row */}
         <View style={styles.statusBar}>
           <TouchableOpacity
@@ -1514,13 +1530,13 @@ export default function TerminalScreen({
           <View style={styles.statusContainer}>
             {/* Status indicator with glow */}
             <View style={styles.indicatorContainer}>
-              {(paired && webrtcConnected) && (
+              {paired && webrtcConnected && (
                 <View style={styles.indicatorGlow} />
               )}
               <View
                 style={[
                   styles.indicator,
-                  (paired && webrtcConnected) && styles.indicatorConnected,
+                  paired && webrtcConnected && styles.indicatorConnected,
                 ]}
               />
             </View>
@@ -1649,7 +1665,7 @@ export default function TerminalScreen({
       ) : (
         <View style={styles.emptyStateContainer}>
           <View style={notConnectedStyles.iconContainer}>
-            <Text style={styles.emptyStateCommand}>$ ls</Text>
+            <Text style={notConnectedStyles.emptyStateCommand}>$ ls</Text>
           </View>
           <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
           <Text style={styles.emptyStateSubtitle}>

@@ -226,8 +226,8 @@ export default function ProfileScreen(): React.ReactElement {
                 <View style={styles.sliderContainer}>
                   <Slider
                     value={settings.fontSize}
-                    min={10}
-                    max={24}
+                    min={8}
+                    max={22}
                     step={1}
                     onValueChange={(val) => updateSetting("fontSize", val)}
                     minLabel="Small"

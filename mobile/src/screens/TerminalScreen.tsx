@@ -2235,7 +2235,7 @@ const notConnectedStyles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   dollarSign: {
-    marginRight: 2,
+    marginRight: 10,
   },
   title: {
     textAlign: "center",

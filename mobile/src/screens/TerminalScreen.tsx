@@ -2217,7 +2217,7 @@ const notConnectedStyles = StyleSheet.create({
   commandContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 1,
   },
   emptyStateCommand: {
     fontSize: 32,

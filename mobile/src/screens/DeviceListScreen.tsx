@@ -406,9 +406,9 @@ const styles = StyleSheet.create({
   },
   loadingGlow: {
     position: "absolute",
-    width: 350,
-    height: 350,
-    borderRadius: 175,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     backgroundColor: theme.accent.glow,
     opacity: 0.5,
   },

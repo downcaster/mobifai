@@ -1117,17 +1117,29 @@ export default function TerminalScreen({
             height: 100%;
             width: 100%;
             touch-action: pan-y;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         .xterm-viewport {
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         .xterm-screen {
             touch-action: pan-y;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         .xterm-rows {
             touch-action: pan-y;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .xterm-rows > div {
+            padding: 0 !important;
+            margin: 0 !important;
         }
     </style>
 </head>

@@ -1136,6 +1136,7 @@ export default function TerminalScreen({
             padding: 0 !important;
             margin: 0 !important;
             letter-spacing: 0.5px;
+            line-height: 0.9 !important;
         }
         .xterm-viewport {
             overflow-y: auto !important;
@@ -1153,10 +1154,12 @@ export default function TerminalScreen({
             touch-action: pan-y;
             padding: 0 !important;
             margin: 0 !important;
+            line-height: 0.9 !important;
         }
         .xterm-rows > div {
             padding: 0 !important;
             margin: 0 !important;
+            line-height: 0.9 !important;
         }
     </style>
 </head>

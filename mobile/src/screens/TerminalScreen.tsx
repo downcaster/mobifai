@@ -974,6 +974,12 @@ export default function TerminalScreen({
     try {
       const message = JSON.parse(event.nativeEvent.data);
 
+      // Forward WebView console logs to React Native console
+      if (message.type === "console") {
+        console.log(`[WebView] ${message.data}`);
+        return;
+      }
+
       if (message.type === "ready") {
         console.log("📱 Terminal WebView ready:", message.data);
         terminalDimensionsRef.current = message.data;
@@ -1162,6 +1168,22 @@ export default function TerminalScreen({
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
     
     <script>
+        // Forward console logs to React Native
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            try {
+                window.ReactNativeWebView?.postMessage(JSON.stringify({
+                    type: 'console',
+                    data: args.map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                    ).join(' ')
+                }));
+            } catch (e) {
+                // Ignore errors in console forwarding
+            }
+        };
+
         const terminal = new Terminal({
             cursorBlink: true,
             cursorStyle: 'block',

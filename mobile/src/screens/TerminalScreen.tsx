@@ -1236,7 +1236,7 @@ export default function TerminalScreen({
                 // First, let xterm do its default fit
                 fitAddon.fit();
                 
-                // Now measure the actual rendered character width
+                // Now measure the actual rendered character width and line height
                 const testSpan = document.createElement('span');
                 testSpan.style.fontFamily = terminal.options.fontFamily;
                 testSpan.style.fontSize = terminal.options.fontSize + 'px';
@@ -1247,23 +1247,23 @@ export default function TerminalScreen({
                 document.body.appendChild(testSpan);
                 
                 const actualCharWidth = testSpan.offsetWidth / 10;
+                const actualLineHeight = testSpan.offsetHeight; // Actual rendered line height
                 document.body.removeChild(testSpan);
                 
                 // Calculate how many columns actually fit (subtract columns for safety margin)
                 const maxCols = Math.floor(container.clientWidth / actualCharWidth);
                 const properCols = Math.max(10, maxCols - 5); // Subtract 5 columns buffer
                 
-                // Calculate rows - use maximum available
-                const lineHeightPx = terminal.options.fontSize * terminal.options.lineHeight;
-                const maxRows = Math.floor(container.clientHeight / lineHeightPx);
-                const properRows = Math.max(5, maxRows); // No buffer - use full height
+                // Calculate rows using actual rendered line height with safety margin
+                const maxRows = Math.floor(container.clientHeight / actualLineHeight);
+                const properRows = Math.max(5, maxRows - 3); // Subtract 3 rows buffer to prevent overflow
                 
                 console.log('Fit calculation:', {
                     containerWidth: container.clientWidth,
                     containerHeight: container.clientHeight,
                     fontSize: terminal.options.fontSize,
                     lineHeight: terminal.options.lineHeight,
-                    lineHeightPx: lineHeightPx.toFixed(2),
+                    actualLineHeight: actualLineHeight.toFixed(2),
                     calculatedMaxRows: maxRows,
                     xtermCols: terminal.cols,
                     xtermRows: terminal.rows,

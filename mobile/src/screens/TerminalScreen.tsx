@@ -1115,10 +1115,9 @@ export default function TerminalScreen({
             left: 0;
             right: 0;
             bottom: 0;
-            padding: 0;
+            padding: 3px;
             margin: 0;
-            width: 100%;
-            height: 100%;
+            box-sizing: border-box;
         }
         #touch-layer {
             position: absolute;
@@ -1233,46 +1232,51 @@ export default function TerminalScreen({
                 const container = document.getElementById('terminal');
                 if (!container) return;
                 
-                // First, let xterm do its default fit
+                // First, let xterm do its default fit to initialize dimensions
                 fitAddon.fit();
                 
-                // Now measure the actual rendered character width and line height
-                const testSpan = document.createElement('span');
-                testSpan.style.fontFamily = terminal.options.fontFamily;
-                testSpan.style.fontSize = terminal.options.fontSize + 'px';
-                testSpan.style.lineHeight = terminal.options.lineHeight;
-                testSpan.style.visibility = 'hidden';
-                testSpan.style.position = 'absolute';
-                testSpan.textContent = 'W'.repeat(10); // Measure 10 chars for accuracy
-                document.body.appendChild(testSpan);
+                // Use xterm's actual rendered cell dimensions (more accurate than span measurement)
+                // This is the same method FitAddon uses internally
+                const cellWidth = terminal._core._renderService.dimensions.css.cell.width;
+                const cellHeight = terminal._core._renderService.dimensions.css.cell.height;
                 
-                const actualCharWidth = testSpan.offsetWidth / 10;
-                const actualLineHeight = testSpan.offsetHeight; // Actual rendered line height
-                document.body.removeChild(testSpan);
+                // Get container padding to subtract from available space
+                const style = window.getComputedStyle(container);
+                const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+                const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
                 
-                // Calculate how many columns actually fit (subtract columns for safety margin)
-                const maxCols = Math.floor(container.clientWidth / actualCharWidth);
-                const properCols = Math.max(10, maxCols - 5); // Subtract 5 columns buffer
+                // Calculate available space (clientWidth/Height include padding, so subtract it)
+                const availableWidth = container.clientWidth - paddingX;
+                const availableHeight = container.clientHeight - paddingY;
                 
-                // Calculate rows using actual rendered line height with safety margin
-                const maxRows = Math.floor(container.clientHeight / actualLineHeight);
-                const properRows = Math.max(5, maxRows - 5); // Subtract 5 rows buffer to prevent overflow
+                // Calculate how many cells fit using xterm's actual dimensions
+                const maxCols = Math.floor(availableWidth / cellWidth);
+                const maxRows = Math.floor(availableHeight / cellHeight);
+                
+                // No buffer needed with accurate xterm measurement
+                const properCols = Math.max(10, maxCols);
+                const properRows = Math.max(5, maxRows);
                 
                 console.log('Fit calculation:', {
                     containerWidth: container.clientWidth,
                     containerHeight: container.clientHeight,
+                    paddingX: paddingX,
+                    paddingY: paddingY,
+                    availableWidth: availableWidth,
+                    availableHeight: availableHeight,
                     fontSize: terminal.options.fontSize,
                     lineHeight: terminal.options.lineHeight,
-                    actualLineHeight: actualLineHeight.toFixed(2),
-                    calculatedMaxRows: maxRows,
+                    cellWidth: cellWidth.toFixed(2),
+                    cellHeight: cellHeight.toFixed(2),
+                    maxCols: maxCols,
+                    maxRows: maxRows,
                     xtermCols: terminal.cols,
                     xtermRows: terminal.rows,
-                    actualCharWidth: actualCharWidth.toFixed(2),
                     properCols: properCols,
                     properRows: properRows
                 });
                 
-                // Resize terminal with proper columns
+                // Resize terminal with proper dimensions
                 if (properCols !== terminal.cols || properRows !== terminal.rows) {
                     terminal.resize(properCols, properRows);
                     console.log('Resized terminal to:', properCols, 'x', properRows);

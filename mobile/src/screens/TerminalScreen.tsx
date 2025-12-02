@@ -1086,11 +1086,18 @@ export default function TerminalScreen({
     <title>Terminal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
     <style>
-        body {
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
             margin: 0;
             padding: 0;
-            background-color: #000;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+        }
+        body {
+            background-color: #000;
             -webkit-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
@@ -1103,6 +1110,9 @@ export default function TerminalScreen({
             right: 0;
             bottom: 0;
             padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
         }
         #touch-layer {
             position: absolute;

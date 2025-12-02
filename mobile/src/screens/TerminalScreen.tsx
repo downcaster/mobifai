@@ -1231,6 +1231,10 @@ export default function TerminalScreen({
         
         terminal.open(document.getElementById('terminal'));
         
+        // Force compact line height after opening
+        terminal.options.lineHeight = 0.9;
+        console.log('Set terminal lineHeight to 0.9');
+        
         function fitTerminal() {
             try {
                 const container = document.getElementById('terminal');
@@ -1400,6 +1404,9 @@ export default function TerminalScreen({
                         ? 'Menlo, Monaco, "Courier New", monospace'
                         : 'System, sans-serif';
                 }
+                
+                // Always force compact line height
+                terminal.options.lineHeight = 0.9;
                 
                 setTimeout(fitTerminal, 50);
             } else if (message.type === 'theme') {

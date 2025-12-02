@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -35,9 +35,7 @@ export function Slider({
   thumbColor = "#fff",
 }: SliderProps): React.ReactElement {
   const [trackWidth, setTrackWidth] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartXRef = useRef(0);
-  const dragStartValueRef = useRef(value);
+  const trackLayoutRef = useRef({ x: 0, width: 0 });
 
   const snapToStep = (val: number): number => {
     const snapped = Math.round(val / step) * step;
@@ -49,56 +47,36 @@ export function Slider({
     return ((val - min) / (max - min)) * trackWidth;
   };
 
-  const positionToValue = (x: number): number => {
+  const positionToValue = (absoluteX: number): number => {
     if (trackWidth === 0) return min;
-    const ratio = Math.max(0, Math.min(1, x / trackWidth));
+    // Convert absolute X to relative position within track
+    const relativeX = absoluteX - trackLayoutRef.current.x;
+    const ratio = Math.max(0, Math.min(1, relativeX / trackWidth));
     return snapToStep(min + ratio * (max - min));
   };
 
-  const handleGrant = (evt: GestureResponderEvent): void => {
-    setIsDragging(true);
-    dragStartXRef.current = evt.nativeEvent.locationX;
-    dragStartValueRef.current = value;
-    
-    // Jump to tapped position
-    const newValue = positionToValue(evt.nativeEvent.locationX);
-    if (newValue !== value) {
-      onValueChange(newValue);
-      dragStartValueRef.current = newValue;
-    }
-  };
-
-  const handleMove = (
-    _evt: GestureResponderEvent,
-    gestureState: PanResponderGestureState
-  ): void => {
-    // Calculate new position based on drag delta from starting point
-    const startPosition = valueToPosition(dragStartValueRef.current);
-    const newPosition = startPosition + gestureState.dx;
-    const newValue = positionToValue(newPosition);
-    
+  const handleTouch = (evt: GestureResponderEvent): void => {
+    const newValue = positionToValue(evt.nativeEvent.pageX);
     if (newValue !== value) {
       onValueChange(newValue);
     }
-  };
-
-  const handleRelease = (): void => {
-    setIsDragging(false);
   };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: handleGrant,
-      onPanResponderMove: handleMove,
-      onPanResponderRelease: handleRelease,
-      onPanResponderTerminate: handleRelease,
+      onPanResponderGrant: handleTouch,
+      onPanResponderMove: handleTouch,
+      onPanResponderRelease: () => {},
+      onPanResponderTerminate: () => {},
     })
   ).current;
 
   const handleLayout = (event: LayoutChangeEvent): void => {
-    setTrackWidth(event.nativeEvent.layout.width);
+    const { x, width } = event.nativeEvent.layout;
+    trackLayoutRef.current = { x, width };
+    setTrackWidth(width);
   };
 
   const thumbX = valueToPosition(value);
@@ -157,7 +135,6 @@ export function Slider({
               {
                 left: thumbX - 12,
                 backgroundColor: thumbColor,
-                shadowOpacity: isDragging ? 0.5 : 0.3,
               },
             ]}
           >

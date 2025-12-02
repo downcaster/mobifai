@@ -1136,7 +1136,6 @@ export default function TerminalScreen({
             padding: 0 !important;
             margin: 0 !important;
             letter-spacing: 0.5px;
-            line-height: 0.9 !important;
         }
         .xterm-viewport {
             overflow-y: auto !important;
@@ -1154,12 +1153,10 @@ export default function TerminalScreen({
             touch-action: pan-y;
             padding: 0 !important;
             margin: 0 !important;
-            line-height: 0.9 !important;
         }
         .xterm-rows > div {
             padding: 0 !important;
             margin: 0 !important;
-            line-height: 0.9 !important;
         }
     </style>
 </head>
@@ -1193,7 +1190,7 @@ export default function TerminalScreen({
             cursorStyle: 'block',
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             fontSize: 14,
-            lineHeight: 0.9,
+            lineHeight: 1.0,
             theme: {
                 background: '#000000',
                 foreground: '#00ff00',
@@ -1231,10 +1228,6 @@ export default function TerminalScreen({
         
         terminal.open(document.getElementById('terminal'));
         
-        // Force compact line height after opening
-        terminal.options.lineHeight = 0.9;
-        console.log('Set terminal lineHeight to 0.9');
-        
         function fitTerminal() {
             try {
                 const container = document.getElementById('terminal');
@@ -1263,7 +1256,7 @@ export default function TerminalScreen({
                 
                 // Calculate rows using actual rendered line height with safety margin
                 const maxRows = Math.floor(container.clientHeight / actualLineHeight);
-                const properRows = Math.max(5, maxRows - 4); // Subtract 4 rows buffer to prevent overflow
+                const properRows = Math.max(5, maxRows - 5); // Subtract 5 rows buffer to prevent overflow
                 
                 console.log('Fit calculation:', {
                     containerWidth: container.clientWidth,
@@ -1404,9 +1397,6 @@ export default function TerminalScreen({
                         ? 'Menlo, Monaco, "Courier New", monospace'
                         : 'System, sans-serif';
                 }
-                
-                // Always force compact line height
-                terminal.options.lineHeight = 0.9;
                 
                 setTimeout(fitTerminal, 50);
             } else if (message.type === 'theme') {

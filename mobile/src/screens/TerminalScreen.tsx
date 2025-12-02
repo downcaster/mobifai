@@ -1207,11 +1207,28 @@ export default function TerminalScreen({
         
         function fitTerminal() {
             try {
+                // Get container dimensions for debugging
+                const container = document.getElementById('terminal');
+                if (container) {
+                    console.log('Container dimensions:', {
+                        clientWidth: container.clientWidth,
+                        clientHeight: container.clientHeight,
+                        offsetWidth: container.offsetWidth,
+                        offsetHeight: container.offsetHeight,
+                        scrollWidth: container.scrollWidth,
+                        scrollHeight: container.scrollHeight
+                    });
+                }
+                
                 fitAddon.fit();
+                
                 const dims = {
                     cols: terminal.cols,
                     rows: terminal.rows
                 };
+                
+                console.log('Terminal dimensions after fit:', dims);
+                
                 window.ReactNativeWebView?.postMessage(JSON.stringify({
                     type: 'dimensions',
                     data: dims
@@ -1221,7 +1238,11 @@ export default function TerminalScreen({
             }
         }
         
+        // Initial fit with delay to ensure container is measured
         setTimeout(fitTerminal, 100);
+        // Second fit to ensure dimensions are accurate
+        setTimeout(fitTerminal, 250);
+        
         window.addEventListener('resize', () => setTimeout(fitTerminal, 100));
         window.addEventListener('orientationchange', () => setTimeout(fitTerminal, 200));
         
@@ -1468,7 +1489,9 @@ export default function TerminalScreen({
             }
         };
         
+        // Send ready message after final fit
         setTimeout(() => {
+            console.log('Sending ready with dimensions:', terminal.cols, 'x', terminal.rows);
             window.ReactNativeWebView?.postMessage(JSON.stringify({
                 type: 'ready',
                 data: {
@@ -1476,7 +1499,7 @@ export default function TerminalScreen({
                     rows: terminal.rows
                 }
             }));
-        }, 200);
+        }, 300);
     </script>
 </body>
 </html>

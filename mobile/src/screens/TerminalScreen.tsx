@@ -1118,6 +1118,9 @@ export default function TerminalScreen({
             padding: 3px;
             margin: 0;
             box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #touch-layer {
             position: absolute;
@@ -1129,8 +1132,6 @@ export default function TerminalScreen({
             touch-action: pan-y;
         }
         .xterm {
-            height: 100%;
-            width: 100%;
             touch-action: pan-y;
             padding: 0 !important;
             margin: 0 !important;

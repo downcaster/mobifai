@@ -1666,7 +1666,14 @@ export default function TerminalScreen({
         <View style={styles.emptyStateContainer}>
           <View style={notConnectedStyles.iconContainer}>
             <View style={notConnectedStyles.commandContainer}>
-              <Text style={[notConnectedStyles.emptyStateCommand, notConnectedStyles.dollarSign]}>$</Text>
+              <Text
+                style={[
+                  notConnectedStyles.emptyStateCommand,
+                  notConnectedStyles.dollarSign,
+                ]}
+              >
+                $
+              </Text>
               <Text style={notConnectedStyles.emptyStateCommand}>ls</Text>
             </View>
           </View>
@@ -2228,7 +2235,7 @@ const notConnectedStyles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   dollarSign: {
-    marginRight: 6,
+    marginRight: 2,
   },
   title: {
     textAlign: "center",

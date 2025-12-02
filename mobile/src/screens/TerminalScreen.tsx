@@ -1251,7 +1251,7 @@ export default function TerminalScreen({
                 
                 // Calculate how many columns actually fit (subtract columns for safety margin)
                 const maxCols = Math.floor(container.clientWidth / actualCharWidth);
-                const properCols = Math.max(10, maxCols - 6); // Subtract 6 columns buffer
+                const properCols = Math.max(10, maxCols - 5); // Subtract 5 columns buffer
                 const properRows = Math.floor(container.clientHeight / (terminal.options.fontSize * terminal.options.lineHeight));
                 
                 console.log('Fit calculation:', {

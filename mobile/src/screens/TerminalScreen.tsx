@@ -2014,9 +2014,9 @@ const styles = StyleSheet.create({
   },
   loadingGlow: {
     position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
     backgroundColor: "rgba(98, 0, 238, 0.3)",
     opacity: 0.5,
   },

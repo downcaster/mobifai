@@ -44,3 +44,12 @@
   - Check types (especially numbers) and throw errors if invalid
   - No default values for critical environment variables
   - App must not boot if required env vars are missing or invalid
+
+## Collaboration & Problem Solving
+
+- **Ask for clarification**: If you're uncertain about requirements, implementation details, or user intent, ALWAYS ask additional questions before proceeding
+- **Propose better alternatives**: When the user suggests a solution:
+  - First consider if there's a better approach (design pattern, library, framework, standard practice)
+  - If a better alternative exists, propose it with explanation before implementing
+  - Examples: existing libraries vs custom code, established patterns vs ad-hoc solutions, framework features vs workarounds
+  - Always explain why the alternative might be better (performance, maintainability, community support, etc.)

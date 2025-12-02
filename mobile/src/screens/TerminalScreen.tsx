@@ -1242,6 +1242,13 @@ export default function TerminalScreen({
                     });
                 }
                 
+                // Log current font settings before fit
+                console.log('Font settings before fit:', {
+                    fontSize: terminal.options.fontSize,
+                    fontFamily: terminal.options.fontFamily,
+                    lineHeight: terminal.options.lineHeight
+                });
+                
                 fitAddon.fit();
                 
                 const dims = {
@@ -1249,7 +1256,11 @@ export default function TerminalScreen({
                     rows: terminal.rows
                 };
                 
+                // Calculate expected character width
+                const expectedCharWidth = container ? container.clientWidth / dims.cols : 0;
+                
                 console.log('Terminal dimensions after fit:', dims);
+                console.log('Calculated character width:', expectedCharWidth.toFixed(2) + 'px');
                 
                 window.ReactNativeWebView?.postMessage(JSON.stringify({
                     type: 'dimensions',

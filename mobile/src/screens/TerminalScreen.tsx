@@ -2199,11 +2199,11 @@ const notConnectedStyles = StyleSheet.create({
     color: "#8888aa",
   },
   emptyStateCommand: {
-    fontSize: 28,
+    fontSize: 40,
     fontWeight: "700",
-    color: "#6200EE",
+    color: "#BB86FC",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   title: {
     textAlign: "center",

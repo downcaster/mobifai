@@ -1649,7 +1649,7 @@ export default function TerminalScreen({
       ) : (
         <View style={styles.emptyStateContainer}>
           <View style={notConnectedStyles.iconContainer}>
-            <Text style={styles.emptyStateIcon}>⌨️</Text>
+            <Text style={styles.emptyStateIcon}>▣</Text>
           </View>
           <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
           <Text style={styles.emptyStateSubtitle}>

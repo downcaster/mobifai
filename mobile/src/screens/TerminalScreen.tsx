@@ -1230,42 +1230,50 @@ export default function TerminalScreen({
         
         function fitTerminal() {
             try {
-                // Get container dimensions for debugging
                 const container = document.getElementById('terminal');
-                if (container) {
-                    console.log('Container dimensions:', {
-                        clientWidth: container.clientWidth,
-                        clientHeight: container.clientHeight,
-                        offsetWidth: container.offsetWidth,
-                        offsetHeight: container.offsetHeight,
-                        scrollWidth: container.scrollWidth,
-                        scrollHeight: container.scrollHeight
-                    });
-                }
+                if (!container) return;
                 
-                // Log current font settings before fit
-                console.log('Font settings before fit:', {
-                    fontSize: terminal.options.fontSize,
-                    fontFamily: terminal.options.fontFamily,
-                    lineHeight: terminal.options.lineHeight
-                });
-                
+                // First, let xterm do its default fit
                 fitAddon.fit();
                 
-                const dims = {
-                    cols: terminal.cols,
-                    rows: terminal.rows
-                };
+                // Now measure the actual rendered character width
+                const testSpan = document.createElement('span');
+                testSpan.style.fontFamily = terminal.options.fontFamily;
+                testSpan.style.fontSize = terminal.options.fontSize + 'px';
+                testSpan.style.lineHeight = terminal.options.lineHeight;
+                testSpan.style.visibility = 'hidden';
+                testSpan.style.position = 'absolute';
+                testSpan.textContent = 'W'.repeat(10); // Measure 10 chars for accuracy
+                document.body.appendChild(testSpan);
                 
-                // Calculate expected character width
-                const expectedCharWidth = container ? container.clientWidth / dims.cols : 0;
+                const actualCharWidth = testSpan.offsetWidth / 10;
+                document.body.removeChild(testSpan);
                 
-                console.log('Terminal dimensions after fit:', dims);
-                console.log('Calculated character width:', expectedCharWidth.toFixed(2) + 'px');
+                // Calculate how many columns actually fit
+                const properCols = Math.floor(container.clientWidth / actualCharWidth);
+                const properRows = Math.floor(container.clientHeight / (terminal.options.fontSize * terminal.options.lineHeight));
+                
+                console.log('Fit calculation:', {
+                    containerWidth: container.clientWidth,
+                    containerHeight: container.clientHeight,
+                    xtermCols: terminal.cols,
+                    actualCharWidth: actualCharWidth.toFixed(2),
+                    properCols: properCols,
+                    properRows: properRows
+                });
+                
+                // Resize terminal with proper columns
+                if (properCols !== terminal.cols || properRows !== terminal.rows) {
+                    terminal.resize(properCols, properRows);
+                    console.log('Resized terminal to:', properCols, 'x', properRows);
+                }
                 
                 window.ReactNativeWebView?.postMessage(JSON.stringify({
                     type: 'dimensions',
-                    data: dims
+                    data: {
+                        cols: terminal.cols,
+                        rows: terminal.rows
+                    }
                 }));
             } catch (err) {
                 console.error('Error fitting terminal:', err);

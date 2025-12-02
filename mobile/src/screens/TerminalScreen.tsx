@@ -1135,6 +1135,7 @@ export default function TerminalScreen({
             touch-action: pan-y;
             padding: 0 !important;
             margin: 0 !important;
+            letter-spacing: 0.5px;
         }
         .xterm-viewport {
             overflow-y: auto !important;

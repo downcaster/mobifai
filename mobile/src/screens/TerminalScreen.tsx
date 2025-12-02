@@ -1190,7 +1190,7 @@ export default function TerminalScreen({
             cursorStyle: 'block',
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             fontSize: 14,
-            lineHeight: 1.0,
+            lineHeight: 0.9,
             theme: {
                 background: '#000000',
                 foreground: '#00ff00',
@@ -1252,11 +1252,11 @@ export default function TerminalScreen({
                 
                 // Calculate how many columns actually fit (subtract columns for safety margin)
                 const maxCols = Math.floor(container.clientWidth / actualCharWidth);
-                const properCols = Math.max(10, maxCols - 7); // Subtract 7 columns buffer
+                const properCols = Math.max(10, maxCols - 5); // Subtract 5 columns buffer
                 
                 // Calculate rows using actual rendered line height with safety margin
                 const maxRows = Math.floor(container.clientHeight / actualLineHeight);
-                const properRows = Math.max(5, maxRows - 3); // Subtract 3 rows buffer to prevent overflow
+                const properRows = Math.max(5, maxRows - 4); // Subtract 4 rows buffer to prevent overflow
                 
                 console.log('Fit calculation:', {
                     containerWidth: container.clientWidth,

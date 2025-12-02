@@ -1649,7 +1649,7 @@ export default function TerminalScreen({
       ) : (
         <View style={styles.emptyStateContainer}>
           <View style={notConnectedStyles.iconContainer}>
-            <Text style={styles.emptyStateIcon}>▣</Text>
+            <Text style={styles.emptyStateCommand}>$ ls</Text>
           </View>
           <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
           <Text style={styles.emptyStateSubtitle}>
@@ -2197,6 +2197,13 @@ const notConnectedStyles = StyleSheet.create({
   icon: {
     fontSize: 48,
     color: "#8888aa",
+  },
+  emptyStateCommand: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#6200EE",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    letterSpacing: 1,
   },
   title: {
     textAlign: "center",

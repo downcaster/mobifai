@@ -2214,6 +2214,11 @@ const notConnectedStyles = StyleSheet.create({
     fontSize: 48,
     color: "#8888aa",
   },
+  commandContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   emptyStateCommand: {
     fontSize: 32,
     fontWeight: "700",

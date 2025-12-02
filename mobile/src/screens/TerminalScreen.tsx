@@ -2215,7 +2215,7 @@ const notConnectedStyles = StyleSheet.create({
     color: "#8888aa",
   },
   emptyStateCommand: {
-    fontSize: 40,
+    fontSize: 32,
     fontWeight: "700",
     color: "#BB86FC",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",

@@ -115,6 +115,8 @@ export default function ProfileScreen(): React.ReactElement {
     key: string,
     value: string | number
   ): Promise<void> => {
+    // Optimistic update
+    const previousSettings = settings;
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
 
@@ -135,11 +137,12 @@ export default function ProfileScreen(): React.ReactElement {
         throw new Error("Failed to update settings");
       }
 
-      const updatedSettings = await response.json();
-      setSettings((prev) => ({ ...prev, ...updatedSettings }));
+      // Don't update settings again from server response - we already updated optimistically
+      // This prevents flickering/animation on the slider
     } catch (error) {
       console.error("Error updating settings:", error);
-      setSettings(settings);
+      // Revert to previous settings on error
+      setSettings(previousSettings);
     }
   };
 

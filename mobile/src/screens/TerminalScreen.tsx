@@ -2219,7 +2219,7 @@ const notConnectedStyles = StyleSheet.create({
     fontWeight: "700",
     color: "#BB86FC",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    letterSpacing: 2,
+    letterSpacing: 0.5,
   },
   title: {
     textAlign: "center",

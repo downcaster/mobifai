@@ -800,25 +800,45 @@ function connectToRelay() {
   // WebRTC handlers
   socket.on("webrtc:answer", async ({ answer }) => {
     console.log(chalk.cyan("← Received WebRTC answer"));
-    if (peerConnection) {
+    
+    if (!peerConnection) {
+      console.log(chalk.yellow("⚠️  No peer connection available, ignoring answer"));
+      return;
+    }
+
+    // Check signaling state to prevent setting answer in wrong state
+    const signalingState = peerConnection.signalingState;
+    if (signalingState !== "have-local-offer") {
+      console.log(chalk.yellow(`⚠️  Cannot set answer in state: ${signalingState} (expected: have-local-offer)`));
+      return;
+    }
+
+    try {
       await peerConnection.setRemoteDescription(answer);
 
       // Add pending candidates
       if (pendingIceCandidates.length > 0) {
+        console.log(chalk.gray(`→ Adding ${pendingIceCandidates.length} pending ICE candidate(s)`));
         for (const c of pendingIceCandidates) {
           await peerConnection.addIceCandidate(new RTCIceCandidate(c));
         }
         pendingIceCandidates = [];
       }
+    } catch (error) {
+      console.error(chalk.red("❌ Failed to set remote answer:"), error);
     }
   });
 
   socket.on("webrtc:ice-candidate", async ({ candidate }) => {
     if (peerConnection && candidate.candidate) {
-      if (!peerConnection.remoteDescription) {
-        pendingIceCandidates.push(candidate);
-      } else {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        if (!peerConnection.remoteDescription) {
+          pendingIceCandidates.push(candidate);
+        } else {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (error) {
+        console.error(chalk.red("❌ Failed to add ICE candidate:"), error);
       }
     }
   });

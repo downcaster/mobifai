@@ -125,7 +125,9 @@ function setupProcessManagerCallbacks(): void {
     }
     
     // Debug: log output being sent
-    console.log(chalk.gray(`→ Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
+    if (config.DEBUG) {
+      console.log(chalk.gray(`→ Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
+    }
     
     // Send output to iOS with uuid
     sendToClient("terminal:output", { uuid, data });

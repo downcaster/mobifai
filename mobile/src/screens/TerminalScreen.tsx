@@ -33,6 +33,7 @@ import {
   signChallenge,
   KeyPair,
 } from "../utils/crypto";
+import { config } from "../config";
 import {
   TerminalProcess,
   ProcessCreatePayload,
@@ -555,23 +556,29 @@ export default function TerminalScreen({
         case "terminal:output": {
           // Handle output with uuid
           const outputPayload = payload as TerminalOutputPayload | string;
-          console.log(
-            `📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(
-              0,
-              8
-            )}`
-          );
-
-          if (typeof outputPayload === "object" && outputPayload.uuid) {
+          if (config.DEBUG) {
             console.log(
-              `   Output from process: ${outputPayload.uuid.substring(
+              `📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(
                 0,
                 8
-              )}, data length: ${outputPayload.data?.length}`
+              )}`
             );
+          }
+
+          if (typeof outputPayload === "object" && outputPayload.uuid) {
+            if (config.DEBUG) {
+              console.log(
+                `   Output from process: ${outputPayload.uuid.substring(
+                  0,
+                  8
+                )}, data length: ${outputPayload.data?.length}`
+              );
+            }
             // Only display if from active process (use ref for current value)
             if (outputPayload.uuid === activeProcessUuidRef.current) {
-              console.log(`   ✅ Displaying output`);
+              if (config.DEBUG) {
+                console.log(`   ✅ Displaying output`);
+              }
               sendToTerminal("output", outputPayload.data);
             } else {
               console.log(
@@ -768,11 +775,13 @@ export default function TerminalScreen({
 
       // Handle WebRTC messages - now with process support
       webrtcRef.current.onMessage((data) => {
-        console.log(
-          `📡 WebRTC message received: type=${
-            data.type
-          }, hasPayload=${!!data.payload}`
-        );
+        if (config.DEBUG) {
+          console.log(
+            `📡 WebRTC message received: type=${
+              data.type
+            }, hasPayload=${!!data.payload}`
+          );
+        }
         handleProcessMessage(data.type, data.payload ?? data);
       });
 
@@ -1016,9 +1025,11 @@ export default function TerminalScreen({
         const currentActiveUuid = activeProcessUuidRef.current;
         if (paired && currentActiveUuid) {
           const input = message.data;
-          console.log(
-            `⌨️ Input received from WebView: ${JSON.stringify(input)}`
-          );
+          if (config.DEBUG) {
+            console.log(
+              `⌨️ Input received from WebView: ${JSON.stringify(input)}`
+            );
+          }
 
           // Send input with process uuid
           const payload: TerminalInputPayload = {
@@ -1027,7 +1038,9 @@ export default function TerminalScreen({
           };
 
           if (webrtcRef.current?.isWebRTCConnected()) {
-            console.log("📤 Sending via WebRTC P2P");
+            if (config.DEBUG) {
+              console.log("📤 Sending via WebRTC P2P");
+            }
             const success = webrtcRef.current.sendMessage(
               "terminal:input",
               payload
@@ -1257,25 +1270,6 @@ export default function TerminalScreen({
                 // No buffer needed with accurate xterm measurement
                 const properCols = Math.max(10, maxCols);
                 const properRows = Math.max(5, maxRows);
-                
-                console.log('Fit calculation:', {
-                    containerWidth: container.clientWidth,
-                    containerHeight: container.clientHeight,
-                    paddingX: paddingX,
-                    paddingY: paddingY,
-                    availableWidth: availableWidth,
-                    availableHeight: availableHeight,
-                    fontSize: terminal.options.fontSize,
-                    lineHeight: terminal.options.lineHeight,
-                    cellWidth: cellWidth.toFixed(2),
-                    cellHeight: cellHeight.toFixed(2),
-                    maxCols: maxCols,
-                    maxRows: maxRows,
-                    xtermCols: terminal.cols,
-                    xtermRows: terminal.rows,
-                    properCols: properCols,
-                    properRows: properRows
-                });
                 
                 // Resize terminal with proper dimensions
                 if (properCols !== terminal.cols || properRows !== terminal.rows) {

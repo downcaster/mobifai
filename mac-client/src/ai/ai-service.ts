@@ -35,6 +35,9 @@ const DEFAULT_INITIAL_SLICE_SIZE = 15000;
 /** Maximum buffer size to keep in memory */
 const MAX_BUFFER_SIZE = 100000;
 
+/** Maximum conversation history messages to keep (to prevent unbounded growth) */
+const MAX_CONVERSATION_HISTORY = 20;
+
 /**
  * AI Service class that manages Claude interactions
  */
@@ -285,6 +288,34 @@ ${screen.content}
   }
 
   /**
+   * Trim conversation history to prevent unbounded growth
+   */
+  private trimConversationHistory(history: ConversationMessage[]): ConversationMessage[] {
+    if (history.length <= MAX_CONVERSATION_HISTORY) {
+      return history;
+    }
+
+    console.log(chalk.yellow(`⚠️  Trimming conversation history from ${history.length} to ${MAX_CONVERSATION_HISTORY} messages`));
+    
+    // Keep the first message (user prompt) and the most recent messages
+    const firstMessage = history[0];
+    const recentMessages = history.slice(-(MAX_CONVERSATION_HISTORY - 1));
+    
+    return [firstMessage, ...recentMessages];
+  }
+
+  /**
+   * Clean up old screen buffer data periodically
+   */
+  private cleanupScreenBuffer(): void {
+    if (this.screenBuffer.length > MAX_BUFFER_SIZE) {
+      const oldLength = this.screenBuffer.length;
+      this.screenBuffer = this.screenBuffer.slice(-MAX_BUFFER_SIZE);
+      console.log(chalk.gray(`🧹 Cleaned screen buffer: ${oldLength} -> ${this.screenBuffer.length} chars`));
+    }
+  }
+
+  /**
    * Handle an AI prompt from the mobile client
    * This is the main entry point for AI interactions
    */
@@ -308,6 +339,9 @@ ${screen.content}
     console.log(chalk.gray(`Prompt: "${prompt}"`));
 
     try {
+      // Clean up screen buffer before starting
+      this.cleanupScreenBuffer();
+      
       // Build initial context
       const conversationHistory: ConversationMessage[] = [];
 
@@ -350,6 +384,13 @@ ${this.formatScreenForClaude(initialScreen)}`,
           role: "assistant",
           content: JSON.stringify(claudeResponse),
         });
+
+        // Trim conversation history to prevent unbounded growth
+        if (conversationHistory.length > MAX_CONVERSATION_HISTORY) {
+          const trimmed = this.trimConversationHistory(conversationHistory);
+          conversationHistory.length = 0;
+          conversationHistory.push(...trimmed);
+        }
 
         // Execute the actions
         await executeActions(
@@ -402,6 +443,14 @@ ${this.formatScreenForClaude(initialScreen)}`,
       callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
     } finally {
       this.isProcessing = false;
+      
+      // Clean up screen buffer after interaction
+      this.cleanupScreenBuffer();
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
     }
   }
 }

@@ -52,6 +52,7 @@ import { AppView, AppText, AppButton, AppCard } from "../components/ui";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { getThemeById } from "../theme/terminalThemes";
+import { KeyCombinationModal } from "../components/KeyCombinationModal";
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -127,6 +128,9 @@ export default function TerminalScreen({
   const [aiToastMessage, setAiToastMessage] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const scrollButtonOpacity = useRef(new Animated.Value(0)).current;
+
+  // Key Combination Modal state
+  const [keyCombModalVisible, setKeyCombModalVisible] = useState(false);
 
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -429,6 +433,30 @@ export default function TerminalScreen({
 
     // Reset processing state after a delay (the Mac client will handle the actual processing)
     setTimeout(() => setAiProcessing(false), 2000);
+  };
+
+  /**
+   * Handle key combination send
+   */
+  const handleKeyCombinationSend = (escapeSequence: string): void => {
+    if (!paired) {
+      Alert.alert("Error", "Not connected to Mac client");
+      return;
+    }
+
+    if (!activeProcessUuidRef.current) {
+      Alert.alert("Error", "No active terminal process");
+      return;
+    }
+
+    console.log("⌨️ Sending key combination");
+    
+    // Send the escape sequence to the active terminal process
+    const payload: TerminalInputPayload = {
+      uuid: activeProcessUuidRef.current,
+      data: escapeSequence,
+    };
+    sendToMac("terminal:input", payload);
   };
 
   const getDeviceId = async () => {
@@ -1620,7 +1648,11 @@ export default function TerminalScreen({
       <TouchableOpacity
         key={process.uuid}
         style={[styles.tab, isActive && styles.tabActive]}
-        onPress={() => switchProcess(process.uuid)}
+        onPress={() => {
+          sendToTerminal("blur", {});
+          Keyboard.dismiss();
+          switchProcess(process.uuid);
+        }}
         activeOpacity={0.7}
       >
         <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
@@ -1631,6 +1663,8 @@ export default function TerminalScreen({
           style={styles.tabCloseButton}
           onPress={(e) => {
             e.stopPropagation(); // Prevent tab switch when clicking close
+            sendToTerminal("blur", {});
+            Keyboard.dismiss();
             terminateProcess(process.uuid);
           }}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
@@ -1714,7 +1748,11 @@ export default function TerminalScreen({
                 styles.aiButton,
                 (!paired || aiProcessing) && styles.buttonDisabled,
               ]}
-              onPress={() => setAiModalVisible(true)}
+              onPress={() => {
+                sendToTerminal("blur", {});
+                Keyboard.dismiss();
+                setAiModalVisible(true);
+              }}
               disabled={!paired || aiProcessing}
             >
               {aiProcessing ? (
@@ -1724,14 +1762,36 @@ export default function TerminalScreen({
               )}
             </TouchableOpacity>
             <TouchableOpacity
+              style={[
+                styles.keyComboButton,
+                !paired && styles.buttonDisabled,
+              ]}
+              onPress={() => {
+                sendToTerminal("blur", {});
+                Keyboard.dismiss();
+                setKeyCombModalVisible(true);
+              }}
+              disabled={!paired}
+            >
+              <Text style={styles.keyComboButtonText}>⌘</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.refreshButton}
-              onPress={handleRefreshDimensions}
+              onPress={() => {
+                sendToTerminal("blur", {});
+                Keyboard.dismiss();
+                handleRefreshDimensions();
+              }}
             >
               <Text style={styles.refreshButtonText}>⟳</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.fitButton}
-              onPress={() => sendToTerminal("copy", {})}
+              onPress={() => {
+                sendToTerminal("blur", {});
+                Keyboard.dismiss();
+                sendToTerminal("copy", {});
+              }}
             >
               <Text style={styles.fitButtonText}>❐</Text>
             </TouchableOpacity>
@@ -1750,7 +1810,11 @@ export default function TerminalScreen({
             {/* Add tab button */}
             <TouchableOpacity
               style={[styles.addTabButton, !paired && styles.buttonDisabled]}
-              onPress={createProcess}
+              onPress={() => {
+                sendToTerminal("blur", {});
+                Keyboard.dismiss();
+                createProcess();
+              }}
               disabled={!paired}
             >
               <Text style={styles.addTabText}>+</Text>
@@ -1886,9 +1950,6 @@ export default function TerminalScreen({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalIconContainer}>
-              <Text style={styles.modalIcon}>✨</Text>
-            </View>
             <Text style={styles.modalTitle}>AI Assistant</Text>
             <Text style={styles.modalSubtitle}>
               Describe what you want to do in the terminal
@@ -1931,6 +1992,13 @@ export default function TerminalScreen({
           </View>
         </View>
       </Modal>
+
+      {/* Key Combination Modal */}
+      <KeyCombinationModal
+        visible={keyCombModalVisible}
+        onClose={() => setKeyCombModalVisible(false)}
+        onSend={handleKeyCombinationSend}
+      />
     </View>
   );
 }
@@ -2058,6 +2126,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     includeFontPadding: false,
     letterSpacing: 0.5,
+  },
+  keyComboButton: {
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+  },
+  keyComboButtonText: {
+    color: "#BB86FC",
+    fontSize: 18,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -2281,9 +2365,10 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(10, 10, 15, 0.95)",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     padding: 20,
+    paddingTop: 80,
   },
   modalContent: {
     backgroundColor: "#12121a",

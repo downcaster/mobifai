@@ -36,7 +36,7 @@ export type ProcessExitCallback = (uuid: string) => void;
 
 /**
  * ProcessManager - Mid-layer controller for managing multiple terminal processes
- * 
+ *
  * Responsibilities:
  * - Maintain a map of all processes keyed by UUID
  * - Track which processes are currently "active" (output forwarded to iOS)
@@ -48,6 +48,8 @@ export class ProcessManager {
   private activeProcesses: string[] = [];
   private outputCallback: ProcessOutputCallback | null = null;
   private exitCallback: ProcessExitCallback | null = null;
+  private lastMemoryCheck: number = Date.now();
+  private memoryCheckInterval: NodeJS.Timeout | null = null;
 
   /**
    * Set the callback for process output
@@ -72,20 +74,33 @@ export class ProcessManager {
    * @param name - Optional display name for the tab
    * @returns The created ProcessInfo or null on failure
    */
-  public createProcess(uuid: string, cols: number, rows: number, name?: string): ProcessInfo | null {
+  public createProcess(
+    uuid: string,
+    cols: number,
+    rows: number,
+    name?: string
+  ): ProcessInfo | null {
     if (this.processMap.has(uuid)) {
       console.log(chalk.yellow(`⚠️  Process ${uuid} already exists`));
       return this.processMap.get(uuid) || null;
     }
 
-    const shell = os.platform() === "win32" 
-      ? "powershell.exe" 
-      : process.env.SHELL || "bash";
+    const shell =
+      os.platform() === "win32"
+        ? "powershell.exe"
+        : process.env.SHELL || "bash";
 
     // Generate default name if not provided
     const processName = name || `Tab ${this.processMap.size + 1}`;
 
-    console.log(chalk.cyan(`\n🖥️  Creating process ${uuid.substring(0, 8)} "${processName}"... (${shell})`));
+    console.log(
+      chalk.cyan(
+        `\n🖥️  Creating process ${uuid.substring(
+          0,
+          8
+        )} "${processName}"... (${shell})`
+      )
+    );
 
     const env = {
       ...process.env,
@@ -114,8 +129,8 @@ export class ProcessManager {
 
       this.processMap.set(uuid, processInfo);
 
-      // Set up output handler
-      ptyProcess.onData((data: string) => {
+      // Set up output handler - store reference for cleanup
+      const onDataHandler = (data: string) => {
         // Always update the screen buffer
         processInfo.screenBuffer += data;
         // Limit buffer size to prevent memory issues (keep last 100KB)
@@ -128,16 +143,28 @@ export class ProcessManager {
         if (isActive && this.outputCallback) {
           this.outputCallback(uuid, data);
         } else if (!isActive) {
-          // Debug: log when output is suppressed
-          console.log(chalk.gray(`🔇 Output suppressed for inactive process ${uuid.substring(0, 8)}`));
+          // Debug: log when output is suppressed (rate-limited)
+          if (Math.random() < 0.01) {
+            // Only log 1% of the time to avoid spam
+            console.log(
+              chalk.gray(
+                `🔇 Output suppressed for inactive process ${uuid.substring(
+                  0,
+                  8
+                )}`
+              )
+            );
+          }
         }
-      });
+      };
+
+      ptyProcess.onData(onDataHandler);
 
       // Set up exit handler
       ptyProcess.onExit(() => {
         console.log(chalk.gray(`Process ${uuid.substring(0, 8)} exited`));
         this.processMap.delete(uuid);
-        this.activeProcesses = this.activeProcesses.filter(id => id !== uuid);
+        this.activeProcesses = this.activeProcesses.filter((id) => id !== uuid);
         if (this.exitCallback) {
           this.exitCallback(uuid);
         }
@@ -166,7 +193,7 @@ export class ProcessManager {
 
     // Send commands with a small delay to ensure shell is ready
     setTimeout(() => {
-      initCommands.forEach(cmd => processInfo.pty.write(cmd + "\r"));
+      initCommands.forEach((cmd) => processInfo.pty.write(cmd + "\r"));
     }, 100);
   }
 
@@ -182,16 +209,21 @@ export class ProcessManager {
       return false;
     }
 
-    console.log(chalk.cyan(`🗑️  Terminating process ${uuid.substring(0, 8)}...`));
+    console.log(
+      chalk.cyan(`🗑️  Terminating process ${uuid.substring(0, 8)}...`)
+    );
 
     try {
       processInfo.pty.kill();
       this.processMap.delete(uuid);
-      this.activeProcesses = this.activeProcesses.filter(id => id !== uuid);
+      this.activeProcesses = this.activeProcesses.filter((id) => id !== uuid);
       console.log(chalk.green(`✅ Process ${uuid.substring(0, 8)} terminated`));
       return true;
     } catch (error) {
-      console.error(chalk.red(`❌ Failed to terminate process ${uuid}:`), error);
+      console.error(
+        chalk.red(`❌ Failed to terminate process ${uuid}:`),
+        error
+      );
       return false;
     }
   }
@@ -203,10 +235,16 @@ export class ProcessManager {
    * @returns Screen snapshots for the newly active processes
    */
   public switchActiveProcesses(uuids: string[]): Map<string, string> {
-    console.log(chalk.cyan(`🔄 Switching active processes to: ${uuids.map(u => u.substring(0, 8)).join(", ")}`));
-    
+    console.log(
+      chalk.cyan(
+        `🔄 Switching active processes to: ${uuids
+          .map((u) => u.substring(0, 8))
+          .join(", ")}`
+      )
+    );
+
     // Update active list
-    this.activeProcesses = uuids.filter(uuid => this.processMap.has(uuid));
+    this.activeProcesses = uuids.filter((uuid) => this.processMap.has(uuid));
 
     // Collect screen snapshots for newly active processes
     const snapshots = new Map<string, string>();
@@ -229,7 +267,9 @@ export class ProcessManager {
   public writeToProcess(uuid: string, data: string): boolean {
     const processInfo = this.processMap.get(uuid);
     if (!processInfo) {
-      console.log(chalk.yellow(`⚠️  Cannot write to process ${uuid}: not found`));
+      console.log(
+        chalk.yellow(`⚠️  Cannot write to process ${uuid}: not found`)
+      );
       return false;
     }
 
@@ -342,9 +382,87 @@ export class ProcessManager {
       return false;
     }
 
-    console.log(chalk.cyan(`📝 Renaming process ${uuid.substring(0, 8)} to "${name}"`));
+    console.log(
+      chalk.cyan(`📝 Renaming process ${uuid.substring(0, 8)} to "${name}"`)
+    );
     processInfo.name = name;
     return true;
+  }
+
+  /**
+   * Start periodic memory health checks
+   */
+  public startMemoryMonitoring(): void {
+    // Check memory every 5 minutes
+    this.memoryCheckInterval = setInterval(() => {
+      this.performMemoryCleanup();
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Perform memory cleanup on inactive processes
+   */
+  private performMemoryCleanup(): void {
+    const now = Date.now();
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+
+    console.log(
+      chalk.gray(`\n🧹 Memory check: ${heapUsedMB}MB / ${heapTotalMB}MB`)
+    );
+
+    // Clear screen buffers for inactive processes to save memory
+    let buffersCleared = 0;
+    for (const [uuid, processInfo] of this.processMap) {
+      if (!this.isActive(uuid) && processInfo.screenBuffer.length > 0) {
+        // Keep only last 10KB for inactive processes
+        if (processInfo.screenBuffer.length > 10000) {
+          processInfo.screenBuffer = processInfo.screenBuffer.slice(-10000);
+          buffersCleared++;
+        }
+      }
+    }
+
+    if (buffersCleared > 0) {
+      console.log(
+        chalk.gray(
+          `   Cleared buffers for ${buffersCleared} inactive process(es)`
+        )
+      );
+    }
+
+    // Force garbage collection if available
+    if (global.gc) {
+      console.log(chalk.gray("   Running garbage collection..."));
+      global.gc();
+    }
+
+    this.lastMemoryCheck = now;
+  }
+
+  /**
+   * Get memory usage statistics
+   */
+  public getMemoryStats(): {
+    heapUsedMB: number;
+    heapTotalMB: number;
+    processCount: number;
+    totalBufferSize: number;
+  } {
+    const memUsage = process.memoryUsage();
+    let totalBufferSize = 0;
+
+    for (const [_, processInfo] of this.processMap) {
+      totalBufferSize += processInfo.screenBuffer.length;
+    }
+
+    return {
+      heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+      processCount: this.processMap.size,
+      totalBufferSize,
+    };
   }
 
   /**
@@ -352,8 +470,19 @@ export class ProcessManager {
    */
   public cleanup(): void {
     console.log(chalk.yellow("🧹 Cleaning up all processes..."));
+
+    // Stop memory monitoring
+    if (this.memoryCheckInterval) {
+      clearInterval(this.memoryCheckInterval);
+      this.memoryCheckInterval = null;
+    }
+
     for (const [uuid, processInfo] of this.processMap) {
       try {
+        // Clear buffer first to free memory
+        processInfo.screenBuffer = "";
+
+        // Kill the PTY process
         processInfo.pty.kill();
         console.log(chalk.gray(`  Killed process ${uuid.substring(0, 8)}`));
       } catch (error) {
@@ -362,7 +491,11 @@ export class ProcessManager {
     }
     this.processMap.clear();
     this.activeProcesses = [];
+
+    // Clear callbacks
+    this.outputCallback = null;
+    this.exitCallback = null;
+
     console.log(chalk.green("✅ All processes cleaned up"));
   }
 }
-

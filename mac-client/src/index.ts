@@ -91,9 +91,15 @@ let pendingIceCandidates: Array<{
 // Process Manager - replaces single terminal
 const processManager = new ProcessManager();
 
+// Start memory monitoring
+processManager.startMemoryMonitoring();
+
 // Store terminal dimensions from mobile
 let terminalCols = 80;
 let terminalRows = 30;
+
+// Periodic health check interval
+let healthCheckInterval: NodeJS.Timeout | null = null;
 
 /**
  * Send data to iOS client via WebRTC or Socket fallback
@@ -110,6 +116,42 @@ function sendToClient(type: string, payload: unknown): void {
   } else {
     socket.emit(type, payload);
   }
+}
+
+/**
+ * Perform periodic health check and log system status
+ */
+function performHealthCheck(): void {
+  const stats = processManager.getMemoryStats();
+  
+  console.log(chalk.gray("\n💓 Health Check"));
+  console.log(chalk.gray(`   Memory: ${stats.heapUsedMB}MB / ${stats.heapTotalMB}MB`));
+  console.log(chalk.gray(`   Processes: ${stats.processCount}`));
+  console.log(chalk.gray(`   Buffer Size: ${Math.round(stats.totalBufferSize / 1024)}KB`));
+  console.log(chalk.gray(`   WebRTC: ${isWebRTCConnected ? "Connected" : "Disconnected"}`));
+  
+  // Warn if memory usage is high
+  if (stats.heapUsedMB > 512) {
+    console.log(chalk.yellow(`⚠️  High memory usage detected: ${stats.heapUsedMB}MB`));
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      console.log(chalk.gray("   Running garbage collection..."));
+      global.gc();
+    }
+  }
+}
+
+/**
+ * Start periodic health monitoring
+ */
+function startHealthMonitoring(): void {
+  // Check health every 10 minutes
+  healthCheckInterval = setInterval(() => {
+    performHealthCheck();
+  }, 10 * 60 * 1000);
+  
+  console.log(chalk.gray("✅ Health monitoring started"));
 }
 
 /**
@@ -530,6 +572,12 @@ function connectToRelay() {
 
   socket.on("connect", () => {
     console.log(chalk.green("✅ Connected to relay server"));
+    
+    // Start health monitoring on first connection
+    if (!healthCheckInterval) {
+      startHealthMonitoring();
+    }
+    
     // Register as Mac device with public key and tab count
     socket.emit("register", {
       type: "mac",
@@ -764,9 +812,12 @@ function connectToRelay() {
     // Processes will persist for reconnection
     console.log(chalk.cyan(`→ Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`));
     
-    // Close WebRTC
+    // Close WebRTC and clean up event listeners
     if (dataChannel) {
       try {
+        dataChannel.onopen = null;
+        dataChannel.onclose = null;
+        dataChannel.onmessage = null;
         dataChannel.close();
       } catch (e) {
         // Ignore
@@ -776,6 +827,8 @@ function connectToRelay() {
     
     if (peerConnection) {
       try {
+        peerConnection.onicecandidate = null;
+        peerConnection.onconnectionstatechange = null;
         peerConnection.close();
       } catch (e) {
         // Ignore
@@ -784,6 +837,11 @@ function connectToRelay() {
     }
     isWebRTCConnected = false;
     pendingIceCandidates = [];
+    
+    // Force garbage collection to clean up closed connections
+    if (global.gc) {
+      global.gc();
+    }
     
     // Re-register to wait for reconnection
     const token = getToken();
@@ -892,6 +950,12 @@ function handleShutdown(signal: string) {
   forceExitTimeout.unref();
 
   try {
+    // Stop health monitoring
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      healthCheckInterval = null;
+    }
+
     // Close readline interface first
     if (rl) {
       try {
@@ -915,7 +979,7 @@ function handleShutdown(signal: string) {
       // Ignore stdin cleanup errors
     }
 
-    // Clean up all processes
+    // Clean up all processes (this also stops process manager's memory monitoring)
     processManager.cleanup();
 
     // Close WebRTC connections
@@ -925,6 +989,7 @@ function handleShutdown(signal: string) {
       } catch (e) {
         // Ignore
       }
+      dataChannel = null;
     }
 
     if (peerConnection) {
@@ -933,6 +998,7 @@ function handleShutdown(signal: string) {
       } catch (e) {
         // Ignore
       }
+      peerConnection = null;
     }
 
     // Disconnect socket SYNCHRONOUSLY

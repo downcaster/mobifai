@@ -52,7 +52,7 @@ import { AppView, AppText, AppButton, AppCard } from "../components/ui";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { getThemeById } from "../theme/terminalThemes";
-import { KeyCombinationModal } from "../components/KeyCombinationModal";
+import { KeyCombinationModal, TerminalAction } from "../components/KeyCombinationModal";
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -436,9 +436,9 @@ export default function TerminalScreen({
   };
 
   /**
-   * Handle key combination send
+   * Handle key combination/text send
    */
-  const handleKeyCombinationSend = (escapeSequence: string): void => {
+  const handleKeyCombinationSend = (actions: TerminalAction[]): void => {
     if (!paired) {
       Alert.alert("Error", "Not connected to Mac client");
       return;
@@ -449,14 +449,13 @@ export default function TerminalScreen({
       return;
     }
 
-    console.log("⌨️ Sending key combination");
+    console.log("⌨️ Sending actions:", actions);
     
-    // Send the escape sequence to the active terminal process
-    const payload: TerminalInputPayload = {
+    // Send the action array to the Mac client
+    sendToMac("terminal:actions", {
       uuid: activeProcessUuidRef.current,
-      data: escapeSequence,
-    };
-    sendToMac("terminal:input", payload);
+      actions,
+    });
   };
 
   const getDeviceId = async () => {
@@ -1773,7 +1772,10 @@ export default function TerminalScreen({
               }}
               disabled={!paired}
             >
-              <Text style={styles.keyComboButtonText}>⌘</Text>
+              <View style={styles.keyComboButtonContent}>
+                <Text style={styles.keyComboButtonText}>⌘</Text>
+                <Text style={styles.keyComboButtonTextSmall}>a</Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.refreshButton}
@@ -2137,11 +2139,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2a2a3a",
   },
+  keyComboButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: -2,
+  },
   keyComboButtonText: {
     color: "#BB86FC",
     fontSize: 18,
     textAlign: "center",
     includeFontPadding: false,
+  },
+  keyComboButtonTextSmall: {
+    color: "#BB86FC",
+    fontSize: 10,
+    textAlign: "center",
+    includeFontPadding: false,
+    marginTop: 6,
   },
   buttonDisabled: {
     opacity: 0.5,

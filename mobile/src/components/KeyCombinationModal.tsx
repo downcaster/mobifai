@@ -13,97 +13,167 @@ import {
   KEY_DEFINITIONS,
   KeyDefinition,
   searchKeys,
-  keysToEscapeSequence,
 } from '../config/keyCombinations';
+
+export interface TerminalAction {
+  type: 'text' | 'command';
+  value: string; // For text, the actual text. For command, the escape sequence
+  label?: string; // For command display (e.g., "CTRL+C")
+}
 
 interface KeyCombinationModalProps {
   visible: boolean;
   onClose: () => void;
-  onSend: (escapeSequence: string) => void;
+  onSend: (actions: TerminalAction[]) => void;
 }
+
+type Item = 
+  | { type: 'text'; value: string }
+  | { type: 'command'; key: KeyDefinition };
 
 export function KeyCombinationModal({
   visible,
   onClose,
   onSend,
 }: KeyCombinationModalProps): React.ReactElement {
-  const [selectedKeys, setSelectedKeys] = useState<KeyDefinition[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [items, setItems] = useState<Item[]>([]);
+  const [currentText, setCurrentText] = useState('');
   const [suggestions, setSuggestions] = useState<KeyDefinition[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Update suggestions when search query changes
+  // Update suggestions based on the last word when current text changes
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const results = searchKeys(searchQuery);
-      setSuggestions(results.slice(0, 20)); // Limit to 20 suggestions
-      setShowSuggestions(results.length > 0);
+    if (currentText.trim()) {
+      // Get the last word for command search
+      const words = currentText.split(' ');
+      const lastWord = words[words.length - 1];
+      
+      if (lastWord) {
+        const results = searchKeys(lastWord);
+        setSuggestions(results.slice(0, 20)); // Limit to 20 suggestions
+        setShowSuggestions(results.length > 0);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [searchQuery]);
+  }, [currentText]);
 
   // Focus input when modal opens
   useEffect(() => {
     if (visible) {
-      // Small delay to ensure modal is rendered
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
     } else {
       // Reset state when modal closes
-      setSelectedKeys([]);
-      setSearchQuery('');
+      setItems([]);
+      setCurrentText('');
       setSuggestions([]);
       setShowSuggestions(false);
     }
   }, [visible]);
 
-  const handleAddKey = (key: KeyDefinition): void => {
-    // Avoid duplicates
-    if (!selectedKeys.some(k => k.symbol === key.symbol)) {
-      setSelectedKeys([...selectedKeys, key]);
+  const addCommand = (key: KeyDefinition): void => {
+    const newItems = [...items];
+    
+    // If there's text before the last word (which was used for searching), add it as text
+    const words = currentText.split(' ');
+    if (words.length > 1) {
+      // Everything except the last word is actual text
+      const textBeforeSearch = words.slice(0, -1).join(' ');
+      if (textBeforeSearch.trim()) {
+        newItems.push({ type: 'text', value: textBeforeSearch });
+      }
     }
-    setSearchQuery('');
+    
+    // Add the command
+    newItems.push({ type: 'command', key });
+    
+    setItems(newItems);
+    setCurrentText('');
     setShowSuggestions(false);
     inputRef.current?.focus();
   };
 
-  const handleRemoveKey = (index: number): void => {
-    setSelectedKeys(selectedKeys.filter((_, i) => i !== index));
+  const removeItem = (index: number): void => {
+    setItems(items.filter((_, i) => i !== index));
   };
 
   const handleSend = (): void => {
-    if (selectedKeys.length === 0) return;
-    
-    const escapeSequence = keysToEscapeSequence(selectedKeys);
-    onSend(escapeSequence);
+    // Build final items array including any remaining text
+    const finalItems = [...items];
+    if (currentText.trim()) {
+      finalItems.push({ type: 'text', value: currentText });
+    }
+
+    if (finalItems.length === 0) return;
+
+    // Convert to action array
+    const actions: TerminalAction[] = finalItems.map(item => {
+      if (item.type === 'text') {
+        return {
+          type: 'text',
+          value: item.value,
+        };
+      } else {
+        return {
+          type: 'command',
+          value: item.key.escapeSequence || item.key.symbol,
+          label: item.key.symbol,
+        };
+      }
+    });
+
+    onSend(actions);
     onClose();
   };
 
   const handleTextChange = (text: string): void => {
-    // Check if the last character is a space
-    if (text.endsWith(' ') && suggestions.length > 0 && text.trim() !== '') {
-      // Select the first suggestion
-      handleAddKey(suggestions[0]);
-    } else {
-      setSearchQuery(text);
+    // Just update the current text - space no longer auto-selects
+    setCurrentText(text);
+  };
+
+  const handleKeyPress = (e: { nativeEvent: { key: string } }): void => {
+    // Enter key selects the first suggestion if available
+    if (e.nativeEvent.key === 'Enter' && suggestions.length > 0 && currentText.trim()) {
+      addCommand(suggestions[0]);
     }
   };
 
-  const renderKeyTile = (key: KeyDefinition, index: number): React.ReactElement => (
-    <View key={`${key.symbol}-${index}`} style={styles.keyTile}>
-      <Text style={styles.keyTileText}>{key.symbol}</Text>
-      <TouchableOpacity
-        onPress={() => handleRemoveKey(index)}
-        style={styles.keyTileRemove}
-      >
-        <Text style={styles.keyTileRemoveText}>×</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderItem = (item: Item, index: number): React.ReactElement => {
+    if (item.type === 'text') {
+      return (
+        <View key={`text-${index}`} style={styles.textTile}>
+          <Text style={styles.textTileText} numberOfLines={1}>
+            "{item.value}"
+          </Text>
+          <TouchableOpacity
+            onPress={() => removeItem(index)}
+            style={styles.tileRemove}
+          >
+            <Text style={styles.tileRemoveText}>×</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    } else {
+      return (
+        <View key={`cmd-${index}`} style={styles.commandTile}>
+          <Text style={styles.commandTileText}>{item.key.symbol}</Text>
+          <TouchableOpacity
+            onPress={() => removeItem(index)}
+            style={styles.tileRemove}
+          >
+            <Text style={styles.tileRemoveText}>×</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  };
 
   const renderSuggestionItem = ({ item, index }: { item: KeyDefinition; index: number }): React.ReactElement => (
     <TouchableOpacity
@@ -111,7 +181,7 @@ export function KeyCombinationModal({
         styles.suggestionItem,
         index === 0 && styles.suggestionItemSelected,
       ]}
-      onPress={() => handleAddKey(item)}
+      onPress={() => addCommand(item)}
     >
       <Text style={styles.suggestionSymbol}>{item.symbol}</Text>
       {item.name && <Text style={styles.suggestionName}>{item.name}</Text>}
@@ -135,23 +205,27 @@ export function KeyCombinationModal({
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
-          {/* Input Container with Selected Keys */}
+          {/* Input Container with Items */}
           <View style={styles.inputContainer}>
-            <View style={styles.selectedKeysRow}>
-              {selectedKeys.map((key, index) => renderKeyTile(key, index))}
+            <View style={styles.itemsRow}>
+              {items.map((item, index) => renderItem(item, index))}
               <TextInput
                 ref={inputRef}
                 style={styles.textInput}
-                value={searchQuery}
+                value={currentText}
                 onChangeText={handleTextChange}
-                placeholder={selectedKeys.length === 0 ? "Type to search keys..." : ""}
+                onKeyPress={handleKeyPress}
+                placeholder={items.length === 0 && !currentText ? "Type text or search commands..." : ""}
                 placeholderTextColor="#555566"
                 autoCapitalize="none"
                 autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={() => {
-                  if (suggestions.length > 0 && searchQuery.trim()) {
-                    handleAddKey(suggestions[0]);
+                multiline={false}
+                blurOnSubmit={false}
+                onSubmitEditing={(e) => {
+                  // Prevent default behavior
+                  e.preventDefault();
+                  if (suggestions.length > 0 && currentText.trim()) {
+                    addCommand(suggestions[0]);
                   }
                 }}
               />
@@ -176,10 +250,10 @@ export function KeyCombinationModal({
           <TouchableOpacity
             style={[
               styles.sendButton,
-              selectedKeys.length === 0 && styles.sendButtonDisabled,
+              (items.length === 0 && !currentText.trim()) && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={selectedKeys.length === 0}
+            disabled={items.length === 0 && !currentText.trim()}
           >
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
@@ -214,13 +288,30 @@ const styles = StyleSheet.create({
     padding: 8,
     minHeight: 48,
   },
-  selectedKeysRow: {
+  itemsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
   },
-  keyTile: {
+  textTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a25',
+    borderRadius: 6,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 6,
+    gap: 6,
+    maxWidth: 200,
+  },
+  textTileText: {
+    color: '#BB86FC',
+    fontSize: 14,
+    fontWeight: '400',
+    fontStyle: 'italic',
+  },
+  commandTile: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#6200EE',
@@ -230,12 +321,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 6,
   },
-  keyTileText: {
+  commandTileText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
   },
-  keyTileRemove: {
+  tileRemove: {
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -243,7 +334,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  keyTileRemoveText: {
+  tileRemoveText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -309,4 +400,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-

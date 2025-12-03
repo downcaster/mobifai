@@ -289,6 +289,46 @@ function handleTerminalInput(payload: TerminalInputPayload | string): void {
 }
 
 /**
+ * Handle terminal:actions command - process array of text and command actions sequentially
+ */
+interface TerminalAction {
+  type: "text" | "command";
+  value: string;
+  label?: string;
+}
+
+interface TerminalActionsPayload {
+  uuid: string;
+  actions: TerminalAction[];
+}
+
+function handleTerminalActions(payload: TerminalActionsPayload): void {
+  const { uuid, actions } = payload;
+  
+  console.log(
+    chalk.cyan(
+      `\n⌨️  Processing ${actions.length} action(s) for process ${uuid.substring(
+        0,
+        8
+      )}`
+    )
+  );
+
+  // Process each action sequentially
+  actions.forEach((action, index) => {
+    if (action.type === "text") {
+      console.log(chalk.gray(`  ${index + 1}. Text: "${action.value}"`));
+      processManager.writeToProcess(uuid, action.value);
+    } else if (action.type === "command") {
+      console.log(
+        chalk.gray(`  ${index + 1}. Command: ${action.label || "key"}`)
+      );
+      processManager.writeToProcess(uuid, action.value);
+    }
+  });
+}
+
+/**
  * Handle terminal:resize command from iOS
  */
 function handleTerminalResize(payload: TerminalResizePayload): void {
@@ -452,6 +492,9 @@ function handleWebRTCMessage(message: { type: string; payload: unknown }): void 
       break;
     case "terminal:input":
       handleTerminalInput(message.payload as TerminalInputPayload);
+      break;
+    case "terminal:actions":
+      handleTerminalActions(message.payload as TerminalActionsPayload);
       break;
     case "terminal:resize":
       handleTerminalResize(message.payload as TerminalResizePayload);
@@ -923,6 +966,10 @@ function connectToRelay() {
   // Fallback IO - Accept from socket even if WebRTC is active (Mobile decides routing)
   socket.on("terminal:input", (data: TerminalInputPayload | string) => {
     handleTerminalInput(data);
+  });
+
+  socket.on("terminal:actions", (payload: TerminalActionsPayload) => {
+    handleTerminalActions(payload);
   });
 
   socket.on("terminal:resize", (payload: TerminalResizePayload) => {

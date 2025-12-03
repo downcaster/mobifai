@@ -1672,7 +1672,7 @@ export default function TerminalScreen({
               {aiProcessing ? (
                 <ActivityIndicator size="small" color="#6200EE" />
               ) : (
-                <Text style={styles.aiButtonText}>✨</Text>
+                <Text style={styles.aiButtonText}>AI</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -1905,7 +1905,8 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: "#BB86FC",
     fontSize: 20,
-    lineHeight: 20,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   statusContainer: {
     flex: 1,
@@ -1961,6 +1962,10 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: "#BB86FC",
     fontSize: 18,
+    textAlign: "center",
+    includeFontPadding: false,
+    marginTop: 2,
+    marginLeft: 2.5,
   },
   fitButton: {
     backgroundColor: "#1a1a25",
@@ -1976,6 +1981,8 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
+    includeFontPadding: false,
   },
   aiButton: {
     backgroundColor: "#6200EE",
@@ -1987,7 +1994,11 @@ const styles = StyleSheet.create({
   },
   aiButtonText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    includeFontPadding: false,
+    letterSpacing: 0.5,
   },
   buttonDisabled: {
     opacity: 0.5,

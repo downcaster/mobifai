@@ -415,14 +415,17 @@ async function setupWebRTC() {
       console.log(chalk.green("✅ WebRTC data channel opened"));
       isWebRTCConnected = true;
       
-      // Always send processes:sync via WebRTC (even if empty) so iOS knows sync is complete
-      const existingProcesses = processManager.getProcessSyncData();
-      console.log(chalk.cyan(`→ Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
-      const syncPayload = {
-        processes: existingProcesses,
-        activeUuids: processManager.getActiveProcessIds(),
-      };
-      sendToClient("processes:sync", syncPayload);
+      // Small delay to ensure iOS data channel is fully ready to receive
+      setTimeout(() => {
+        // Always send processes:sync via WebRTC (even if empty) so iOS knows sync is complete
+        const existingProcesses = processManager.getProcessSyncData();
+        console.log(chalk.cyan(`→ Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
+        const syncPayload = {
+          processes: existingProcesses,
+          activeUuids: processManager.getActiveProcessIds(),
+        };
+        sendToClient("processes:sync", syncPayload);
+      }, 100); // 100ms delay to ensure both sides are ready
     };
 
     channel.onclose = () => {

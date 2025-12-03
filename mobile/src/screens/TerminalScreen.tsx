@@ -6,7 +6,6 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Linking,
   StatusBar,
   Modal,
@@ -14,6 +13,8 @@ import {
   ActivityIndicator,
   Animated,
   ScrollView,
+  Keyboard,
+  LayoutChangeEvent,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { WebView } from "react-native-webview";
@@ -84,6 +85,7 @@ export default function TerminalScreen({
   // Get params from route - may be undefined when accessed from tab
   const relayServerUrl = route.params?.relayServerUrl;
   const targetDeviceId = route.params?.targetDeviceId;
+  const targetDeviceName = route.params?.targetDeviceName;
 
   // Check if we have connection params
   const hasConnectionParams = !!relayServerUrl;
@@ -125,6 +127,11 @@ export default function TerminalScreen({
   const [aiToastMessage, setAiToastMessage] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const scrollButtonOpacity = useRef(new Animated.Value(0)).current;
+
+  // Keyboard-aware terminal sizing
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(null);
+  const terminalWrapperRef = useRef<ScrollView>(null);
 
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -1096,6 +1103,44 @@ export default function TerminalScreen({
     }).start();
   }, [showScrollToBottom, scrollButtonOpacity]);
 
+  // Keyboard visibility listener - terminal keeps fixed size, wrapper becomes scrollable
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardVisible(true);
+      // Scroll by keyboard height so content appears to stay in place
+      const keyboardHeight = e.endCoordinates.height;
+      setTimeout(() => {
+        terminalWrapperRef.current?.scrollTo({ y: keyboardHeight, animated: false });
+      }, 50);
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      // Scroll back to top when keyboard hides
+      terminalWrapperRef.current?.scrollTo({ y: 0, animated: true });
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  // Capture the terminal wrapper height once (before keyboard opens)
+  // This ensures the terminal size never changes, even when keyboard appears
+  const handleTerminalWrapperLayout = useCallback((event: LayoutChangeEvent) => {
+    if (fixedTerminalHeight === null && !keyboardVisible) {
+      const { height } = event.nativeEvent.layout;
+      setFixedTerminalHeight(height);
+    }
+  }, [fixedTerminalHeight, keyboardVisible]);
+
+  // Use the fixed height, or flex until it's measured
+  const terminalHeight = fixedTerminalHeight;
+
   const terminalHtml = `
 <!DOCTYPE html>
 <html>
@@ -1445,6 +1490,9 @@ export default function TerminalScreen({
                 }));
             } else if (message.type === 'focus') {
                 terminal.focus();
+            } else if (message.type === 'blur') {
+                terminal.blur();
+                document.activeElement?.blur();
             } else if (message.type === 'scrollToBottom') {
                 if (window.scrollToBottom) {
                     window.scrollToBottom();
@@ -1612,22 +1660,11 @@ export default function TerminalScreen({
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={100}
-    >
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
       <SafeAreaView edges={["top"]} style={{ backgroundColor: "#0a0a0f" }}>
         {/* Header Row */}
         <View style={styles.statusBar}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.navigate("Connections")}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-
           <View style={styles.statusContainer}>
             {/* Status indicator with glow */}
             <View style={styles.indicatorContainer}>
@@ -1641,13 +1678,13 @@ export default function TerminalScreen({
                 ]}
               />
             </View>
-            <Text style={styles.statusText}>
+            <Text style={styles.statusText} numberOfLines={1}>
               {copyFeedback
                 ? "✓ Copied!"
                 : paired && webrtcConnected
-                ? "Connected"
+                ? targetDeviceName || "Connected"
                 : paired
-                ? "Connecting"
+                ? "Connecting..."
                 : connected
                 ? "Relay"
                 : "Offline"}
@@ -1655,6 +1692,17 @@ export default function TerminalScreen({
           </View>
 
           <View style={styles.rightButtons}>
+            {keyboardVisible && (
+              <TouchableOpacity
+                style={styles.dismissKeyboardButton}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                }}
+              >
+                <Text style={styles.dismissKeyboardText}>⌨↓</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[
                 styles.aiButton,
@@ -1706,43 +1754,54 @@ export default function TerminalScreen({
       </SafeAreaView>
 
       {processes.length > 0 ? (
-        <View style={styles.terminalContainer}>
-          <WebView
-            ref={webViewRef}
-            source={{ html: terminalHtml }}
-            style={styles.webview}
-            onMessage={handleWebViewMessage}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            scrollEnabled={true}
-            showsVerticalScrollIndicator={true}
-            showsHorizontalScrollIndicator={false}
-            keyboardDisplayRequiresUserAction={false}
-            originWhitelist={["*"]}
-            mixedContentMode="always"
-            allowsInlineMediaPlayback={true}
-            mediaPlaybackRequiresUserAction={false}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error("WebView error:", nativeEvent);
-            }}
-            onHttpError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error("WebView HTTP error:", nativeEvent);
-            }}
-            hideKeyboardAccessoryView={true}
-          />
-          {/* Loading overlay while terminal initializes - only show for active process */}
-          {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
-            <View style={styles.terminalLoadingOverlay}>
-              <View style={styles.loadingGlow} />
-              <ActivityIndicator size="small" color="#6200EE" />
-              <Text style={styles.terminalLoadingText}>
-                Starting terminal...
-              </Text>
-            </View>
-          )}
-        </View>
+        <ScrollView
+          ref={terminalWrapperRef}
+          style={styles.terminalWrapper}
+          contentContainerStyle={terminalHeight ? { height: terminalHeight } : { flex: 1 }}
+          scrollEnabled={keyboardVisible}
+          showsVerticalScrollIndicator={keyboardVisible}
+          keyboardShouldPersistTaps="always"
+          bounces={keyboardVisible}
+          onLayout={handleTerminalWrapperLayout}
+        >
+          <View style={[styles.terminalContainer, terminalHeight ? { height: terminalHeight } : { flex: 1 }]}>
+            <WebView
+              ref={webViewRef}
+              source={{ html: terminalHtml }}
+              style={styles.webview}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+              showsHorizontalScrollIndicator={false}
+              keyboardDisplayRequiresUserAction={false}
+              originWhitelist={["*"]}
+              mixedContentMode="always"
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error("WebView error:", nativeEvent);
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error("WebView HTTP error:", nativeEvent);
+              }}
+              hideKeyboardAccessoryView={true}
+            />
+            {/* Loading overlay while terminal initializes - only show for active process */}
+            {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
+              <View style={styles.terminalLoadingOverlay}>
+                <View style={styles.loadingGlow} />
+                <ActivityIndicator size="small" color="#6200EE" />
+                <Text style={styles.terminalLoadingText}>
+                  Starting terminal...
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       ) : !paired ? (
         // Show connecting state before pairing is complete
         <View style={styles.emptyStateContainer}>
@@ -1866,7 +1925,7 @@ export default function TerminalScreen({
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1886,26 +1945,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#2a2a3a",
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1a1a25",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2a2a3a",
-  },
-  backButtonText: {
-    color: "#BB86FC",
-    fontSize: 20,
-    textAlign: "center",
-    includeFontPadding: false,
-  },
   statusContainer: {
     flex: 1,
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
   },
   rightButtons: {
@@ -1975,6 +2018,22 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
+  dismissKeyboardButton: {
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+  },
+  dismissKeyboardText: {
+    color: "#BB86FC",
+    fontSize: 12,
     textAlign: "center",
     includeFontPadding: false,
   },
@@ -2126,8 +2185,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 20,
   },
-  terminalContainer: {
+  terminalWrapper: {
     flex: 1,
+  },
+  terminalContainer: {
     position: "relative",
   },
   webview: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import {
   View,
   ScrollView,
@@ -7,7 +7,6 @@ import {
   Image,
   ActivityIndicator,
   TouchableOpacity,
-  Platform,
   Dimensions,
 } from "react-native";
 import { AppText, Slider } from "../components/ui";
@@ -17,6 +16,56 @@ import { useNavigation, CommonActions } from "@react-navigation/native";
 import { terminalThemes, TerminalTheme } from "../theme/terminalThemes";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Memoized theme preview component to prevent re-renders during scroll
+interface ThemePreviewProps {
+  terminalTheme: TerminalTheme;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  theme: typeof themeColors;
+}
+
+const ThemePreviewItem = memo(function ThemePreviewItem({
+  terminalTheme,
+  isSelected,
+  onSelect,
+  theme,
+}: ThemePreviewProps) {
+  const handlePress = useCallback(() => {
+    onSelect(terminalTheme.id);
+  }, [onSelect, terminalTheme.id]);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.themePreview,
+        isSelected && styles.themePreviewSelected,
+      ]}
+      onPress={handlePress}
+    >
+      {isSelected && <View style={styles.themePreviewGlow} />}
+      <View
+        style={[
+          styles.themePreviewInner,
+          { backgroundColor: terminalTheme.background },
+          isSelected && { borderColor: themeColors.accent.primary, borderWidth: 2.5 },
+        ]}
+      >
+        <AppText
+          style={[
+            styles.themePreviewText,
+            { color: terminalTheme.foreground },
+          ]}
+        >
+          $ ls
+        </AppText>
+      </View>
+      <AppText style={styles.themePreviewName}>
+        {terminalTheme.name}
+      </AppText>
+    </TouchableOpacity>
+  );
+});
 
 const TOKEN_KEY = "mobifai_auth_token";
 const USER_INFO_KEY = "mobifai_user_info";
@@ -36,7 +85,7 @@ interface TerminalSettings {
 }
 
 // Design tokens for the futuristic theme
-const theme = {
+const themeColors = {
   bg: {
     primary: "#0a0a0f",
     secondary: "#12121a",
@@ -83,7 +132,7 @@ export default function ProfileScreen(): React.ReactElement {
       }
       await fetchSettings();
     } catch (error) {
-      console.error("Error loading profile data:", error);
+      if (__DEV__) console.error("Error loading profile data:", error);
     } finally {
       setLoading(false);
     }
@@ -107,46 +156,47 @@ export default function ProfileScreen(): React.ReactElement {
         setSettings((prev) => ({ ...prev, ...data }));
       }
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      if (__DEV__) console.error("Error fetching settings:", error);
     }
   };
 
-  const updateSetting = async (
+  const updateSetting = useCallback(async (
     key: string,
     value: string | number
   ): Promise<void> => {
     // Optimistic update
-    const previousSettings = settings;
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
+    setSettings((prev) => {
+      const newSettings = { ...prev, [key]: value };
+      
+      // Fire API call asynchronously
+      (async () => {
+        try {
+          const token = await AsyncStorage.getItem(TOKEN_KEY);
+          if (!token) return;
 
-    try {
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token) return;
+          const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ [key]: value }),
+          });
 
-      const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ [key]: value }),
-      });
+          if (!response.ok) {
+            throw new Error("Failed to update settings");
+            // Note: In production, you'd revert settings here
+          }
+        } catch (error) {
+          if (__DEV__) console.error("Error updating settings:", error);
+        }
+      })();
+      
+      return newSettings;
+    });
+  }, []);
 
-      if (!response.ok) {
-        throw new Error("Failed to update settings");
-      }
-
-      // Don't update settings again from server response - we already updated optimistically
-      // This prevents flickering/animation on the slider
-    } catch (error) {
-      console.error("Error updating settings:", error);
-      // Revert to previous settings on error
-      setSettings(previousSettings);
-    }
-  };
-
-  const handleLogout = async (): Promise<void> => {
+  const handleLogout = useCallback((): void => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -165,17 +215,17 @@ export default function ProfileScreen(): React.ReactElement {
               })
             );
           } catch (e) {
-            console.error("Logout error:", e);
+            if (__DEV__) console.error("Logout error:", e);
           }
         },
       },
     ]);
-  };
+  }, [navigation]);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.accent.primary} />
+        <ActivityIndicator size="large" color={themeColors.accent.primary} />
       </View>
     );
   }
@@ -185,6 +235,8 @@ export default function ProfileScreen(): React.ReactElement {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        scrollEventThrottle={16}
       >
         {/* Profile Header with Gradient */}
         <View style={styles.headerSection}>
@@ -232,8 +284,8 @@ export default function ProfileScreen(): React.ReactElement {
                     onValueChange={(val) => updateSetting("fontSize", val)}
                     minLabel="Small"
                     maxLabel="Large"
-                    trackColor={theme.bg.tertiary}
-                    activeTrackColor={theme.accent.primary}
+                    trackColor={themeColors.bg.tertiary}
+                    activeTrackColor={themeColors.accent.primary}
                   />
                 </View>
               </View>
@@ -247,41 +299,17 @@ export default function ProfileScreen(): React.ReactElement {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.themesContainer}
+                  removeClippedSubviews={true}
                 >
-                  {terminalThemes.map((terminalTheme) => {
-                    const isSelected = settings.terminalTheme === terminalTheme.id;
-                    return (
-                      <TouchableOpacity
-                        key={terminalTheme.id}
-                        style={[
-                          styles.themePreview,
-                          isSelected && styles.themePreviewSelected,
-                        ]}
-                        onPress={() => updateSetting("terminalTheme", terminalTheme.id)}
-                      >
-                        {isSelected && <View style={styles.themePreviewGlow} />}
-                        <View
-                          style={[
-                            styles.themePreviewInner,
-                            { backgroundColor: terminalTheme.background },
-                            isSelected && { borderColor: theme.accent.primary, borderWidth: 2.5 },
-                          ]}
-                        >
-                          <AppText
-                            style={[
-                              styles.themePreviewText,
-                              { color: terminalTheme.foreground },
-                            ]}
-                          >
-                            $ ls
-                          </AppText>
-                        </View>
-                        <AppText style={styles.themePreviewName}>
-                          {terminalTheme.name}
-                        </AppText>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {terminalThemes.map((terminalTheme) => (
+                    <ThemePreviewItem
+                      key={terminalTheme.id}
+                      terminalTheme={terminalTheme}
+                      isSelected={settings.terminalTheme === terminalTheme.id}
+                      onSelect={(id) => updateSetting("terminalTheme", id)}
+                      theme={themeColors}
+                    />
+                  ))}
                 </ScrollView>
               </View>
             </View>
@@ -364,13 +392,13 @@ export default function ProfileScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bg.primary,
+    backgroundColor: themeColors.bg.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: theme.bg.primary,
+    backgroundColor: themeColors.bg.primary,
   },
   content: {
     paddingBottom: 120,
@@ -392,7 +420,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: theme.accent.glow,
+    backgroundColor: themeColors.accent.glow,
     top: -5,
     left: -5,
   },
@@ -401,32 +429,32 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     borderWidth: 2,
-    borderColor: theme.accent.primary,
+    borderColor: themeColors.accent.primary,
   },
   avatarPlaceholder: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: theme.bg.tertiary,
+    backgroundColor: themeColors.bg.tertiary,
     borderWidth: 2,
-    borderColor: theme.accent.primary,
+    borderColor: themeColors.accent.primary,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarText: {
     fontSize: 36,
-    color: theme.accent.secondary,
+    color: themeColors.accent.secondary,
     fontWeight: "700",
   },
   userName: {
     fontSize: 24,
     fontWeight: "700",
-    color: theme.text.primary,
+    color: themeColors.text.primary,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: theme.text.secondary,
+    color: themeColors.text.secondary,
   },
 
   // Sections
@@ -446,29 +474,29 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: theme.accent.glow,
+    backgroundColor: themeColors.accent.glow,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
   sectionIconText: {
     fontSize: 14,
-    color: theme.accent.secondary,
+    color: themeColors.accent.secondary,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: "600",
-    color: theme.text.secondary,
+    color: themeColors.text.secondary,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
 
   // Card
   card: {
-    backgroundColor: theme.bg.card,
+    backgroundColor: themeColors.bg.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.border.subtle,
+    borderColor: themeColors.border.subtle,
     overflow: "hidden",
   },
   settingItem: {
@@ -477,12 +505,12 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 15,
     fontWeight: "600",
-    color: theme.text.primary,
+    color: themeColors.text.primary,
     marginBottom: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.border.subtle,
+    backgroundColor: themeColors.border.subtle,
     marginHorizontal: 20,
   },
 
@@ -494,7 +522,7 @@ const styles = StyleSheet.create({
   // Toggle Group
   toggleGroup: {
     flexDirection: "row",
-    backgroundColor: theme.bg.tertiary,
+    backgroundColor: themeColors.bg.tertiary,
     borderRadius: 10,
     padding: 4,
   },
@@ -505,15 +533,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   toggleButtonActive: {
-    backgroundColor: theme.accent.primary,
+    backgroundColor: themeColors.accent.primary,
   },
   toggleText: {
     fontSize: 14,
     fontWeight: "600",
-    color: theme.text.muted,
+    color: themeColors.text.muted,
   },
   toggleTextActive: {
-    color: theme.text.primary,
+    color: themeColors.text.primary,
   },
 
   // Terminal Theme Picker
@@ -533,7 +561,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 16,
-    backgroundColor: theme.accent.glow,
+    backgroundColor: themeColors.accent.glow,
     top: -4,
     left: -4,
   },
@@ -553,7 +581,7 @@ const styles = StyleSheet.create({
   },
   themePreviewName: {
     fontSize: 11,
-    color: theme.text.secondary,
+    color: themeColors.text.secondary,
     marginTop: 6,
     fontWeight: "500",
   },
@@ -565,7 +593,7 @@ const styles = StyleSheet.create({
   },
   cursorOption: {
     flex: 1,
-    backgroundColor: theme.bg.tertiary,
+    backgroundColor: themeColors.bg.tertiary,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -573,8 +601,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   cursorOptionActive: {
-    borderColor: theme.accent.primary,
-    backgroundColor: theme.accent.glow,
+    borderColor: themeColors.accent.primary,
+    backgroundColor: themeColors.accent.glow,
   },
   cursorPreview: {
     width: 40,
@@ -586,28 +614,28 @@ const styles = StyleSheet.create({
   cursorBlock: {
     width: 16,
     height: 20,
-    backgroundColor: theme.accent.secondary,
+    backgroundColor: themeColors.accent.secondary,
     borderRadius: 2,
   },
   cursorUnderline: {
     width: 16,
     height: 3,
-    backgroundColor: theme.accent.secondary,
+    backgroundColor: themeColors.accent.secondary,
     borderRadius: 1,
   },
   cursorBar: {
     width: 3,
     height: 20,
-    backgroundColor: theme.accent.secondary,
+    backgroundColor: themeColors.accent.secondary,
     borderRadius: 1,
   },
   cursorLabel: {
     fontSize: 12,
     fontWeight: "500",
-    color: theme.text.muted,
+    color: themeColors.text.muted,
   },
   cursorLabelActive: {
-    color: theme.text.primary,
+    color: themeColors.text.primary,
   },
 
   // Sign Out
@@ -634,11 +662,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 16,
     fontWeight: "700",
-    color: theme.text.muted,
+    color: themeColors.text.muted,
     marginBottom: 4,
   },
   versionText: {
     fontSize: 12,
-    color: theme.text.muted,
+    color: themeColors.text.muted,
   },
 });

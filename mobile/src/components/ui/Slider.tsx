@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo, useCallback, memo } from "react";
 import {
   View,
   StyleSheet,
@@ -20,7 +20,7 @@ interface SliderProps {
   thumbColor?: string;
 }
 
-export function Slider({
+function SliderComponent({
   value,
   min,
   max,
@@ -35,41 +35,50 @@ export function Slider({
   const [trackWidth, setTrackWidth] = useState(0);
   const trackX = useRef(0);
 
-  const snapToStep = (val: number): number => {
+  const snapToStep = useCallback((val: number): number => {
     const snapped = Math.round(val / step) * step;
     return Math.max(min, Math.min(max, snapped));
-  };
+  }, [step, min, max]);
 
-  const valueToPosition = (val: number): number => {
+  const valueToPosition = useCallback((val: number): number => {
     if (trackWidth === 0) return 0;
     return ((val - min) / (max - min)) * trackWidth;
-  };
+  }, [trackWidth, min, max]);
 
-  const positionToValue = (pageX: number): number => {
+  const positionToValue = useCallback((pageX: number): number => {
     if (trackWidth === 0) return min;
     const relativeX = pageX - trackX.current;
     const ratio = Math.max(0, Math.min(1, relativeX / trackWidth));
     return snapToStep(min + ratio * (max - min));
-  };
+  }, [trackWidth, min, max, snapToStep]);
 
-  const handleLayout = (event: LayoutChangeEvent): void => {
-    const target = event.target as any;
+  const handleLayout = useCallback((event: LayoutChangeEvent): void => {
+    const target = event.target as unknown as { measure: (callback: (x: number, y: number, width: number, height: number, pageX: number) => void) => void };
     target.measure((_x: number, _y: number, width: number, _height: number, pageX: number) => {
       trackX.current = pageX;
       setTrackWidth(width);
     });
-  };
+  }, []);
 
-  const handleTouch = (evt: GestureResponderEvent): void => {
+  const handleTouch = useCallback((evt: GestureResponderEvent): void => {
     const newValue = positionToValue(evt.nativeEvent.pageX);
     if (newValue !== value) {
       onValueChange(newValue);
     }
-  };
+  }, [positionToValue, value, onValueChange]);
 
   const thumbX = valueToPosition(value);
   const progressPercent = ((value - min) / (max - min)) * 100;
   const numSteps = Math.floor((max - min) / step) + 1;
+
+  // Memoize tick marks to prevent re-renders during scroll
+  const tickMarks = useMemo(() => {
+    return Array.from({ length: numSteps }).map((_, i) => {
+      const tickValue = min + i * step;
+      const tickPercent = ((tickValue - min) / (max - min)) * 100;
+      return { tickValue, tickPercent, key: i };
+    });
+  }, [numSteps, min, step, max]);
 
   return (
     <View style={styles.container}>
@@ -95,15 +104,13 @@ export function Slider({
           ]}
         />
 
-        {/* Tick marks */}
+        {/* Tick marks - memoized for performance */}
         <View style={styles.tickContainer} pointerEvents="none">
-          {Array.from({ length: numSteps }).map((_, i) => {
-            const tickValue = min + i * step;
-            const tickPercent = ((tickValue - min) / (max - min)) * 100;
+          {tickMarks.map(({ tickValue, tickPercent, key }) => {
             const isActive = tickValue <= value;
             return (
               <View
-                key={i}
+                key={key}
                 style={[
                   styles.tick,
                   {
@@ -209,4 +216,6 @@ const styles = StyleSheet.create({
   },
 });
 
+// Wrap in React.memo to prevent unnecessary re-renders
+export const Slider = memo(SliderComponent);
 export default Slider;

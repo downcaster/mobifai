@@ -201,6 +201,7 @@ export default function DeviceListScreen(): React.ReactElement {
       navigation.navigate("Terminal", {
         relayServerUrl: RELAY_SERVER_URL,
         targetDeviceId: device.deviceId,
+        targetDeviceName: device.deviceName,
       });
       return;
     }
@@ -210,6 +211,7 @@ export default function DeviceListScreen(): React.ReactElement {
     navigation.navigate("Terminal", {
       relayServerUrl: RELAY_SERVER_URL,
       targetDeviceId: device.deviceId,
+      targetDeviceName: device.deviceName,
     });
   };
 

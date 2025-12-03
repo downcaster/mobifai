@@ -22,7 +22,9 @@ if (!RELAY_SERVER_URL) {
 }
 
 // Log startup config (helpful for debugging env switches)
-console.log(`📱 Mobile Config: Connecting to ${RELAY_SERVER_URL}`);
+if (__DEV__) {
+  console.log(`📱 Mobile Config: Connecting to ${RELAY_SERVER_URL}`);
+}
 
 // Export
 export const config = {

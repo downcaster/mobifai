@@ -7,7 +7,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 
 export type MainTabParamList = {
   Connections: undefined;
-  Terminal: { relayServerUrl?: string; targetDeviceId?: string } | undefined;
+  Terminal: { relayServerUrl?: string; targetDeviceId?: string; targetDeviceName?: string } | undefined;
   Profile: undefined;
 };
 

@@ -1,0 +1,64 @@
+name: mobifai
+description: "MobiFai - Mobile Terminal Access via P2P WebRTC"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.8
+  
+  # WebRTC P2P Connection
+  flutter_webrtc: ^0.12.12
+  
+  # Socket.IO for signaling
+  socket_io_client: ^3.0.2
+  
+  # Native terminal emulator
+  xterm: ^4.0.0
+  
+  # Local storage (AsyncStorage equivalent)
+  shared_preferences: ^2.5.3
+  
+  # Cryptography for ECDH
+  pointycastle: ^3.9.1
+  convert: ^3.1.2
+  
+  # Navigation
+  go_router: ^14.8.1
+  
+  # Environment variables
+  flutter_dotenv: ^5.2.1
+  
+  # State management
+  provider: ^6.1.4
+  
+  # URL launcher for OAuth
+  url_launcher: ^6.3.1
+  
+  # Deep linking
+  app_links: ^6.4.0
+  
+  # UUID generation
+  uuid: ^4.5.1
+  
+  # HTTP client
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Assets can be added here as needed
+  # assets:
+  #   - assets/

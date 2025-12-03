@@ -205,8 +205,8 @@ export function KeyCombinationModal({
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
-          {/* Input Container with Items */}
-          <View style={styles.inputContainer}>
+            {/* Input Container with Items */}
+            <View style={styles.inputContainer}>
             <View style={styles.itemsRow}>
               {items.map((item, index) => renderItem(item, index))}
               <TextInput
@@ -266,7 +266,7 @@ export function KeyCombinationModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 10, 15, 0.85)',
+    backgroundColor: 'rgba(10, 10, 15, 0.6)',
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: 80,
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '85%',
     maxWidth: 400,
-    backgroundColor: 'rgba(26, 26, 37, 0.95)',
+    backgroundColor: 'rgba(26, 26, 37, 0.85)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,

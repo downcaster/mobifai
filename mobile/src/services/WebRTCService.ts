@@ -239,11 +239,15 @@ export class WebRTCService {
     this.dataChannel.addEventListener("message", (event: any) => {
       try {
         const data = JSON.parse(event.data);
+        // Log all incoming messages for debugging
+        console.log(`📨 WebRTC raw message: type=${data.type}`);
         if (this.messageHandler) {
           this.messageHandler(data);
+        } else {
+          console.warn("⚠️ WebRTC message received but no handler set!");
         }
       } catch (error) {
-        console.error("❌ Error parsing WebRTC message:", error);
+        console.error("❌ Error parsing WebRTC message:", error, "Raw:", event.data?.substring?.(0, 100));
       }
     });
   }

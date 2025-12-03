@@ -446,6 +446,8 @@ export default function TerminalScreen({
    */
   const handleProcessMessage = useCallback(
     (type: string, payload: unknown) => {
+      console.log(`🔄 handleProcessMessage called: type=${type}`);
+      
       switch (type) {
         case "processes:sync": {
           // Restore tabs from Mac on reconnection
@@ -453,6 +455,7 @@ export default function TerminalScreen({
           console.log(
             `📋 Received processes:sync with ${syncPayload.processes.length} process(es)`
           );
+          console.log(`📋 Sync payload:`, JSON.stringify(syncPayload));
 
           // End syncing state - we've received the sync data
           setSyncingTabs(false);
@@ -782,13 +785,15 @@ export default function TerminalScreen({
 
       // Handle WebRTC messages - now with process support
       webrtcRef.current.onMessage((data) => {
-        if (config.DEBUG) {
-          console.log(
-            `📡 WebRTC message received: type=${
-              data.type
-            }, hasPayload=${!!data.payload}`
-          );
+        console.log(
+          `📡 WebRTC message received: type=${data.type}, hasPayload=${!!data.payload}`
+        );
+        
+        // Handle processes:sync specially to ensure it's processed
+        if (data.type === "processes:sync") {
+          console.log(`📋 WebRTC processes:sync payload:`, JSON.stringify(data.payload));
         }
+        
         handleProcessMessage(data.type, data.payload ?? data);
       });
 
@@ -854,9 +859,10 @@ export default function TerminalScreen({
     });
 
     // Listen for process-related messages via Socket
-    socket.on("processes:sync", (payload) =>
-      handleProcessMessage("processes:sync", payload)
-    );
+    socket.on("processes:sync", (payload) => {
+      console.log("📨 Socket received processes:sync:", JSON.stringify(payload));
+      handleProcessMessage("processes:sync", payload);
+    });
     socket.on("process:created", (payload) =>
       handleProcessMessage("process:created", payload)
     );

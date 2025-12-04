@@ -47,7 +47,8 @@ export function KeyCombinationModal({
   // Building mode state
   const [buildingMode, setBuildingMode] = useState(false);
   const [buildingKeys, setBuildingKeys] = useState<KeyDefinition[]>([]);
-  const [textBeforeBuilding, setTextBeforeBuilding] = useState('');
+  
+  const prevShowSuggestions = useRef(showSuggestions);
 
   // Update suggestions based on the last word when current text changes
   useEffect(() => {
@@ -84,17 +85,22 @@ export function KeyCombinationModal({
       setShowSuggestions(false);
       setBuildingMode(false);
       setBuildingKeys([]);
-      setTextBeforeBuilding('');
     }
   }, [visible]);
 
   const addKeyToBuilding = (key: KeyDefinition): void => {
     if (!buildingMode) {
-      // Enter building mode
+      // Before entering building mode, convert any existing text to a text tile
       const words = currentText.split(' ');
-      const textBefore = words.length > 1 ? words.slice(0, -1).join(' ') : '';
+      const lastWord = words[words.length - 1]; // This is the search term
+      const textBefore = words.slice(0, -1).join(' '); // Everything before the search
       
-      setTextBeforeBuilding(textBefore);
+      // Add text before search as a text tile (if any)
+      if (textBefore.trim()) {
+        setItems(prev => [...prev, { type: 'text', value: textBefore }]);
+      }
+      
+      // Enter building mode with the selected key
       setBuildingMode(true);
       setBuildingKeys([key]);
       setCurrentText('');
@@ -110,41 +116,28 @@ export function KeyCombinationModal({
 
   const confirmBuilding = (): void => {
     if (buildingKeys.length > 0) {
-      const newItems = [...items];
-      
-      // Add any text before building started
-      if (textBeforeBuilding.trim()) {
-        newItems.push({ type: 'text', value: textBeforeBuilding });
-      }
-      
       // Add the combined command
       const combinedEscape = combineKeys(buildingKeys);
       const label = formatKeysLabel(buildingKeys);
       
-      newItems.push({ 
+      setItems(prev => [...prev, { 
         type: 'command', 
         keys: buildingKeys,
         label,
         value: combinedEscape
-      });
+      }]);
       
-      setItems(newItems);
       setBuildingMode(false);
       setBuildingKeys([]);
-      setTextBeforeBuilding('');
       setCurrentText('');
     }
     inputRef.current?.focus();
   };
 
   const cancelBuilding = (): void => {
-    // Restore the text before building started
-    if (textBeforeBuilding.trim()) {
-      setCurrentText(textBeforeBuilding + ' ');
-    }
     setBuildingMode(false);
     setBuildingKeys([]);
-    setTextBeforeBuilding('');
+    setCurrentText('');
     inputRef.current?.focus();
   };
 
@@ -188,7 +181,6 @@ export function KeyCombinationModal({
   };
 
   const handleTextChange = (text: string): void => {
-    // Just update the current text - space no longer auto-selects
     setCurrentText(text);
   };
 
@@ -485,6 +477,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     fontStyle: 'italic',
+  },
+  textTileInput: {
+    color: '#BB86FC',
+    fontSize: 14,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    flex: 1,
+    padding: 0,
+    minWidth: 50,
   },
   commandTile: {
     flexDirection: 'row',

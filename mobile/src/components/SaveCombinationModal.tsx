@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,15 +8,15 @@ import {
   FlatList,
   StyleSheet,
   Keyboard,
-} from 'react-native';
+} from "react-native";
 import {
   KEY_DEFINITIONS,
   KeyDefinition,
   searchKeys,
   combineKeys,
   formatKeysLabel,
-} from '../config/keyCombinations';
-import { TerminalAction } from './KeyCombinationModal';
+} from "../config/keyCombinations";
+import { TerminalAction } from "./KeyCombinationModal";
 
 interface SaveCombinationModalProps {
   visible: boolean;
@@ -26,40 +26,41 @@ interface SaveCombinationModalProps {
   initialActions?: TerminalAction[];
 }
 
-type Item = 
-  | { type: 'text'; value: string }
-  | { type: 'command'; keys: KeyDefinition[]; label: string; value: string };
+type Item =
+  | { type: "text"; value: string }
+  | { type: "command"; keys: KeyDefinition[]; label: string; value: string };
 
 export function SaveCombinationModal({
   visible,
   onClose,
   onSave,
-  initialTitle = '',
+  initialTitle = "",
   initialActions = [],
 }: SaveCombinationModalProps): React.ReactElement {
   const [title, setTitle] = useState(initialTitle);
   const [items, setItems] = useState<Item[]>([]);
-  const [currentText, setCurrentText] = useState('');
+  const [currentText, setCurrentText] = useState("");
   const [suggestions, setSuggestions] = useState<KeyDefinition[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  
+
   // Building mode state
   const [buildingMode, setBuildingMode] = useState(false);
   const [buildingKeys, setBuildingKeys] = useState<KeyDefinition[]>([]);
-  const [textBeforeBuilding, setTextBeforeBuilding] = useState('');
+
+  const prevShowSuggestions = useRef(showSuggestions);
 
   // Update suggestions based on the last word when current text changes
   useEffect(() => {
     if (currentText.trim()) {
-      const words = currentText.split(' ');
+      const words = currentText.split(" ");
       const lastWord = words[words.length - 1];
-      
-      console.log('SaveCombinationModal - searching for:', lastWord);
-      
+
+      console.log("SaveCombinationModal - searching for:", lastWord);
+
       if (lastWord) {
         const results = searchKeys(lastWord);
-        console.log('SaveCombinationModal - results:', results.length);
+        console.log("SaveCombinationModal - results:", results.length);
         setSuggestions(results.slice(0, 20));
         setShowSuggestions(results.length > 0);
       } else {
@@ -75,67 +76,72 @@ export function SaveCombinationModal({
   // Reset when modal opens
   useEffect(() => {
     if (visible) {
-      setTitle(initialTitle || '');
-      
+      setTitle(initialTitle || "");
+
       // Convert initialActions to items if editing
       if (initialActions && initialActions.length > 0) {
-        const convertedItems: Item[] = initialActions.map(action => {
-          if (action.type === 'text') {
-            return { type: 'text', value: action.value };
+        const convertedItems: Item[] = initialActions.map((action) => {
+          if (action.type === "text") {
+            return { type: "text", value: action.value };
           } else {
             // For multi-key commands, parse the label (e.g., "CTRL+P")
-            const keySymbols = action.label?.split('+') || [];
+            const keySymbols = action.label?.split("+") || [];
             const keys: KeyDefinition[] = [];
-            
+
             for (const symbol of keySymbols) {
-              const keyDef = KEY_DEFINITIONS.find(k => k.symbol === symbol);
+              const keyDef = KEY_DEFINITIONS.find((k) => k.symbol === symbol);
               if (keyDef) {
                 keys.push(keyDef);
               }
             }
-            
+
             if (keys.length > 0) {
               return {
-                type: 'command',
+                type: "command",
                 keys,
-                label: action.label || '',
+                label: action.label || "",
                 value: action.value,
               };
             }
-            
+
             // Fallback if not found
-            return { type: 'text', value: action.label || action.value };
+            return { type: "text", value: action.label || action.value };
           }
         });
         setItems(convertedItems);
       } else {
         setItems([]);
       }
-      
-      setCurrentText('');
+
+      setCurrentText("");
       setSuggestions([]);
       setShowSuggestions(false);
       setBuildingMode(false);
       setBuildingKeys([]);
-      setTextBeforeBuilding('');
     }
   }, [visible]);
 
   const addKeyToBuilding = (key: KeyDefinition): void => {
     if (!buildingMode) {
-      // Enter building mode
-      const words = currentText.split(' ');
-      const textBefore = words.length > 1 ? words.slice(0, -1).join(' ') : '';
-      
-      setTextBeforeBuilding(textBefore);
+      // Before entering building mode, convert any existing text to a text tile
+      const words = currentText.split(" ");
+      const lastWord = words[words.length - 1]; // This is the search term
+      const textBefore = words.slice(0, -1).join(" "); // Everything before the search
+
+      // Add text before search as a text tile (if any)
+      if (textBefore.trim()) {
+        setItems((prev) => [...prev, { type: "text", value: textBefore }]);
+      }
+
+      // Enter building mode with the selected key
       setBuildingMode(true);
       setBuildingKeys([key]);
-      setCurrentText('');
+      setCurrentText("");
       setShowSuggestions(false);
     } else {
       // Add to existing building
       setBuildingKeys([...buildingKeys, key]);
-      setCurrentText('');
+      setCurrentText("");
       setShowSuggestions(false);
     }
     inputRef.current?.focus();
@@ -143,41 +149,31 @@ export function SaveCombinationModal({
 
   const confirmBuilding = (): void => {
     if (buildingKeys.length > 0) {
-      const newItems = [...items];
-      
-      // Add any text before building started
-      if (textBeforeBuilding.trim()) {
-        newItems.push({ type: 'text', value: textBeforeBuilding });
-      }
-      
       // Add the combined command
       const combinedEscape = combineKeys(buildingKeys);
       const label = formatKeysLabel(buildingKeys);
-      
-      newItems.push({ 
-        type: 'command', 
-        keys: buildingKeys,
-        label,
-        value: combinedEscape
-      });
-      
-      setItems(newItems);
+
+      setItems((prev) => [
+        ...prev,
+        {
+          type: "command",
+          keys: buildingKeys,
+          label,
+          value: combinedEscape,
+        },
+      ]);
+
       setBuildingMode(false);
       setBuildingKeys([]);
-      setTextBeforeBuilding('');
-      setCurrentText('');
+      setCurrentText("");
     }
     inputRef.current?.focus();
   };
 
   const cancelBuilding = (): void => {
-    // Restore the text before building started
-    if (textBeforeBuilding.trim()) {
-      setCurrentText(textBeforeBuilding + ' ');
-    }
     setBuildingMode(false);
     setBuildingKeys([]);
-    setTextBeforeBuilding('');
+    setCurrentText("");
     inputRef.current?.focus();
   };
 
@@ -198,20 +194,20 @@ export function SaveCombinationModal({
 
     const finalItems = [...items];
     if (currentText.trim()) {
-      finalItems.push({ type: 'text', value: currentText });
+      finalItems.push({ type: "text", value: currentText });
     }
 
     if (finalItems.length === 0) return;
 
-    const actions: TerminalAction[] = finalItems.map(item => {
-      if (item.type === 'text') {
+    const actions: TerminalAction[] = finalItems.map((item) => {
+      if (item.type === "text") {
         return {
-          type: 'text',
+          type: "text",
           value: item.value,
         };
       } else {
         return {
-          type: 'command',
+          type: "command",
           value: item.value,
           label: item.label,
         };
@@ -228,15 +224,15 @@ export function SaveCombinationModal({
 
   const handleKeyPress = (e: { nativeEvent: { key: string } }): void => {
     const key = e.nativeEvent.key;
-    
+
     // Escape key cancels building mode
-    if (key === 'Escape' && buildingMode) {
+    if (key === "Escape" && buildingMode) {
       cancelBuilding();
       return;
     }
-    
+
     // Enter key behavior
-    if (key === 'Enter') {
+    if (key === "Enter") {
       if (buildingMode && buildingKeys.length > 0) {
         // Confirm the building
         confirmBuilding();
@@ -248,7 +244,7 @@ export function SaveCombinationModal({
   };
 
   const renderItem = (item: Item, index: number): React.ReactElement => {
-    if (item.type === 'text') {
+    if (item.type === "text") {
       return (
         <View key={`text-${index}`} style={styles.textTile}>
           <Text style={styles.textTileText} numberOfLines={1}>
@@ -277,7 +273,13 @@ export function SaveCombinationModal({
     }
   };
 
-  const renderSuggestionItem = ({ item, index }: { item: KeyDefinition; index: number }): React.ReactElement => (
+  const renderSuggestionItem = ({
+    item,
+    index,
+  }: {
+    item: KeyDefinition;
+    index: number;
+  }): React.ReactElement => (
     <TouchableOpacity
       style={[
         styles.suggestionItem,
@@ -360,7 +362,11 @@ export function SaveCombinationModal({
                 value={currentText}
                 onChangeText={handleTextChange}
                 onKeyPress={handleKeyPress}
-                placeholder={items.length === 0 && !currentText ? "Type text or search commands..." : ""}
+                placeholder={
+                  items.length === 0 && !currentText
+                    ? "Type text or search commands..."
+                    : ""
+                }
                 placeholderTextColor="#555566"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -396,10 +402,13 @@ export function SaveCombinationModal({
           <TouchableOpacity
             style={[
               styles.saveButton,
-              (!title.trim() || (items.length === 0 && !currentText.trim())) && styles.saveButtonDisabled,
+              (!title.trim() || (items.length === 0 && !currentText.trim())) &&
+                styles.saveButtonDisabled,
             ]}
             onPress={handleSave}
-            disabled={!title.trim() || (items.length === 0 && !currentText.trim())}
+            disabled={
+              !title.trim() || (items.length === 0 && !currentText.trim())
+            }
           >
             <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
@@ -412,59 +421,59 @@ export function SaveCombinationModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 10, 15, 0.6)',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+    backgroundColor: "rgba(10, 10, 15, 0.6)",
+    justifyContent: "flex-start",
+    alignItems: "center",
     paddingTop: 80,
   },
   modalContainer: {
-    width: '85%',
+    width: "85%",
     maxWidth: 400,
-    backgroundColor: 'rgba(26, 26, 37, 0.85)',
+    backgroundColor: "rgba(26, 26, 37, 0.85)",
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(98, 0, 238, 0.3)',
+    borderColor: "rgba(98, 0, 238, 0.3)",
   },
   buildingPreview: {
-    backgroundColor: 'rgba(98, 0, 238, 0.15)',
+    backgroundColor: "rgba(98, 0, 238, 0.15)",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: 'rgba(98, 0, 238, 0.3)',
+    borderColor: "rgba(98, 0, 238, 0.3)",
   },
   buildingKeys: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
     gap: 6,
   },
   buildingKeyBadge: {
-    backgroundColor: 'rgba(42, 42, 58, 0.8)',
+    backgroundColor: "rgba(42, 42, 58, 0.8)",
     borderRadius: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: 'rgba(98, 0, 238, 0.4)',
+    borderColor: "rgba(98, 0, 238, 0.4)",
   },
   buildingKeyText: {
-    color: '#BB86FC',
+    color: "#BB86FC",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   buildingPlus: {
-    color: '#8888aa',
+    color: "#8888aa",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginHorizontal: 2,
   },
   buildingActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginLeft: 12,
   },
@@ -472,62 +481,62 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(0, 200, 100, 0.3)',
+    backgroundColor: "rgba(0, 200, 100, 0.3)",
     borderWidth: 1,
-    borderColor: 'rgba(0, 200, 100, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(0, 200, 100, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   buildingConfirmText: {
-    color: '#00ff88',
+    color: "#00ff88",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   buildingCancel: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 50, 50, 0.3)',
+    backgroundColor: "rgba(255, 50, 50, 0.3)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 50, 50, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(255, 50, 50, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   buildingCancelText: {
-    color: '#ff6666',
+    color: "#ff6666",
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: -2,
   },
   titleInput: {
-    backgroundColor: '#12121a',
+    backgroundColor: "#12121a",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
+    borderColor: "#2a2a3a",
     padding: 12,
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
   },
   inputContainer: {
-    backgroundColor: '#12121a',
+    backgroundColor: "#12121a",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
+    borderColor: "#2a2a3a",
     padding: 8,
     minHeight: 48,
   },
   itemsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: 6,
   },
   textTile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a25',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a25",
     borderRadius: 6,
     paddingLeft: 10,
     paddingRight: 6,
@@ -536,15 +545,24 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   textTileText: {
-    color: '#BB86FC',
+    color: "#BB86FC",
     fontSize: 14,
-    fontWeight: '400',
-    fontStyle: 'italic',
+    fontWeight: "400",
+    fontStyle: "italic",
+  },
+  textTileInput: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontWeight: "400",
+    fontStyle: "italic",
+    flex: 1,
+    padding: 0,
+    minWidth: 50,
   },
   commandTile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6200EE',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#6200EE",
     borderRadius: 6,
     paddingLeft: 10,
     paddingRight: 6,
@@ -552,40 +570,40 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   commandTileText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   tileRemove: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   tileRemoveText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: -2,
   },
   textInput: {
     flex: 1,
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
     minWidth: 100,
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
   suggestionsContainer: {
-    backgroundColor: '#12121a',
+    backgroundColor: "#12121a",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
+    borderColor: "#2a2a3a",
     marginTop: 8,
     maxHeight: 200,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   suggestionsList: {
     flexGrow: 0,
@@ -593,41 +611,40 @@ const styles = StyleSheet.create({
   suggestionItem: {
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a25',
-    flexDirection: 'column',
-    alignItems: 'center',
+    borderBottomColor: "#1a1a25",
+    flexDirection: "column",
+    alignItems: "center",
   },
   suggestionItemSelected: {
-    backgroundColor: 'rgba(98, 0, 238, 0.2)',
+    backgroundColor: "rgba(98, 0, 238, 0.2)",
     borderLeftWidth: 3,
-    borderLeftColor: '#6200EE',
+    borderLeftColor: "#6200EE",
   },
   suggestionSymbol: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 1,
   },
   suggestionName: {
-    color: '#8888aa',
+    color: "#8888aa",
     fontSize: 9,
-    fontWeight: '400',
+    fontWeight: "400",
   },
   saveButton: {
-    backgroundColor: '#6200EE',
+    backgroundColor: "#6200EE",
     borderRadius: 8,
     padding: 14,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 16,
   },
   saveButtonDisabled: {
     opacity: 0.4,
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
 });
-

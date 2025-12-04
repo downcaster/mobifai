@@ -44,44 +44,50 @@ export function CommandComboBar({
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.barContainer, { height: barHeight, opacity: barOpacity }]}>
-        {expanded && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            style={styles.scrollView}
-          >
-            {combinations.map((combo) => (
-              <TouchableOpacity
-                key={combo.id}
-                style={styles.comboTile}
-                onPress={() => onExecute(combo)}
-              >
-                <Text style={styles.comboText} numberOfLines={1}>
-                  {combo.title}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {combinations.length === 0 && (
-              <Text style={styles.emptyText}>No saved combinations</Text>
-            )}
-          </ScrollView>
-        )}
-      </Animated.View>
+      <View style={styles.contentWrapper}>
+        <Animated.View style={[styles.barContainer, { height: barHeight, opacity: barOpacity }]}>
+          {expanded && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+              style={styles.scrollView}
+            >
+              {combinations.map((combo) => (
+                <TouchableOpacity
+                  key={combo.id}
+                  style={styles.comboTile}
+                  onPress={() => onExecute(combo)}
+                >
+                  <Text style={styles.comboText} numberOfLines={1}>
+                    {combo.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {combinations.length === 0 && (
+                <Text style={styles.emptyText}>No saved combinations</Text>
+              )}
+            </ScrollView>
+          )}
+        </Animated.View>
 
-      <TouchableOpacity
-        style={styles.toggleButton}
-        onPress={onToggleExpand}
-      >
-        <Text style={styles.toggleButtonText}>{expanded ? '×' : '+'}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={onToggleExpand}
+        >
+          <Text style={styles.toggleButtonText}>{expanded ? '×' : '+'}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    position: 'relative',
+  },
+  contentWrapper: {
+    height: 48, // Fixed height matching expanded bar height
     position: 'relative',
   },
   barContainer: {
@@ -125,8 +131,7 @@ const styles = StyleSheet.create({
   toggleButton: {
     position: 'absolute',
     right: 12,
-    top: '50%',
-    marginTop: -15,
+    top: 9, // Fixed position: (48px bar height / 2) - (30px button height / 2) = 9px
     width: 30,
     height: 30,
     borderRadius: 15,

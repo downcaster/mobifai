@@ -27,7 +27,10 @@ import {
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   generateKeyPair,
   deriveSharedSecret,
@@ -53,9 +56,18 @@ import { AppView, AppText, AppButton, AppCard } from "../components/ui";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { getThemeById } from "../theme/terminalThemes";
-import { KeyCombinationModal, TerminalAction } from "../components/KeyCombinationModal";
+import {
+  KeyCombinationModal,
+  TerminalAction,
+} from "../components/KeyCombinationModal";
 import { CommandComboBar } from "../components/CommandComboBar";
-import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
+import {
+  SavedCombination,
+  SAVED_COMBINATIONS_KEY,
+} from "../types/savedCombinations";
+
+// Constants
+const IOS_QUICKTYPE_BAR_HEIGHT = 44; // Height of iOS QuickType suggestion bar
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -85,6 +97,7 @@ export default function TerminalScreen({
   const route =
     propRoute || useRoute<RouteProp<MainTabParamList, "Terminal">>();
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
 
   // Get params from route - may be undefined when accessed from tab
   const relayServerUrl = route.params?.relayServerUrl;
@@ -136,12 +149,17 @@ export default function TerminalScreen({
   const [keyCombModalVisible, setKeyCombModalVisible] = useState(false);
 
   // Saved Combinations state
-  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
+  const [savedCombinations, setSavedCombinations] = useState<
+    SavedCombination[]
+  >([]);
   const [comboBarExpanded, setComboBarExpanded] = useState(false);
 
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(
+    null
+  );
   const terminalWrapperRef = useRef<ScrollView>(null);
 
   const webViewRef = useRef<WebView>(null);
@@ -474,7 +492,7 @@ export default function TerminalScreen({
     }
 
     console.log("⌨️ Sending actions:", actions);
-    
+
     // Send the action array to the Mac client
     sendToMac("terminal:actions", {
       uuid: activeProcessUuidRef.current,
@@ -485,7 +503,9 @@ export default function TerminalScreen({
   /**
    * Handle saved combination execution
    */
-  const handleExecuteSavedCombination = (combination: SavedCombination): void => {
+  const handleExecuteSavedCombination = (
+    combination: SavedCombination
+  ): void => {
     handleKeyCombinationSend(combination.actions);
   };
 
@@ -505,7 +525,7 @@ export default function TerminalScreen({
   const handleProcessMessage = useCallback(
     (type: string, payload: unknown) => {
       console.log(`🔄 handleProcessMessage called: type=${type}`);
-      
+
       switch (type) {
         case "processes:sync": {
           // Restore tabs from Mac on reconnection
@@ -844,14 +864,19 @@ export default function TerminalScreen({
       // Handle WebRTC messages - now with process support
       webrtcRef.current.onMessage((data) => {
         console.log(
-          `📡 WebRTC message received: type=${data.type}, hasPayload=${!!data.payload}`
+          `📡 WebRTC message received: type=${
+            data.type
+          }, hasPayload=${!!data.payload}`
         );
-        
+
         // Handle processes:sync specially to ensure it's processed
         if (data.type === "processes:sync") {
-          console.log(`📋 WebRTC processes:sync payload:`, JSON.stringify(data.payload));
+          console.log(
+            `📋 WebRTC processes:sync payload:`,
+            JSON.stringify(data.payload)
+          );
         }
-        
+
         handleProcessMessage(data.type, data.payload ?? data);
       });
 
@@ -918,7 +943,10 @@ export default function TerminalScreen({
 
     // Listen for process-related messages via Socket
     socket.on("processes:sync", (payload) => {
-      console.log("📨 Socket received processes:sync:", JSON.stringify(payload));
+      console.log(
+        "📨 Socket received processes:sync:",
+        JSON.stringify(payload)
+      );
       handleProcessMessage("processes:sync", payload);
     });
     socket.on("process:created", (payload) =>
@@ -1169,20 +1197,24 @@ export default function TerminalScreen({
 
   // Keyboard visibility listener - terminal keeps fixed size, wrapper becomes scrollable
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      const kbHeight = e.endCoordinates.height;
       setKeyboardVisible(true);
+      setKeyboardHeight(kbHeight);
       // Scroll by keyboard height so content appears to stay in place
-      const keyboardHeight = e.endCoordinates.height;
       setTimeout(() => {
-        terminalWrapperRef.current?.scrollTo({ y: keyboardHeight, animated: false });
+        terminalWrapperRef.current?.scrollTo({ y: kbHeight, animated: false });
       }, 50);
     });
 
     const hideSubscription = Keyboard.addListener(hideEvent, () => {
       setKeyboardVisible(false);
+      setKeyboardHeight(0);
       // Scroll back to top when keyboard hides
       terminalWrapperRef.current?.scrollTo({ y: 0, animated: true });
     });
@@ -1195,12 +1227,15 @@ export default function TerminalScreen({
 
   // Capture the terminal wrapper height once (before keyboard opens)
   // This ensures the terminal size never changes, even when keyboard appears
-  const handleTerminalWrapperLayout = useCallback((event: LayoutChangeEvent) => {
-    if (fixedTerminalHeight === null && !keyboardVisible) {
-      const { height } = event.nativeEvent.layout;
-      setFixedTerminalHeight(height);
-    }
-  }, [fixedTerminalHeight, keyboardVisible]);
+  const handleTerminalWrapperLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      if (fixedTerminalHeight === null && !keyboardVisible) {
+        const { height } = event.nativeEvent.layout;
+        setFixedTerminalHeight(height);
+      }
+    },
+    [fixedTerminalHeight, keyboardVisible]
+  );
 
   // Use the fixed height, or flex until it's measured
   const terminalHeight = fixedTerminalHeight;
@@ -1792,10 +1827,7 @@ export default function TerminalScreen({
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                styles.keyComboButton,
-                !paired && styles.buttonDisabled,
-              ]}
+              style={[styles.keyComboButton, !paired && styles.buttonDisabled]}
               onPress={() => {
                 sendToTerminal("blur", {});
                 Keyboard.dismiss();
@@ -1860,14 +1892,21 @@ export default function TerminalScreen({
         <ScrollView
           ref={terminalWrapperRef}
           style={styles.terminalWrapper}
-          contentContainerStyle={terminalHeight ? { height: terminalHeight } : { flex: 1 }}
+          contentContainerStyle={
+            terminalHeight ? { height: terminalHeight } : { flex: 1 }
+          }
           scrollEnabled={keyboardVisible}
           showsVerticalScrollIndicator={keyboardVisible}
           keyboardShouldPersistTaps="always"
           bounces={keyboardVisible}
           onLayout={handleTerminalWrapperLayout}
         >
-          <View style={[styles.terminalContainer, terminalHeight ? { height: terminalHeight } : { flex: 1 }]}>
+          <View
+            style={[
+              styles.terminalContainer,
+              terminalHeight ? { height: terminalHeight } : { flex: 1 },
+            ]}
+          >
             <WebView
               ref={webViewRef}
               source={{ html: terminalHtml }}
@@ -1903,16 +1942,6 @@ export default function TerminalScreen({
                 </Text>
               </View>
             )}
-
-            {/* Command Combo Bar - positioned at bottom, follows keyboard */}
-            <View style={styles.comboBarWrapper}>
-              <CommandComboBar
-                combinations={savedCombinations}
-                expanded={comboBarExpanded}
-                onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
-                onExecute={handleExecuteSavedCombination}
-              />
-            </View>
           </View>
         </ScrollView>
       ) : !paired ? (
@@ -1971,9 +2000,38 @@ export default function TerminalScreen({
         </View>
       )}
 
+      {/* Command Combo Bar - follows keyboard */}
+      {processes.length > 0 && (
+        <View
+          style={[
+            styles.comboBarContainer,
+            Platform.OS === "ios" &&
+              keyboardVisible && {
+                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
+              },
+          ]}
+        >
+          <CommandComboBar
+            combinations={savedCombinations}
+            expanded={comboBarExpanded}
+            onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
+            onExecute={handleExecuteSavedCombination}
+          />
+        </View>
+      )}
+
       {/* Scroll to Bottom Button */}
       <Animated.View
-        style={[styles.scrollToBottomButton, { opacity: scrollButtonOpacity }]}
+          style={[
+            styles.scrollToBottomButton,
+            {
+              opacity: scrollButtonOpacity,
+            },
+            Platform.OS === "ios" &&
+              keyboardVisible && {
+                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 50,
+              },
+          ]}
         pointerEvents={showScrollToBottom ? "auto" : "none"}
       >
         <TouchableOpacity
@@ -2336,7 +2394,7 @@ const styles = StyleSheet.create({
   terminalContainer: {
     position: "relative",
   },
-  comboBarWrapper: {
+  comboBarContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
@@ -2398,7 +2456,7 @@ const styles = StyleSheet.create({
   // Scroll to Bottom Button
   scrollToBottomButton: {
     position: "absolute",
-    bottom: 60,
+    bottom: 50,
     right: 12,
     zIndex: 1000,
   },

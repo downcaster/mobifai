@@ -48,11 +48,14 @@ import {
 } from "../types/process";
 import { MainTabParamList } from "../navigation/MainTabNavigator";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppView, AppText, AppButton, AppCard } from "../components/ui";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { getThemeById } from "../theme/terminalThemes";
 import { KeyCombinationModal, TerminalAction } from "../components/KeyCombinationModal";
+import { CommandComboBar } from "../components/CommandComboBar";
+import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
@@ -131,6 +134,10 @@ export default function TerminalScreen({
 
   // Key Combination Modal state
   const [keyCombModalVisible, setKeyCombModalVisible] = useState(false);
+
+  // Saved Combinations state
+  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
+  const [comboBarExpanded, setComboBarExpanded] = useState(false);
 
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -299,6 +306,23 @@ export default function TerminalScreen({
     }
   }, [isFocused, webrtcConnected]);
 
+  // Load saved combinations when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadSavedCombinations = async (): Promise<void> => {
+        try {
+          const saved = await AsyncStorage.getItem(SAVED_COMBINATIONS_KEY);
+          if (saved) {
+            setSavedCombinations(JSON.parse(saved));
+          }
+        } catch (error) {
+          console.error("Failed to load saved combinations:", error);
+        }
+      };
+      loadSavedCombinations();
+    }, [])
+  );
+
   useEffect(() => {
     // Only connect if we have connection params
     if (!hasConnectionParams) {
@@ -456,6 +480,13 @@ export default function TerminalScreen({
       uuid: activeProcessUuidRef.current,
       actions,
     });
+  };
+
+  /**
+   * Handle saved combination execution
+   */
+  const handleExecuteSavedCombination = (combination: SavedCombination): void => {
+    handleKeyCombinationSend(combination.actions);
   };
 
   const getDeviceId = async () => {
@@ -1872,6 +1903,16 @@ export default function TerminalScreen({
                 </Text>
               </View>
             )}
+
+            {/* Command Combo Bar - positioned at bottom, follows keyboard */}
+            <View style={styles.comboBarWrapper}>
+              <CommandComboBar
+                combinations={savedCombinations}
+                expanded={comboBarExpanded}
+                onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
+                onExecute={handleExecuteSavedCombination}
+              />
+            </View>
           </View>
         </ScrollView>
       ) : !paired ? (
@@ -2295,6 +2336,13 @@ const styles = StyleSheet.create({
   terminalContainer: {
     position: "relative",
   },
+  comboBarWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
   webview: {
     flex: 1,
     backgroundColor: "#000",
@@ -2350,15 +2398,15 @@ const styles = StyleSheet.create({
   // Scroll to Bottom Button
   scrollToBottomButton: {
     position: "absolute",
-    bottom: 20,
-    right: 20,
+    bottom: 60,
+    right: 12,
     zIndex: 1000,
   },
   scrollToBottomTouchable: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#6200EE",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(98, 0, 238, 0.5)",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#6200EE",
@@ -2371,9 +2419,9 @@ const styles = StyleSheet.create({
   },
   scrollToBottomText: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "bold",
-    marginBottom: 2,
+    marginBottom: 1,
   },
   // AI Modal Styles
   modalOverlay: {

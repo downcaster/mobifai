@@ -14,6 +14,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RELAY_SERVER_URL } from "../config";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { terminalThemes, TerminalTheme } from "../theme/terminalThemes";
+import { SaveCombinationModal } from "../components/SaveCombinationModal";
+import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
+import { TerminalAction } from "../components/KeyCombinationModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -119,6 +122,9 @@ export default function ProfileScreen(): React.ReactElement {
     terminalTheme: "default",
   });
   const [loading, setLoading] = useState(true);
+  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(null);
 
   useEffect(() => {
     loadData();
@@ -131,10 +137,22 @@ export default function ProfileScreen(): React.ReactElement {
         setUserInfo(JSON.parse(userInfoStr));
       }
       await fetchSettings();
+      await loadCombinations();
     } catch (error) {
       if (__DEV__) console.error("Error loading profile data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCombinations = async (): Promise<void> => {
+    try {
+      const saved = await AsyncStorage.getItem(SAVED_COMBINATIONS_KEY);
+      if (saved) {
+        setSavedCombinations(JSON.parse(saved));
+      }
+    } catch (error) {
+      if (__DEV__) console.error("Error loading combinations:", error);
     }
   };
 
@@ -195,6 +213,58 @@ export default function ProfileScreen(): React.ReactElement {
       return newSettings;
     });
   }, []);
+
+  const handleSaveCombination = async (title: string, actions: TerminalAction[]): Promise<void> => {
+    try {
+      let updated: SavedCombination[];
+      
+      if (editingCombo) {
+        // Update existing combination
+        updated = savedCombinations.map((c) =>
+          c.id === editingCombo.id ? { ...c, title, actions } : c
+        );
+      } else {
+        // Create new combination
+        const newCombination: SavedCombination = {
+          id: Date.now().toString(),
+          title,
+          actions,
+        };
+        updated = [...savedCombinations, newCombination];
+      }
+      
+      setSavedCombinations(updated);
+      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+      setEditingCombo(null);
+    } catch (error) {
+      if (__DEV__) console.error("Error saving combination:", error);
+      Alert.alert("Error", "Failed to save combination");
+    }
+  };
+
+  const handleEditCombination = (combo: SavedCombination): void => {
+    setEditingCombo(combo);
+    setSaveModalVisible(true);
+  };
+
+  const handleDeleteCombination = (id: string): void => {
+    Alert.alert("Delete Combination", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const updated = savedCombinations.filter((c) => c.id !== id);
+            setSavedCombinations(updated);
+            await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+          } catch (error) {
+            if (__DEV__) console.error("Error deleting combination:", error);
+          }
+        },
+      },
+    ]);
+  };
 
   const handleLogout = useCallback((): void => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -364,6 +434,65 @@ export default function ProfileScreen(): React.ReactElement {
             </View>
           </View>
 
+          {/* Command Combinations Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <AppText style={styles.sectionIconText}>⌘</AppText>
+              </View>
+              <AppText style={styles.sectionTitle}>Command Combinations</AppText>
+            </View>
+
+            <View style={styles.card}>
+              {savedCombinations.length > 0 ? (
+                savedCombinations.map((combo, index) => {
+                  const preview = combo.actions
+                    .map((a) => (a.type === 'text' ? a.value : a.label || ''))
+                    .join(' ');
+                  
+                  return (
+                    <View key={combo.id}>
+                      {index > 0 && <View style={styles.divider} />}
+                      <TouchableOpacity
+                        style={styles.comboItem}
+                        onPress={() => handleEditCombination(combo)}
+                      >
+                        <View style={styles.comboContent}>
+                          <AppText style={styles.comboTitle}>{combo.title}</AppText>
+                          <AppText style={styles.comboPreview} numberOfLines={1}>
+                            {preview}
+                          </AppText>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCombination(combo.id);
+                          }}
+                        >
+                          <AppText style={styles.deleteButtonText}>×</AppText>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyComboState}>
+                  <AppText style={styles.emptyComboText}>
+                    No saved combinations yet
+                  </AppText>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={styles.addComboButton}
+              onPress={() => setSaveModalVisible(true)}
+            >
+              <AppText style={styles.addComboButtonText}>+ New Combination</AppText>
+            </TouchableOpacity>
+          </View>
+
           {/* Account Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -385,6 +514,18 @@ export default function ProfileScreen(): React.ReactElement {
           <AppText style={styles.versionText}>v1.0.0 · AI-Powered Terminal</AppText>
         </View>
       </ScrollView>
+
+      {/* Save Combination Modal */}
+      <SaveCombinationModal
+        visible={saveModalVisible}
+        onClose={() => {
+          setSaveModalVisible(false);
+          setEditingCombo(null);
+        }}
+        onSave={handleSaveCombination}
+        initialTitle={editingCombo?.title}
+        initialActions={editingCombo?.actions}
+      />
     </View>
   );
 }
@@ -636,6 +777,68 @@ const styles = StyleSheet.create({
   },
   cursorLabelActive: {
     color: themeColors.text.primary,
+  },
+
+  // Command Combinations
+  comboItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+  },
+  comboContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  comboTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: themeColors.text.primary,
+    marginBottom: 4,
+  },
+  comboPreview: {
+    fontSize: 12,
+    fontWeight: "400",
+    color: themeColors.text.muted,
+  },
+  deleteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 68, 68, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteButtonText: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#ff4444",
+    marginTop: -2,
+  },
+  emptyComboState: {
+    padding: 40,
+    alignItems: "center",
+  },
+  emptyComboText: {
+    fontSize: 14,
+    color: themeColors.text.muted,
+    fontStyle: "italic",
+  },
+  addComboButton: {
+    marginTop: 12,
+    backgroundColor: themeColors.accent.glow,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: themeColors.accent.primary,
+    padding: 16,
+    alignItems: "center",
+  },
+  addComboButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: themeColors.accent.secondary,
   },
 
   // Sign Out

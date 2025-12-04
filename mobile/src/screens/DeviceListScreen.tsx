@@ -303,13 +303,6 @@ export default function DeviceListScreen(): React.ReactElement {
               Available Mac terminals
             </AppText>
           </View>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          >
-            <AppText style={styles.refreshIcon}>↻</AppText>
-          </TouchableOpacity>
         </View>
 
         {/* Content */}
@@ -383,20 +376,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: theme.text.secondary,
-  },
-  refreshButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.bg.tertiary,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.border.subtle,
-  },
-  refreshIcon: {
-    fontSize: 20,
-    color: theme.accent.secondary,
   },
 
   // Center Container (Loading/Empty)

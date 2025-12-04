@@ -61,6 +61,7 @@ import {
   TerminalAction,
 } from "../components/KeyCombinationModal";
 import { CommandComboBar } from "../components/CommandComboBar";
+import { ArrowButtons } from "../components/ArrowButtons";
 import {
   SavedCombination,
   SAVED_COMBINATIONS_KEY,
@@ -507,6 +508,26 @@ export default function TerminalScreen({
     combination: SavedCombination
   ): void => {
     handleKeyCombinationSend(combination.actions);
+  };
+
+  /**
+   * Handle arrow button presses
+   */
+  const handleArrowPress = (direction: 'up' | 'down' | 'left' | 'right'): void => {
+    const escapeSequences = {
+      up: '\x1b[A',
+      down: '\x1b[B',
+      right: '\x1b[C',
+      left: '\x1b[D',
+    };
+    
+    const action: TerminalAction = {
+      type: 'command',
+      value: escapeSequences[direction],
+      label: direction.toUpperCase(),
+    };
+    
+    handleKeyCombinationSend([action]);
   };
 
   const getDeviceId = async () => {
@@ -2020,6 +2041,21 @@ export default function TerminalScreen({
         </View>
       )}
 
+      {/* Arrow Navigation Buttons */}
+      {processes.length > 0 && (
+        <View
+          style={[
+            styles.arrowButtonsContainer,
+            Platform.OS === "ios" &&
+              keyboardVisible && {
+                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 50,
+              },
+          ]}
+        >
+          <ArrowButtons onArrowPress={handleArrowPress} disabled={!paired} />
+        </View>
+      )}
+
       {/* Scroll to Bottom Button */}
       <Animated.View
           style={[
@@ -2029,7 +2065,7 @@ export default function TerminalScreen({
             },
             Platform.OS === "ios" &&
               keyboardVisible && {
-                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 50,
+                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 122,
               },
           ]}
         pointerEvents={showScrollToBottom ? "auto" : "none"}
@@ -2453,10 +2489,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
+  // Arrow Navigation Buttons
+  arrowButtonsContainer: {
+    position: "absolute",
+    bottom: 50,
+    right: 12,
+    zIndex: 1000,
+  },
   // Scroll to Bottom Button
   scrollToBottomButton: {
     position: "absolute",
-    bottom: 50,
+    bottom: 122, // Above arrow buttons: 50 + 32 + 4 + 32 + 4 = 122
     right: 12,
     zIndex: 1000,
   },

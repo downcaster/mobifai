@@ -247,6 +247,23 @@ export default function ProfileScreen(): React.ReactElement {
     setSaveModalVisible(true);
   };
 
+  const handleMoveCombination = async (index: number, direction: 'up' | 'down'): Promise<void> => {
+    try {
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= savedCombinations.length) return;
+      
+      const updated = [...savedCombinations];
+      const [moved] = updated.splice(index, 1);
+      updated.splice(newIndex, 0, moved);
+      
+      setSavedCombinations(updated);
+      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+    } catch (error) {
+      if (__DEV__) console.error("Error reordering combinations:", error);
+      Alert.alert("Error", "Failed to reorder");
+    }
+  };
+
   const handleDeleteCombination = (id: string): void => {
     Alert.alert("Delete Combination", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
@@ -453,26 +470,45 @@ export default function ProfileScreen(): React.ReactElement {
                   return (
                     <View key={combo.id}>
                       {index > 0 && <View style={styles.divider} />}
-                      <TouchableOpacity
-                        style={styles.comboItem}
-                        onPress={() => handleEditCombination(combo)}
-                      >
-                        <View style={styles.comboContent}>
+                      <View style={styles.comboItem}>
+                        <View style={styles.reorderButtons}>
+                          <TouchableOpacity
+                            style={[
+                              styles.reorderButton,
+                              index === 0 && styles.reorderButtonDisabled,
+                            ]}
+                            onPress={() => handleMoveCombination(index, 'up')}
+                            disabled={index === 0}
+                          >
+                            <AppText style={styles.reorderButtonText}>↑</AppText>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.reorderButton,
+                              index === savedCombinations.length - 1 && styles.reorderButtonDisabled,
+                            ]}
+                            onPress={() => handleMoveCombination(index, 'down')}
+                            disabled={index === savedCombinations.length - 1}
+                          >
+                            <AppText style={styles.reorderButtonText}>↓</AppText>
+                          </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.comboContent}
+                          onPress={() => handleEditCombination(combo)}
+                        >
                           <AppText style={styles.comboTitle}>{combo.title}</AppText>
                           <AppText style={styles.comboPreview} numberOfLines={1}>
                             {preview}
                           </AppText>
-                        </View>
+                        </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.deleteButton}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCombination(combo.id);
-                          }}
+                          onPress={() => handleDeleteCombination(combo.id)}
                         >
                           <AppText style={styles.deleteButtonText}>×</AppText>
                         </TouchableOpacity>
-                      </TouchableOpacity>
+                      </View>
                     </View>
                   );
                 })
@@ -782,9 +818,32 @@ const styles = StyleSheet.create({
   // Command Combinations
   comboItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
+  },
+  reorderButtons: {
+    flexDirection: "column",
+    gap: 4,
+    marginRight: 12,
+  },
+  reorderButton: {
+    width: 28,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: themeColors.bg.tertiary,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: themeColors.border.subtle,
+  },
+  reorderButtonDisabled: {
+    opacity: 0.3,
+  },
+  reorderButtonText: {
+    fontSize: 14,
+    color: themeColors.accent.secondary,
+    fontWeight: "700",
+    marginTop: -2,
   },
   comboContent: {
     flex: 1,

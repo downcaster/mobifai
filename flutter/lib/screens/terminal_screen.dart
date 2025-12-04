@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -51,7 +50,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   // Terminal
   late Terminal _terminal;
   late TerminalController _terminalController;
-  app_themes.TerminalTheme _currentTheme = app_themes.TerminalThemes.defaultTheme;
+  app_themes.TerminalTheme _currentTheme =
+      app_themes.TerminalThemes.defaultTheme;
 
   // Services
   io.Socket? _socket;
@@ -77,7 +77,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     print('   relayServerUrl: ${widget.relayServerUrl}');
     print('   targetDeviceId: ${widget.targetDeviceId}');
     print('   _hasConnectionParams: $_hasConnectionParams');
-    
+
     _initTerminal();
 
     if (_hasConnectionParams) {
@@ -93,9 +93,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   bool get _hasConnectionParams => widget.relayServerUrl != null;
 
   void _initTerminal() {
-    _terminal = Terminal(
-      maxLines: 10000,
-    );
+    _terminal = Terminal(maxLines: 10000);
 
     _terminalController = TerminalController();
 
@@ -165,7 +163,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           .setReconnectionDelayMax(5000)
           .setReconnectionAttempts(5)
           .setAuth({'token': token})
-          .disableAutoConnect()  // Important: disable auto-connect to set up handlers first
+          .disableAutoConnect() // Important: disable auto-connect to set up handlers first
           .build(),
     );
 
@@ -310,8 +308,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
       if (_webrtc?.isWebRTCConnected ?? false) {
         debugPrint(
-            '⚠️  Relay server disconnected, but P2P connection is still active');
-        _terminal.write('\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n');
+          '⚠️  Relay server disconnected, but P2P connection is still active',
+        );
+        _terminal.write(
+          '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n',
+        );
         return;
       }
 
@@ -326,7 +327,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
       _terminal.write('\r\n\x1b[33m⚠️  $message\x1b[0m\r\n');
       _terminal.write(
-          '\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n');
+        '\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n',
+      );
 
       _showError(
         'Disconnected',
@@ -337,12 +339,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _socket!.onDisconnect((reason) {
       if (_webrtc?.isWebRTCConnected ?? false) {
         debugPrint(
-            '⚠️  Relay server disconnected, but P2P connection is still active');
+          '⚠️  Relay server disconnected, but P2P connection is still active',
+        );
         setState(() {
           _connected = false;
         });
         _terminal.write(
-            '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n');
+          '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n',
+        );
         return;
       }
 
@@ -425,10 +429,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         Config.connectionStatusKey,
-        jsonEncode({
-          'deviceId': widget.targetDeviceId,
-          'status': 'connecting',
-        }),
+        jsonEncode({'deviceId': widget.targetDeviceId, 'status': 'connecting'}),
       );
     }
 
@@ -440,7 +441,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
       final payload = data['payload'];
       if (Config.debug) {
         debugPrint(
-            '📡 WebRTC message received: type=$type, hasPayload=${payload != null}');
+          '📡 WebRTC message received: type=$type, hasPayload=${payload != null}',
+        );
       }
       _handleProcessMessage(type ?? '', payload ?? data);
     });
@@ -468,7 +470,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
         // Auto-create first process if needed
         if (_paired && !_firstProcessCreated) {
           _firstProcessCreated = true;
-          debugPrint('📱 Auto-creating first process after WebRTC connected...');
+          debugPrint(
+            '📱 Auto-creating first process after WebRTC connected...',
+          );
           Future.delayed(const Duration(milliseconds: 200), () {
             _createProcess();
           });
@@ -498,10 +502,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void _handleProcessMessage(String type, dynamic payload) {
     switch (type) {
       case 'processes:sync':
-        final syncPayload =
-            ProcessesSyncPayload.fromJson(payload as Map<String, dynamic>);
+        final syncPayload = ProcessesSyncPayload.fromJson(
+          payload as Map<String, dynamic>,
+        );
         debugPrint(
-            '📋 Received processes:sync with ${syncPayload.processes.length} process(es)');
+          '📋 Received processes:sync with ${syncPayload.processes.length} process(es)',
+        );
 
         setState(() {
           _syncingTabs = false;
@@ -512,11 +518,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
           // Restore processes from Mac
           final restoredProcesses = syncPayload.processes
-              .map((p) => TerminalProcess(
-                    uuid: p.uuid,
-                    createdAt: p.createdAt,
-                    label: p.name,
-                  ))
+              .map(
+                (p) => TerminalProcess(
+                  uuid: p.uuid,
+                  createdAt: p.createdAt,
+                  label: p.name,
+                ),
+              )
               .toList();
 
           setState(() {
@@ -541,13 +549,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
             setState(() {
               _activeProcessUuid = activeUuid;
             });
-            _sendToMac('process:switch', {'activeUuids': [activeUuid]});
+            _sendToMac('process:switch', {
+              'activeUuids': [activeUuid],
+            });
           } else if (restoredProcesses.isNotEmpty) {
             final firstUuid = restoredProcesses.first.uuid;
             setState(() {
               _activeProcessUuid = firstUuid;
             });
-            _sendToMac('process:switch', {'activeUuids': [firstUuid]});
+            _sendToMac('process:switch', {
+              'activeUuids': [firstUuid],
+            });
           }
 
           debugPrint('✅ Restored ${restoredProcesses.length} tab(s) from Mac');
@@ -566,7 +578,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
         final data = payload as Map<String, dynamic>;
         final uuid = data['uuid'] as String;
         debugPrint(
-            '✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}');
+          '✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}',
+        );
         break;
 
       case 'process:exited':
@@ -641,7 +654,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
       );
 
       if (_webrtc?.isWebRTCConnected ?? false) {
-        final success = _webrtc!.sendMessage('terminal:input', payload.toJson());
+        final success = _webrtc!.sendMessage(
+          'terminal:input',
+          payload.toJson(),
+        );
         if (!success && _socket != null) {
           _socket!.emit('terminal:input', payload.toJson());
         }
@@ -681,10 +697,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     });
 
     // Send create command to Mac
-    _sendToMac('process:create', ProcessCreatePayload(
-      uuid: uuid,
-      name: label,
-    ).toJson());
+    _sendToMac(
+      'process:create',
+      ProcessCreatePayload(uuid: uuid, name: label).toJson(),
+    );
 
     // Clear terminal for new process
     _terminal.buffer.clear();
@@ -702,15 +718,20 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void _terminateProcess(String uuid) {
     debugPrint('📱 Terminating process: ${uuid.substring(0, 8)}');
 
-    _sendToMac('process:terminate', ProcessTerminatePayload(uuid: uuid).toJson());
+    _sendToMac(
+      'process:terminate',
+      ProcessTerminatePayload(uuid: uuid).toJson(),
+    );
 
     setState(() {
       _processes.removeWhere((p) => p.uuid == uuid);
 
       if (_activeProcessUuid == uuid && _processes.isNotEmpty) {
         _activeProcessUuid = _processes.last.uuid;
-        _sendToMac('process:switch',
-            ProcessSwitchPayload(activeUuids: [_activeProcessUuid!]).toJson());
+        _sendToMac(
+          'process:switch',
+          ProcessSwitchPayload(activeUuids: [_activeProcessUuid!]).toJson(),
+        );
       } else if (_processes.isEmpty) {
         _activeProcessUuid = null;
       }
@@ -726,8 +747,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
       _activeProcessUuid = uuid;
     });
 
-    _sendToMac('process:switch',
-        ProcessSwitchPayload(activeUuids: [uuid]).toJson());
+    _sendToMac(
+      'process:switch',
+      ProcessSwitchPayload(activeUuids: [uuid]).toJson(),
+    );
 
     // Clear terminal - Mac will send the snapshot
     _terminal.buffer.clear();
@@ -811,8 +834,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bgSecondary,
-        title: Text(title, style: const TextStyle(color: AppColors.textPrimary)),
-        content: Text(message, style: const TextStyle(color: AppColors.textSecondary)),
+        title: Text(
+          title,
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -851,10 +880,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
               child: _processes.isNotEmpty
                   ? _buildTerminal()
                   : !_paired
-                      ? _buildConnectingState()
-                      : _syncingTabs
-                          ? _buildSyncingState()
-                          : _buildEmptyState(),
+                  ? _buildConnectingState()
+                  : _syncingTabs
+                  ? _buildSyncingState()
+                  : _buildEmptyState(),
             ),
             if (_aiToastMessage != null) _buildAiToast(),
           ],
@@ -882,14 +911,20 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     border: Border.all(color: AppColors.borderSubtle),
                   ),
                   child: const Center(
-                    child: Text('◎',
-                        style:
-                            TextStyle(fontSize: 48, color: AppColors.textMuted)),
+                    child: Text(
+                      '◎',
+                      style: TextStyle(
+                        fontSize: 48,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('No Active Connection',
-                    style: Theme.of(context).textTheme.headlineMedium),
+                Text(
+                  'No Active Connection',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'Connect to a Mac client to start using the terminal',
@@ -919,10 +954,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       child: Row(
         children: [
           // Back button
-          _buildIconButton(
-            icon: '←',
-            onTap: widget.onBack,
-          ),
+          _buildIconButton(icon: '←', onTap: widget.onBack),
 
           // Status
           Expanded(
@@ -945,7 +977,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       width: 6,
                       height: 6,
                       margin: EdgeInsets.all(
-                          _paired && _webrtcConnected ? 5 : 0),
+                        _paired && _webrtcConnected ? 5 : 0,
+                      ),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _paired && _webrtcConnected
@@ -960,12 +993,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   _copyFeedback
                       ? '✓ Copied!'
                       : _paired && _webrtcConnected
-                          ? 'Connected'
-                          : _paired
-                              ? 'Connecting'
-                              : _connected
-                                  ? (_connectionStatus.isEmpty ? 'Relay' : 'Connecting')
-                                  : 'Offline',
+                      ? 'Connected'
+                      : _paired
+                      ? 'Connecting'
+                      : _connected
+                      ? (_connectionStatus.isEmpty ? 'Relay' : 'Connecting')
+                      : 'Offline',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -995,10 +1028,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                 },
               ),
               const SizedBox(width: 8),
-              _buildIconButton(
-                icon: '❐',
-                onTap: _handleCopyTerminal,
-              ),
+              _buildIconButton(icon: '❐', onTap: _handleCopyTerminal),
             ],
           ),
         ],
@@ -1029,17 +1059,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 )
               : Text(
                   icon,
                   style: TextStyle(
-                    color:
-                        isPrimary ? AppColors.textPrimary : AppColors.secondary,
+                    color: isPrimary
+                        ? AppColors.textPrimary
+                        : AppColors.secondary,
                     fontSize: icon.length > 1 ? 12 : 18,
-                    fontWeight: icon.length > 1 ? FontWeight.w700 : FontWeight.normal,
+                    fontWeight: icon.length > 1
+                        ? FontWeight.w700
+                        : FontWeight.normal,
                   ),
                 ),
         ),
@@ -1099,9 +1133,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.only(left: 16, right: 12),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.accentSelected
-              : AppColors.bgTertiary,
+          color: isActive ? AppColors.accentSelected : AppColors.bgTertiary,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isActive ? AppColors.primary : AppColors.borderSubtle,
@@ -1186,10 +1218,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
             searchHitBackgroundCurrent: const Color(0xFFFF9632),
             searchHitForeground: Colors.black,
           ),
-          textStyle: const TerminalStyle(
-            fontSize: 14,
-            fontFamily: 'monospace',
-          ),
+          textStyle: const TerminalStyle(fontSize: 14, fontFamily: 'monospace'),
           autofocus: true,
         ),
 
@@ -1220,7 +1249,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.primary),
+                              AppColors.primary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1483,18 +1513,22 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       fillColor: AppColors.bgTertiary,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: AppColors.borderSubtle),
+                        borderSide: const BorderSide(
+                          color: AppColors.borderSubtle,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: AppColors.borderSubtle),
+                        borderSide: const BorderSide(
+                          color: AppColors.borderSubtle,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: AppColors.primary, width: 1.5),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -1515,7 +1549,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: AppColors.borderSubtle),
+                              side: const BorderSide(
+                                color: AppColors.borderSubtle,
+                              ),
                             ),
                           ),
                           child: const Text(
@@ -1527,8 +1563,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed:
-                              _aiPrompt.trim().isNotEmpty ? _handleAiPromptSubmit : null,
+                          onPressed: _aiPrompt.trim().isNotEmpty
+                              ? _handleAiPromptSubmit
+                              : null,
                           child: const Text('Send'),
                         ),
                       ),
@@ -1543,4 +1580,3 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 }
-

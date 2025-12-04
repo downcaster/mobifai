@@ -132,6 +132,7 @@ export default function TerminalScreen({
     new Set()
   );
   const [syncingTabs, setSyncingTabs] = useState(false); // True while waiting for processes:sync
+  const [terminalInitializing, setTerminalInitializing] = useState(false); // True while terminal is initializing after sync
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -148,6 +149,13 @@ export default function TerminalScreen({
 
   // Key Combination Modal state
   const [keyCombModalVisible, setKeyCombModalVisible] = useState(false);
+
+  // Rename Tab Modal state
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renamingProcessUuid, setRenamingProcessUuid] = useState<string | null>(
+    null
+  );
+  const [newTabName, setNewTabName] = useState("");
 
   // Saved Combinations state
   const [savedCombinations, setSavedCombinations] = useState<
@@ -206,6 +214,9 @@ export default function TerminalScreen({
 
     // End syncing state if still active (user manually created a tab)
     setSyncingTabs(false);
+
+    // Clear terminal initialization overlay when creating a new tab
+    setTerminalInitializing(false);
 
     const uuid = generateUUID();
     processCounterRef.current += 1;
@@ -303,6 +314,9 @@ export default function TerminalScreen({
 
       setActiveProcessUuid(uuid);
       activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
+
+      // Clear terminal initialization overlay when manually switching
+      setTerminalInitializing(false);
 
       // Send switch command to Mac
       const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
@@ -513,22 +527,62 @@ export default function TerminalScreen({
   /**
    * Handle arrow button presses
    */
-  const handleArrowPress = (direction: 'up' | 'down' | 'left' | 'right'): void => {
+  const handleArrowPress = (
+    direction: "up" | "down" | "left" | "right"
+  ): void => {
     const escapeSequences = {
-      up: '\x1b[A',
-      down: '\x1b[B',
-      right: '\x1b[C',
-      left: '\x1b[D',
+      up: "\x1b[A",
+      down: "\x1b[B",
+      right: "\x1b[C",
+      left: "\x1b[D",
     };
-    
+
     const action: TerminalAction = {
-      type: 'command',
+      type: "command",
       value: escapeSequences[direction],
       label: direction.toUpperCase(),
     };
-    
+
     handleKeyCombinationSend([action]);
   };
+
+  /**
+   * Handle tab rename
+   */
+  const handleRenameTab = useCallback((uuid: string, currentName: string) => {
+    setRenamingProcessUuid(uuid);
+    setNewTabName(currentName);
+    setRenameModalVisible(true);
+  }, []);
+
+  /**
+   * Submit tab rename
+   */
+  const handleRenameSubmit = useCallback(() => {
+    if (!renamingProcessUuid || !newTabName.trim()) {
+      return;
+    }
+
+    const trimmedName = newTabName.trim();
+
+    // Update local state
+    setProcesses((prev) =>
+      prev.map((p) =>
+        p.uuid === renamingProcessUuid ? { ...p, label: trimmedName } : p
+      )
+    );
+
+    // Send rename command to Mac
+    sendToMac("process:rename", {
+      uuid: renamingProcessUuid,
+      name: trimmedName,
+    });
+
+    // Close modal
+    setRenameModalVisible(false);
+    setRenamingProcessUuid(null);
+    setNewTabName("");
+  }, [renamingProcessUuid, newTabName, sendToMac]);
 
   const getDeviceId = async () => {
     let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
@@ -563,6 +617,9 @@ export default function TerminalScreen({
             // Mark that processes exist (prevents auto-create)
             firstProcessCreatedRef.current = true;
 
+            // Show terminal initializing overlay
+            setTerminalInitializing(true);
+
             // Restore processes from Mac
             const restoredProcesses: TerminalProcess[] =
               syncPayload.processes.map((p) => ({
@@ -596,6 +653,12 @@ export default function TerminalScreen({
               sendToMac("process:switch", { activeUuids: [firstUuid] });
             }
 
+            // Hide initializing overlay after terminal has time to apply theme and dimensions
+            // This prevents the flash of unstyled content
+            setTimeout(() => {
+              setTerminalInitializing(false);
+            }, 1000);
+
             console.log(
               `✅ Restored ${restoredProcesses.length} tab(s) from Mac`
             );
@@ -617,6 +680,20 @@ export default function TerminalScreen({
           const { uuid } = payload as { uuid: string };
           console.log(
             `✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`
+          );
+          break;
+        }
+        case "process:renamed": {
+          const { uuid, name } = payload as { uuid: string; name: string };
+          console.log(
+            `✅ Mac confirmed process renamed: ${uuid.substring(
+              0,
+              8
+            )} -> ${name}`
+          );
+          // Update local state with confirmed name from Mac
+          setProcesses((prev) =>
+            prev.map((p) => (p.uuid === uuid ? { ...p, label: name } : p))
           );
           break;
         }
@@ -651,6 +728,11 @@ export default function TerminalScreen({
           // Only display if this is the active process (use ref for current value)
           if (uuid === activeProcessUuidRef.current) {
             sendToTerminal("output", data);
+            // Clear terminal initialization overlay since we've received content
+            // Add small delay to ensure theme/dimensions are applied first
+            setTimeout(() => {
+              setTerminalInitializing(false);
+            }, 300);
           }
           break;
         }
@@ -975,6 +1057,9 @@ export default function TerminalScreen({
     );
     socket.on("process:terminated", (payload) =>
       handleProcessMessage("process:terminated", payload)
+    );
+    socket.on("process:renamed", (payload) =>
+      handleProcessMessage("process:renamed", payload)
     );
     socket.on("process:exited", (payload) =>
       handleProcessMessage("process:exited", payload)
@@ -1739,6 +1824,11 @@ export default function TerminalScreen({
           Keyboard.dismiss();
           switchProcess(process.uuid);
         }}
+        onLongPress={() => {
+          sendToTerminal("blur", {});
+          Keyboard.dismiss();
+          handleRenameTab(process.uuid, process.label);
+        }}
         activeOpacity={0.7}
       >
         <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
@@ -1963,6 +2053,16 @@ export default function TerminalScreen({
                 </Text>
               </View>
             )}
+            {/* Loading overlay during terminal initialization after sync */}
+            {terminalInitializing && (
+              <View style={styles.terminalLoadingOverlay}>
+                <View style={styles.loadingGlow} />
+                <ActivityIndicator size="small" color="#6200EE" />
+                <Text style={styles.terminalLoadingText}>
+                  Restoring terminal...
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
       ) : !paired ? (
@@ -2028,7 +2128,8 @@ export default function TerminalScreen({
             styles.comboBarContainer,
             Platform.OS === "ios" &&
               keyboardVisible && {
-                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
+                bottom:
+                  keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
               },
           ]}
         >
@@ -2048,7 +2149,11 @@ export default function TerminalScreen({
             styles.arrowButtonsContainer,
             Platform.OS === "ios" &&
               keyboardVisible && {
-                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 50,
+                bottom:
+                  keyboardHeight -
+                  insets.bottom -
+                  IOS_QUICKTYPE_BAR_HEIGHT +
+                  50,
               },
           ]}
         >
@@ -2058,16 +2163,17 @@ export default function TerminalScreen({
 
       {/* Scroll to Bottom Button */}
       <Animated.View
-          style={[
-            styles.scrollToBottomButton,
-            {
-              opacity: scrollButtonOpacity,
+        style={[
+          styles.scrollToBottomButton,
+          {
+            opacity: scrollButtonOpacity,
+          },
+          Platform.OS === "ios" &&
+            keyboardVisible && {
+              bottom:
+                keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 122,
             },
-            Platform.OS === "ios" &&
-              keyboardVisible && {
-                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 122,
-              },
-          ]}
+        ]}
         pointerEvents={showScrollToBottom ? "auto" : "none"}
       >
         <TouchableOpacity
@@ -2136,6 +2242,63 @@ export default function TerminalScreen({
         onClose={() => setKeyCombModalVisible(false)}
         onSend={handleKeyCombinationSend}
       />
+
+      {/* Rename Tab Modal */}
+      <Modal
+        visible={renameModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setRenameModalVisible(false);
+          setRenamingProcessUuid(null);
+          setNewTabName("");
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rename Tab</Text>
+            <Text style={styles.modalSubtitle}>
+              Choose a new name for this terminal tab
+            </Text>
+
+            <TextInput
+              style={styles.renameInput}
+              placeholder="e.g., 'Frontend Dev', 'Backend API'"
+              placeholderTextColor="#555566"
+              value={newTabName}
+              onChangeText={setNewTabName}
+              autoFocus={true}
+              selectTextOnFocus={true}
+              returnKeyType="done"
+              onSubmitEditing={handleRenameSubmit}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setRenameModalVisible(false);
+                  setRenamingProcessUuid(null);
+                  setNewTabName("");
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitButton,
+                  !newTabName.trim() && styles.buttonDisabled,
+                ]}
+                onPress={handleRenameSubmit}
+                disabled={!newTabName.trim()}
+              >
+                <Text style={styles.modalSubmitButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2297,7 +2460,6 @@ const styles = StyleSheet.create({
   },
   // Tabs row styles
   tabsRow: {
-    height: 44,
     backgroundColor: "#12121a",
     borderBottomWidth: 1,
     borderBottomColor: "#2a2a3a",
@@ -2588,6 +2750,18 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 15,
     minHeight: 120,
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+  },
+  renameInput: {
+    backgroundColor: "#1a1a25",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: "#ffffff",
+    fontSize: 15,
+    height: 44,
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
   },
   modalButtons: {

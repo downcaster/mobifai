@@ -13,6 +13,8 @@ import {
   KEY_DEFINITIONS,
   KeyDefinition,
   searchKeys,
+  combineKeys,
+  formatKeysLabel,
 } from '../config/keyCombinations';
 
 export interface TerminalAction {
@@ -29,7 +31,7 @@ interface KeyCombinationModalProps {
 
 type Item = 
   | { type: 'text'; value: string }
-  | { type: 'command'; key: KeyDefinition };
+  | { type: 'command'; keys: KeyDefinition[]; label: string; value: string };
 
 export function KeyCombinationModal({
   visible,
@@ -41,6 +43,11 @@ export function KeyCombinationModal({
   const [suggestions, setSuggestions] = useState<KeyDefinition[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  
+  // Building mode state
+  const [buildingMode, setBuildingMode] = useState(false);
+  const [buildingKeys, setBuildingKeys] = useState<KeyDefinition[]>([]);
+  const [textBeforeBuilding, setTextBeforeBuilding] = useState('');
 
   // Update suggestions based on the last word when current text changes
   useEffect(() => {
@@ -75,28 +82,69 @@ export function KeyCombinationModal({
       setCurrentText('');
       setSuggestions([]);
       setShowSuggestions(false);
+      setBuildingMode(false);
+      setBuildingKeys([]);
+      setTextBeforeBuilding('');
     }
   }, [visible]);
 
-  const addCommand = (key: KeyDefinition): void => {
-    const newItems = [...items];
-    
-    // If there's text before the last word (which was used for searching), add it as text
-    const words = currentText.split(' ');
-    if (words.length > 1) {
-      // Everything except the last word is actual text
-      const textBeforeSearch = words.slice(0, -1).join(' ');
-      if (textBeforeSearch.trim()) {
-        newItems.push({ type: 'text', value: textBeforeSearch });
-      }
+  const addKeyToBuilding = (key: KeyDefinition): void => {
+    if (!buildingMode) {
+      // Enter building mode
+      const words = currentText.split(' ');
+      const textBefore = words.length > 1 ? words.slice(0, -1).join(' ') : '';
+      
+      setTextBeforeBuilding(textBefore);
+      setBuildingMode(true);
+      setBuildingKeys([key]);
+      setCurrentText('');
+      setShowSuggestions(false);
+    } else {
+      // Add to existing building
+      setBuildingKeys([...buildingKeys, key]);
+      setCurrentText('');
+      setShowSuggestions(false);
     }
-    
-    // Add the command
-    newItems.push({ type: 'command', key });
-    
-    setItems(newItems);
-    setCurrentText('');
-    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const confirmBuilding = (): void => {
+    if (buildingKeys.length > 0) {
+      const newItems = [...items];
+      
+      // Add any text before building started
+      if (textBeforeBuilding.trim()) {
+        newItems.push({ type: 'text', value: textBeforeBuilding });
+      }
+      
+      // Add the combined command
+      const combinedEscape = combineKeys(buildingKeys);
+      const label = formatKeysLabel(buildingKeys);
+      
+      newItems.push({ 
+        type: 'command', 
+        keys: buildingKeys,
+        label,
+        value: combinedEscape
+      });
+      
+      setItems(newItems);
+      setBuildingMode(false);
+      setBuildingKeys([]);
+      setTextBeforeBuilding('');
+      setCurrentText('');
+    }
+    inputRef.current?.focus();
+  };
+
+  const cancelBuilding = (): void => {
+    // Restore the text before building started
+    if (textBeforeBuilding.trim()) {
+      setCurrentText(textBeforeBuilding + ' ');
+    }
+    setBuildingMode(false);
+    setBuildingKeys([]);
+    setTextBeforeBuilding('');
     inputRef.current?.focus();
   };
 
@@ -105,6 +153,12 @@ export function KeyCombinationModal({
   };
 
   const handleSend = (): void => {
+    // If in building mode, confirm the building first
+    if (buildingMode && buildingKeys.length > 0) {
+      confirmBuilding();
+      return; // Don't send yet, let user review
+    }
+
     // Build final items array including any remaining text
     const finalItems = [...items];
     if (currentText.trim()) {
@@ -123,8 +177,8 @@ export function KeyCombinationModal({
       } else {
         return {
           type: 'command',
-          value: item.key.escapeSequence || item.key.symbol,
-          label: item.key.symbol,
+          value: item.value,
+          label: item.label,
         };
       }
     });
@@ -139,9 +193,23 @@ export function KeyCombinationModal({
   };
 
   const handleKeyPress = (e: { nativeEvent: { key: string } }): void => {
-    // Enter key selects the first suggestion if available
-    if (e.nativeEvent.key === 'Enter' && suggestions.length > 0 && currentText.trim()) {
-      addCommand(suggestions[0]);
+    const key = e.nativeEvent.key;
+    
+    // Escape key cancels building mode
+    if (key === 'Escape' && buildingMode) {
+      cancelBuilding();
+      return;
+    }
+    
+    // Enter key behavior
+    if (key === 'Enter') {
+      if (buildingMode && buildingKeys.length > 0) {
+        // Confirm the building
+        confirmBuilding();
+      } else if (suggestions.length > 0 && currentText.trim()) {
+        // Start building with first suggestion
+        addKeyToBuilding(suggestions[0]);
+      }
     }
   };
 
@@ -163,7 +231,7 @@ export function KeyCombinationModal({
     } else {
       return (
         <View key={`cmd-${index}`} style={styles.commandTile}>
-          <Text style={styles.commandTileText}>{item.key.symbol}</Text>
+          <Text style={styles.commandTileText}>{item.label}</Text>
           <TouchableOpacity
             onPress={() => removeItem(index)}
             style={styles.tileRemove}
@@ -181,7 +249,7 @@ export function KeyCombinationModal({
         styles.suggestionItem,
         index === 0 && styles.suggestionItemSelected,
       ]}
-      onPress={() => addCommand(item)}
+      onPress={() => addKeyToBuilding(item)}
     >
       <Text style={styles.suggestionSymbol}>{item.symbol}</Text>
       {item.name && <Text style={styles.suggestionName}>{item.name}</Text>}
@@ -205,6 +273,38 @@ export function KeyCombinationModal({
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
+            {/* Building Mode Preview */}
+            {buildingMode && (
+              <View style={styles.buildingPreview}>
+                <View style={styles.buildingKeys}>
+                  {buildingKeys.map((key, index) => (
+                    <React.Fragment key={index}>
+                      <View style={styles.buildingKeyBadge}>
+                        <Text style={styles.buildingKeyText}>{key.symbol}</Text>
+                      </View>
+                      {index < buildingKeys.length - 1 && (
+                        <Text style={styles.buildingPlus}>+</Text>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+                <View style={styles.buildingActions}>
+                  <TouchableOpacity
+                    style={styles.buildingConfirm}
+                    onPress={confirmBuilding}
+                  >
+                    <Text style={styles.buildingConfirmText}>✓</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.buildingCancel}
+                    onPress={cancelBuilding}
+                  >
+                    <Text style={styles.buildingCancelText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {/* Input Container with Items */}
             <View style={styles.inputContainer}>
             <View style={styles.itemsRow}>
@@ -224,8 +324,10 @@ export function KeyCombinationModal({
                 onSubmitEditing={(e) => {
                   // Prevent default behavior
                   e.preventDefault();
-                  if (suggestions.length > 0 && currentText.trim()) {
-                    addCommand(suggestions[0]);
+                  if (buildingMode && buildingKeys.length > 0) {
+                    confirmBuilding();
+                  } else if (suggestions.length > 0 && currentText.trim()) {
+                    addKeyToBuilding(suggestions[0]);
                   }
                 }}
               />
@@ -279,6 +381,79 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: 'rgba(98, 0, 238, 0.3)',
+  },
+  buildingPreview: {
+    backgroundColor: 'rgba(98, 0, 238, 0.15)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(98, 0, 238, 0.3)',
+  },
+  buildingKeys: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  buildingKeyBadge: {
+    backgroundColor: 'rgba(42, 42, 58, 0.8)',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(98, 0, 238, 0.4)',
+  },
+  buildingKeyText: {
+    color: '#BB86FC',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  buildingPlus: {
+    color: '#8888aa',
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: 2,
+  },
+  buildingActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 12,
+  },
+  buildingConfirm: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 200, 100, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 200, 100, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buildingConfirmText: {
+    color: '#00ff88',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  buildingCancel: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 50, 50, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 50, 50, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buildingCancelText: {
+    color: '#ff6666',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: -2,
   },
   inputContainer: {
     backgroundColor: '#12121a',

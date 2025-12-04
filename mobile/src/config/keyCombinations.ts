@@ -94,6 +94,7 @@ export const KEY_DEFINITIONS: KeyDefinition[] = [
   // Navigation Keys
   { symbol: '↵', name: 'Enter', searchTerms: ['enter', 'return', 'ENTER', 'RETURN'], type: 'navigation', escapeSequence: '\r' },
   { symbol: '⇥', name: 'Tab', searchTerms: ['tab', 'TAB'], type: 'navigation', escapeSequence: '\t' },
+  { symbol: 'SHIFT+TAB', name: 'Backtab', searchTerms: ['shift+tab', 'shift tab', 'backtab', 'SHIFT+TAB', 'SHIFT TAB', 'BACKTAB'], type: 'navigation', escapeSequence: '\x1b[Z' },
   { symbol: '⎋', name: 'Escape', searchTerms: ['escape', 'esc', 'ESCAPE', 'ESC'], type: 'navigation', escapeSequence: '\x1b' },
   { symbol: '␣', name: 'Space', searchTerms: ['space', 'SPACE'], type: 'navigation', escapeSequence: ' ' },
   { symbol: '⌫', name: 'Backspace', searchTerms: ['backspace', 'BACKSPACE'], type: 'navigation', escapeSequence: '\x7f' },
@@ -208,5 +209,71 @@ export function keysToEscapeSequence(keys: KeyDefinition[]): string {
     // For keys without escape sequences (like letters and special chars), just return the symbol
     return key.symbol;
   }).join('');
+}
+
+/**
+ * Combine multiple keys into a single escape sequence for multi-key commands
+ * @param keys - Array of key definitions to combine
+ * @returns Combined escape sequence
+ */
+export function combineKeys(keys: KeyDefinition[]): string {
+  if (keys.length === 0) return '';
+  if (keys.length === 1) return keys[0].escapeSequence || keys[0].symbol;
+  
+  // Check if this is a known combination in KEY_DEFINITIONS
+  const label = formatKeysLabel(keys);
+  const predefined = KEY_DEFINITIONS.find(k => k.symbol === label);
+  if (predefined?.escapeSequence) {
+    return predefined.escapeSequence;
+  }
+  
+  // Handle modifier + key combinations
+  const modifiers = keys.filter(k => k.type === 'modifier');
+  const nonModifiers = keys.filter(k => k.type !== 'modifier');
+  
+  // If we have exactly one non-modifier key and at least one modifier
+  if (nonModifiers.length === 1 && modifiers.length > 0) {
+    const targetKey = nonModifiers[0];
+    const hasShift = modifiers.some(m => m.symbol === 'SHIFT');
+    const hasCtrl = modifiers.some(m => m.symbol === 'CTRL');
+    const hasAlt = modifiers.some(m => m.symbol === 'ALT');
+    const hasMeta = modifiers.some(m => m.symbol === 'META' || m.symbol === 'CMD');
+    
+    // SHIFT + TAB = Backtab
+    if (hasShift && targetKey.symbol === '⇥') {
+      return '\x1b[Z';
+    }
+    
+    // SHIFT + letter = uppercase letter
+    if (hasShift && targetKey.type === 'letter' && !hasCtrl && !hasAlt) {
+      return targetKey.symbol.toUpperCase();
+    }
+    
+    // CTRL + letter (a-z) = Control character
+    if (hasCtrl && targetKey.type === 'letter') {
+      const letter = targetKey.symbol.toLowerCase();
+      const code = letter.charCodeAt(0) - 96; // a=1, b=2, etc.
+      if (code >= 1 && code <= 26) {
+        return String.fromCharCode(code);
+      }
+    }
+    
+    // ALT/META + key = ESC + key
+    if ((hasAlt || hasMeta) && targetKey.escapeSequence) {
+      return '\x1b' + targetKey.escapeSequence;
+    }
+  }
+  
+  // Fallback: concatenate escape sequences
+  return keys.map(k => k.escapeSequence || k.symbol).join('');
+}
+
+/**
+ * Format multiple keys into a display label
+ * @param keys - Array of key definitions
+ * @returns Formatted label like "CTRL+P" or "SHIFT+TAB"
+ */
+export function formatKeysLabel(keys: KeyDefinition[]): string {
+  return keys.map(k => k.symbol).join('+');
 }
 

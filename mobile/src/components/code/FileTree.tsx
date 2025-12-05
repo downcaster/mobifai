@@ -5,11 +5,27 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Text,
 } from 'react-native';
-import { AppText } from '../ui';
-import { colors } from '../../theme/colors';
 import { FileNode } from '../../types/code';
 import { useFolderChildren } from '../../hooks/useCodeQueries';
+
+// Dark theme colors (matching terminal)
+const darkTheme = {
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
+  text: {
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
+  },
+  error: '#CF6679',
+};
 
 interface FileTreeProps {
   rootPath: string;
@@ -40,7 +56,6 @@ function TreeNode({
   const fullPath = `${path}/${node.name}`;
   const isSelected = selectedFile === fullPath;
 
-  // Only fetch children if it's a folder and expanded
   const {
     data: children,
     isLoading,
@@ -65,7 +80,6 @@ function TreeNode({
       return isExpanded ? '📂' : '📁';
     }
     
-    // File icons based on extension
     const ext = node.name.split('.').pop()?.toLowerCase();
     const iconMap: Record<string, string> = {
       'js': '📜',
@@ -87,30 +101,29 @@ function TreeNode({
       <TouchableOpacity
         style={[
           styles.nodeContainer,
-          { paddingLeft: 8 + level * 16 },
+          { paddingLeft: 12 + level * 16 },
           isSelected && styles.nodeSelected,
         ]}
         onPress={handlePress}
         activeOpacity={0.6}
       >
         {node.type === 'folder' && (
-          <AppText style={styles.chevron}>
+          <Text style={styles.chevron}>
             {isExpanded ? '▾' : '▸'}
-          </AppText>
+          </Text>
         )}
-        <AppText style={styles.nodeIcon}>{getIcon()}</AppText>
-        <AppText
+        <Text style={styles.nodeIcon}>{getIcon()}</Text>
+        <Text
           style={[styles.nodeName, isSelected && styles.nodeNameSelected]}
           numberOfLines={1}
         >
           {node.name}
-        </AppText>
+        </Text>
         {isLoading && (
-          <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
+          <ActivityIndicator size="small" color={darkTheme.primaryLight} style={styles.loader} />
         )}
       </TouchableOpacity>
 
-      {/* Render children if expanded and loaded */}
       {isExpanded && children && (
         <View>
           {children.map((child, index) => (
@@ -127,15 +140,14 @@ function TreeNode({
         </View>
       )}
 
-      {/* Show error if folder failed to load */}
       {isExpanded && error && (
         <View
           style={[
             styles.errorContainer,
-            { paddingLeft: 8 + (level + 1) * 16 },
+            { paddingLeft: 12 + (level + 1) * 16 },
           ]}
         >
-          <AppText style={styles.errorText}>Failed to load</AppText>
+          <Text style={styles.errorText}>Failed to load</Text>
         </View>
       )}
     </View>
@@ -169,48 +181,48 @@ export function FileTree({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: darkTheme.surface,
   },
   nodeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingRight: 8,
-    minHeight: 36,
+    paddingVertical: 10,
+    paddingRight: 12,
+    minHeight: 40,
   },
   nodeSelected: {
-    backgroundColor: colors.primary + '15',
+    backgroundColor: darkTheme.primary + '25',
   },
   chevron: {
     fontSize: 10,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
     width: 14,
     textAlign: 'center',
-    marginRight: 2,
+    marginRight: 4,
   },
   nodeIcon: {
     fontSize: 14,
-    marginRight: 6,
+    marginRight: 8,
   },
   nodeName: {
     flex: 1,
     fontSize: 13,
-    color: colors.text.primary,
+    color: darkTheme.text.primary,
   },
   nodeNameSelected: {
-    color: colors.primary,
+    color: darkTheme.primaryLight,
     fontWeight: '600',
   },
   loader: {
-    marginLeft: 4,
+    marginLeft: 8,
   },
   errorContainer: {
-    paddingVertical: 4,
-    paddingRight: 8,
+    paddingVertical: 6,
+    paddingRight: 12,
   },
   errorText: {
     fontSize: 11,
-    color: colors.error,
+    color: darkTheme.error,
     fontStyle: 'italic',
   },
 });

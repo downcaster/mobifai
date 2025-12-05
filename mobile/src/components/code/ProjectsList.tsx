@@ -5,11 +5,27 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Text,
 } from 'react-native';
-import { AppText, AppCard } from '../ui';
-import { colors } from '../../theme/colors';
 import { CodeProject } from '../../types/code';
 import { useProjectsHistory } from '../../hooks/useCodeQueries';
+
+// Dark theme colors (matching terminal)
+const darkTheme = {
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
+  text: {
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
+  },
+  error: '#CF6679',
+};
 
 interface ProjectsListProps {
   onProjectSelect: (project: CodeProject) => void;
@@ -25,8 +41,8 @@ export function ProjectsList({
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <AppText style={styles.loadingText}>Loading projects...</AppText>
+        <ActivityIndicator size="large" color={darkTheme.primaryLight} />
+        <Text style={styles.loadingText}>Loading projects...</Text>
       </View>
     );
   }
@@ -34,9 +50,9 @@ export function ProjectsList({
   if (error) {
     return (
       <View style={styles.centerContainer}>
-        <AppText style={styles.errorText}>Failed to load projects</AppText>
+        <Text style={styles.errorText}>Failed to load projects</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
-          <AppText style={styles.retryText}>Retry</AppText>
+          <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -45,8 +61,8 @@ export function ProjectsList({
   if (!projects || projects.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <AppText style={styles.emptyIcon}>📂</AppText>
-        <AppText style={styles.emptyText}>No projects yet</AppText>
+        <Text style={styles.emptyIcon}>📂</Text>
+        <Text style={styles.emptyText}>No projects yet</Text>
       </View>
     );
   }
@@ -63,29 +79,26 @@ export function ProjectsList({
             key={project.path}
             onPress={() => onProjectSelect(project)}
             activeOpacity={0.7}
+            style={[styles.projectCard, isSelected && styles.projectCardSelected]}
           >
-            <AppCard
-              style={[styles.projectCard, isSelected && styles.projectCardSelected]}
-            >
-              <View style={styles.projectIconContainer}>
-                <AppText style={styles.projectIcon}>📂</AppText>
-              </View>
-              <View style={styles.projectInfo}>
-                <AppText
-                  style={[
-                    styles.projectName,
-                    isSelected && styles.projectNameSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {project.name}
-                </AppText>
-                <AppText style={styles.projectPath} numberOfLines={1}>
-                  {project.path}
-                </AppText>
-              </View>
-              <AppText style={styles.projectTime}>{timeAgo}</AppText>
-            </AppCard>
+            <View style={styles.projectIconContainer}>
+              <Text style={styles.projectIcon}>📂</Text>
+            </View>
+            <View style={styles.projectInfo}>
+              <Text
+                style={[
+                  styles.projectName,
+                  isSelected && styles.projectNameSelected,
+                ]}
+                numberOfLines={1}
+              >
+                {project.name}
+              </Text>
+              <Text style={styles.projectPath} numberOfLines={1}>
+                {project.path}
+              </Text>
+            </View>
+            <Text style={styles.projectTime}>{timeAgo}</Text>
           </TouchableOpacity>
         );
       })}
@@ -93,9 +106,6 @@ export function ProjectsList({
   );
 }
 
-/**
- * Get human-readable time ago string
- */
 function getTimeAgo(date: Date): string {
   const now = Date.now();
   const diff = now - date.getTime();
@@ -113,14 +123,14 @@ function getTimeAgo(date: Date): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
   },
   projectCard: {
     flexDirection: 'row',
@@ -128,16 +138,20 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 16,
     marginVertical: 4,
+    backgroundColor: darkTheme.surfaceElevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: darkTheme.border,
   },
   projectCardSelected: {
-    borderColor: colors.primary,
+    borderColor: darkTheme.primary,
     borderWidth: 1.5,
   },
   projectIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: colors.primary + '12',
+    backgroundColor: darkTheme.primary + '25',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -152,39 +166,41 @@ const styles = StyleSheet.create({
   projectName: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: darkTheme.text.primary,
     marginBottom: 2,
   },
   projectNameSelected: {
-    color: colors.primary,
+    color: darkTheme.primaryLight,
   },
   projectPath: {
     fontSize: 11,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
   },
   projectTime: {
     fontSize: 11,
-    color: colors.text.disabled,
+    color: darkTheme.text.disabled,
     marginLeft: 8,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 14,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
   },
   errorText: {
-    color: colors.error,
+    color: darkTheme.error,
     marginBottom: 16,
     textAlign: 'center',
   },
   retryButton: {
     paddingHorizontal: 24,
-    paddingVertical: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: darkTheme.surfaceElevated,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: darkTheme.border,
   },
   retryText: {
-    color: colors.text.inverse,
+    color: darkTheme.primaryLight,
     fontWeight: '600',
   },
   emptyIcon: {
@@ -194,6 +210,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
   },
 });

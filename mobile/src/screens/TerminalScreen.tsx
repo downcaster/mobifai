@@ -27,6 +27,7 @@ import {
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
 import { codeService } from "../services/CodeService";
+import { useConnection } from "../services/ConnectionContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   SafeAreaView,
@@ -106,12 +107,31 @@ export default function TerminalScreen({
   const targetDeviceId = route.params?.targetDeviceId;
   const targetDeviceName = route.params?.targetDeviceName;
 
+  // Connection context for sharing state across screens
+  const connectionContext = useConnection();
+
   // Check if we have connection params
   const hasConnectionParams = !!relayServerUrl;
-  const [connected, setConnected] = useState(false);
-  const [paired, setPaired] = useState(false);
+  const [connected, setConnectedState] = useState(false);
+  const [paired, setPairedState] = useState(false);
   const [terminalReady, setTerminalReady] = useState(false);
-  const [webrtcConnected, setWebrtcConnected] = useState(false);
+  const [webrtcConnected, setWebrtcConnectedState] = useState(false);
+
+  // Wrapper functions to update both local state and context
+  const setConnected = (value: boolean) => {
+    setConnectedState(value);
+    connectionContext.setConnected(value);
+  };
+
+  const setPaired = (value: boolean) => {
+    setPairedState(value);
+    connectionContext.setPaired(value);
+  };
+
+  const setWebrtcConnected = (value: boolean) => {
+    setWebrtcConnectedState(value);
+    connectionContext.setWebRTCConnected(value);
+  };
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [terminalSettings, setTerminalSettings] = useState({
@@ -417,6 +437,8 @@ export default function TerminalScreen({
       }
       // Clear connection status when leaving the screen
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
+      // Reset connection context
+      connectionContext.reset();
     };
   }, [hasConnectionParams]);
 
@@ -1024,6 +1046,15 @@ export default function TerminalScreen({
       }
 
       webrtcRef.current = new WebRTCService(socket);
+
+      // Update connection context with WebRTC service and socket
+      connectionContext.setWebRTCService(webrtcRef.current);
+      connectionContext.setSocket(socket);
+      connectionContext.setConnectionInfo({
+        relayServerUrl: relayServerUrl!,
+        deviceId: targetDeviceId!,
+        deviceName: targetDeviceName || 'Mac',
+      });
 
       // Initialize CodeService with WebRTC
       codeService.initialize(webrtcRef.current);

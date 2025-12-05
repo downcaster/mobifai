@@ -4,9 +4,24 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Text,
 } from 'react-native';
-import { AppText } from '../ui';
-import { colors } from '../../theme/colors';
+
+// Dark theme colors (matching terminal)
+const darkTheme = {
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
+  text: {
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
+  },
+};
 
 export interface OpenFile {
   path: string;
@@ -30,7 +45,7 @@ export function EditorTabs({
   if (files.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <AppText style={styles.emptyText}>No files open</AppText>
+        <Text style={styles.emptyText}>No files open</Text>
       </View>
     );
   }
@@ -56,12 +71,12 @@ export function EditorTabs({
               activeOpacity={0.7}
             >
               {file.isDirty && <View style={styles.dirtyIndicator} />}
-              <AppText
+              <Text
                 style={[styles.tabName, isActive && styles.tabNameActive]}
                 numberOfLines={1}
               >
                 {file.name}
-              </AppText>
+              </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -70,7 +85,7 @@ export function EditorTabs({
               activeOpacity={0.7}
               hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
-              <AppText style={[styles.closeIcon, isActive && styles.closeIconActive]}>×</AppText>
+              <Text style={[styles.closeIcon, isActive && styles.closeIconActive]}>×</Text>
             </TouchableOpacity>
           </View>
         );
@@ -81,81 +96,81 @@ export function EditorTabs({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    maxHeight: 40,
+    borderBottomColor: darkTheme.border,
+    maxHeight: 44,
   },
   contentContainer: {
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
   emptyContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    height: 40,
+    borderBottomColor: darkTheme.border,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 12,
-    color: colors.text.disabled,
+    color: darkTheme.text.disabled,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 6,
-    marginHorizontal: 3,
-    marginVertical: 4,
-    paddingLeft: 8,
+    backgroundColor: darkTheme.surfaceElevated,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 6,
+    paddingLeft: 12,
     paddingRight: 4,
     maxWidth: 160,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: darkTheme.border,
   },
   tabActive: {
-    backgroundColor: colors.primary + '15',
-    borderColor: colors.primary,
+    backgroundColor: darkTheme.primary + '25',
+    borderColor: darkTheme.primary,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   tabName: {
     fontSize: 12,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
     fontWeight: '500',
     flex: 1,
   },
   tabNameActive: {
-    color: colors.primary,
+    color: darkTheme.primaryLight,
     fontWeight: '600',
   },
   dirtyIndicator: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.secondary,
-    marginRight: 4,
+    backgroundColor: darkTheme.secondary,
+    marginRight: 6,
   },
   closeButton: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 2,
-    borderRadius: 10,
+    marginLeft: 4,
+    borderRadius: 11,
   },
   closeIcon: {
     fontSize: 16,
-    color: colors.text.disabled,
+    color: darkTheme.text.disabled,
     fontWeight: '500',
   },
   closeIconActive: {
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
   },
 });

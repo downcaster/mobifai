@@ -73,11 +73,18 @@ export class CodeService {
   }
 
   /**
+   * Check if the service is initialized
+   */
+  public isInitialized(): boolean {
+    return this.webrtcService !== null;
+  }
+
+  /**
    * Send a code layer message
    */
   private sendMessage(action: string, payload: any): boolean {
     if (!this.webrtcService) {
-      console.error('CodeService not initialized with WebRTC service');
+      console.warn('CodeService: Not connected to WebRTC service');
       return false;
     }
 
@@ -89,6 +96,12 @@ export class CodeService {
    */
   public getProjectsHistory(): Promise<CodeProject[]> {
     return new Promise((resolve, reject) => {
+      // Return empty array if not connected
+      if (!this.isInitialized()) {
+        resolve([]);
+        return;
+      }
+
       const unsubscribe = this.onMessage('code:projectsHistory', (_action, payload: ProjectsHistoryResponse) => {
         unsubscribe();
         resolve(payload.projects);
@@ -105,14 +118,15 @@ export class CodeService {
       if (!sent) {
         unsubscribe();
         errorUnsubscribe();
-        reject(new Error('Failed to send message'));
+        resolve([]); // Return empty instead of rejecting
+        return;
       }
 
       // Timeout after 10 seconds
       setTimeout(() => {
         unsubscribe();
         errorUnsubscribe();
-        reject(new Error('Request timeout'));
+        resolve([]); // Return empty instead of rejecting on timeout
       }, 10000);
     });
   }

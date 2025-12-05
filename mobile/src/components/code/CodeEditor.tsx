@@ -1,8 +1,23 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
-import { AppText } from '../ui';
-import { colors } from '../../theme/colors';
+
+// Dark theme colors (matching terminal)
+const darkTheme = {
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
+  text: {
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
+  },
+  error: '#CF6679',
+};
 
 interface CodeEditorProps {
   content: string;
@@ -30,7 +45,6 @@ export function CodeEditor({
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get file extension from language or derive it
   const getLanguage = (lang: string): string => {
     const langMap: Record<string, string> = {
       'javascript': 'js',
@@ -44,7 +58,6 @@ export function CodeEditor({
     return langMap[lang.toLowerCase()] || lang;
   };
 
-  // Send message to WebView
   const sendMessage = useCallback((type: string, data?: any) => {
     if (webviewRef.current && isReady) {
       const message = JSON.stringify({ type, data });
@@ -52,7 +65,6 @@ export function CodeEditor({
     }
   }, [isReady]);
 
-  // Handle messages from WebView
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       const message: EditorMessage = JSON.parse(event.nativeEvent.data);
@@ -80,39 +92,34 @@ export function CodeEditor({
         default:
           console.log('Unknown editor message:', message.type);
       }
-    } catch (error) {
-      console.error('Error parsing editor message:', error);
+    } catch (err) {
+      console.error('Error parsing editor message:', err);
     }
   }, [onContentChange, onSave]);
 
-  // Update content when it changes
   useEffect(() => {
     if (isReady) {
       sendMessage('setContent', { content });
     }
   }, [content, isReady, sendMessage]);
 
-  // Update language when it changes
   useEffect(() => {
     if (isReady) {
       sendMessage('setLanguage', { language: getLanguage(language) });
     }
   }, [language, isReady, sendMessage]);
 
-  // Update read-only state
   useEffect(() => {
     if (isReady) {
       sendMessage('setReadOnly', { readOnly });
     }
   }, [readOnly, isReady, sendMessage]);
 
-  // Handle WebView errors
   const handleError = useCallback(() => {
     setError('Failed to load editor');
     console.error('WebView error');
   }, []);
 
-  // HTML source - load from assets
   const editorHTML = Platform.select({
     ios: require('../../assets/editor.html'),
     android: { uri: 'file:///android_asset/editor.html' },
@@ -121,8 +128,8 @@ export function CodeEditor({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <AppText style={styles.loadingText}>Loading file...</AppText>
+        <ActivityIndicator size="large" color={darkTheme.primaryLight} />
+        <Text style={styles.loadingText}>Loading file...</Text>
       </View>
     );
   }
@@ -130,7 +137,7 @@ export function CodeEditor({
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <AppText style={styles.errorText}>{error}</AppText>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
@@ -159,8 +166,8 @@ export function CodeEditor({
       />
       {!isReady && (
         <View style={styles.initializingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <AppText style={styles.initializingText}>Initializing editor...</AppText>
+          <ActivityIndicator size="large" color={darkTheme.primaryLight} />
+          <Text style={styles.initializingText}>Initializing editor...</Text>
         </View>
       )}
     </View>
@@ -170,42 +177,44 @@ export function CodeEditor({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#282c34',
+    backgroundColor: darkTheme.background,
   },
   webview: {
     flex: 1,
-    backgroundColor: '#282c34',
+    backgroundColor: darkTheme.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
   },
   loadingText: {
     marginTop: 12,
-    color: colors.text.secondary,
+    color: darkTheme.text.secondary,
+    fontSize: 14,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: darkTheme.background,
     padding: 20,
   },
   errorText: {
-    color: colors.error,
+    color: darkTheme.error,
     textAlign: 'center',
+    fontSize: 14,
   },
   initializingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#282c34',
+    backgroundColor: darkTheme.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   initializingText: {
     marginTop: 12,
-    color: '#ffffff',
+    color: darkTheme.text.secondary,
+    fontSize: 14,
   },
 });
-

@@ -2,7 +2,6 @@
 
 ## Overview
 
-
 MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for initial signaling. After devices pair, they communicate **directly** via WebRTC, allowing the relay server to be terminated without breaking the connection.
 
 ## Architecture Diagram

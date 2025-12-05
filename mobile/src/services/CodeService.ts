@@ -19,6 +19,26 @@ import {
 type CodeMessageHandler = (action: string, payload: any) => void;
 
 /**
+ * Represents deleted lines at a specific position
+ */
+export interface DeletedLinesInfo {
+  afterLine: number;
+  content: string[];
+}
+
+/**
+ * Represents the complete diff for a file
+ */
+export interface FileDiff {
+  filePath: string;
+  isGitRepo: boolean;
+  hasChanges: boolean;
+  addedLines: number[];
+  deletedLines: DeletedLinesInfo[];
+  modifiedLines: number[];
+}
+
+/**
  * CodeService handles all code layer communication via WebRTC
  */
 export class CodeService {
@@ -417,6 +437,73 @@ export class CodeService {
         unsubscribe();
         errorUnsubscribe();
         reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Get git diff for a file
+   */
+  public getFileDiff(filePath: string): Promise<FileDiff> {
+    return new Promise((resolve, reject) => {
+      console.log(`📊 CodeService.getFileDiff called for: ${filePath}`);
+      
+      // Return empty diff if not connected
+      if (!this.isInitialized()) {
+        console.log('⚠️ CodeService not initialized, returning empty diff');
+        resolve({
+          filePath,
+          isGitRepo: false,
+          hasChanges: false,
+          addedLines: [],
+          deletedLines: [],
+          modifiedLines: [],
+        });
+        return;
+      }
+
+      const unsubscribe = this.onMessage('code:fileDiff', (_action, payload: FileDiff) => {
+        console.log(`📊 Received code:fileDiff for: ${payload.filePath}`, payload);
+        if (payload.filePath === filePath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:fileDiffError', (_action, payload: { filePath: string; error: string }) => {
+        if (payload.filePath === filePath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('getFileDiff', { filePath });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({
+          filePath,
+          isGitRepo: false,
+          hasChanges: false,
+          addedLines: [],
+          deletedLines: [],
+          modifiedLines: [],
+        });
+        return;
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({
+          filePath,
+          isGitRepo: false,
+          hasChanges: false,
+          addedLines: [],
+          deletedLines: [],
+          modifiedLines: [],
+        });
       }, 10000);
     });
   }

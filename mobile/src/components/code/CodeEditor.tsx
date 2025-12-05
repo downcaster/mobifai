@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { FileDiff } from '../../services/CodeService';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
@@ -19,6 +20,8 @@ const darkTheme = {
   error: '#CF6679',
 };
 
+export type DiffMode = 'off' | 'gutter' | 'inline';
+
 interface CodeEditorProps {
   content: string;
   language?: string;
@@ -26,6 +29,8 @@ interface CodeEditorProps {
   onContentChange?: (content: string) => void;
   onSave?: () => void;
   loading?: boolean;
+  diffMode?: DiffMode;
+  diffData?: FileDiff | null;
 }
 
 interface EditorMessage {
@@ -42,6 +47,8 @@ export function CodeEditor({
   onContentChange,
   onSave,
   loading = false,
+  diffMode = 'off',
+  diffData = null,
 }: CodeEditorProps): React.ReactElement {
   const webviewRef = useRef<WebView>(null);
   const [isReady, setIsReady] = useState(false);
@@ -134,6 +141,29 @@ export function CodeEditor({
       sendMessage('setReadOnly', { readOnly });
     }
   }, [readOnly, isReady, sendMessage]);
+
+  // Send diff data to the editor when it changes
+  useEffect(() => {
+    if (isReady) {
+      if (diffMode === 'off' || !diffData) {
+        console.log('📊 Clearing diff in editor');
+        sendMessage('clearDiff');
+      } else {
+        console.log('📊 Sending diff data to editor:', {
+          addedLines: diffData.addedLines?.length || 0,
+          deletedLines: diffData.deletedLines?.length || 0,
+          modifiedLines: diffData.modifiedLines?.length || 0,
+          mode: diffMode,
+        });
+        sendMessage('setDiffData', {
+          addedLines: diffData.addedLines,
+          deletedLines: diffData.deletedLines,
+          modifiedLines: diffData.modifiedLines,
+          mode: diffMode,
+        });
+      }
+    }
+  }, [isReady, diffMode, diffData, sendMessage]);
 
   const handleError = useCallback(() => {
     setError('Failed to load editor');

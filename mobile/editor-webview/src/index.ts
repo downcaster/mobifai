@@ -1,5 +1,5 @@
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, StateField, StateEffect } from '@codemirror/state';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -7,7 +7,7 @@ import { json } from '@codemirror/lang-json';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { markdown } from '@codemirror/lang-markdown';
-import { keymap } from '@codemirror/view';
+import { keymap, Decoration, DecorationSet, WidgetType, gutter, GutterMarker } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 
 // Declare window interface for React Native WebView
@@ -19,12 +19,201 @@ declare global {
   }
 }
 
+// Types for diff data
+interface DeletedLinesInfo {
+  afterLine: number;
+  content: string[];
+}
+
+interface DiffData {
+  addedLines: number[];
+  deletedLines: DeletedLinesInfo[];
+  modifiedLines: number[];
+  mode: 'off' | 'gutter' | 'inline';
+}
+
 // Language compartment for dynamic language switching
 const languageConf = new Compartment();
 const readOnlyConf = new Compartment();
+const diffGutterConf = new Compartment();
 
 let editorView: EditorView | null = null;
 let currentLanguage = 'javascript';
+let currentDiffData: DiffData | null = null;
+
+// --- Diff Gutter Markers ---
+
+class AddedMarker extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('div');
+    marker.className = 'diff-gutter-added';
+    return marker;
+  }
+}
+
+class DeletedMarker extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('div');
+    marker.className = 'diff-gutter-deleted';
+    return marker;
+  }
+}
+
+class ModifiedMarker extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('div');
+    marker.className = 'diff-gutter-modified';
+    return marker;
+  }
+}
+
+const addedMarker = new AddedMarker();
+const deletedMarker = new DeletedMarker();
+const modifiedMarker = new ModifiedMarker();
+
+// --- Diff Gutter Extension ---
+
+function createDiffGutter(diffData: DiffData | null) {
+  if (!diffData || diffData.mode === 'off') {
+    return [];
+  }
+
+  return gutter({
+    class: 'cm-diff-gutter',
+    lineMarker: (view, line) => {
+      const lineNumber = view.state.doc.lineAt(line.from).number;
+      
+      if (diffData.modifiedLines.includes(lineNumber)) {
+        return modifiedMarker;
+      }
+      if (diffData.addedLines.includes(lineNumber)) {
+        return addedMarker;
+      }
+      // Check if there are deleted lines after the previous line
+      const hasDeletedBefore = diffData.deletedLines.some(
+        d => d.afterLine === lineNumber - 1
+      );
+      if (hasDeletedBefore) {
+        return deletedMarker;
+      }
+      return null;
+    },
+    initialSpacer: () => addedMarker,
+  });
+}
+
+// --- Inline Diff Decorations ---
+
+// Widget to show deleted lines inline
+class DeletedLinesWidget extends WidgetType {
+  constructor(readonly lines: string[]) {
+    super();
+  }
+
+  toDOM() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'diff-deleted-lines';
+    
+    for (const line of this.lines) {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'diff-deleted-line';
+      lineEl.textContent = line || ' '; // Show space for empty lines
+      wrapper.appendChild(lineEl);
+    }
+    
+    return wrapper;
+  }
+
+  eq(other: DeletedLinesWidget) {
+    return this.lines.join('\n') === other.lines.join('\n');
+  }
+}
+
+// Effect to set diff decorations
+const setDiffDecorations = StateEffect.define<DecorationSet>();
+
+// State field for diff decorations
+const diffDecorationsField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setDiffDecorations)) {
+        return e.value;
+      }
+    }
+    return decorations.map(tr.changes);
+  },
+  provide: f => EditorView.decorations.from(f),
+});
+
+// Line decoration for added lines (inline mode)
+const addedLineDecoration = Decoration.line({ class: 'diff-line-added' });
+const modifiedLineDecoration = Decoration.line({ class: 'diff-line-modified' });
+
+// Function to create diff decorations
+function createDiffDecorations(state: EditorState, diffData: DiffData | null): DecorationSet {
+  if (!diffData || diffData.mode !== 'inline') {
+    return Decoration.none;
+  }
+
+  const decorations: any[] = [];
+
+  // Add line decorations for added lines
+  for (const lineNum of diffData.addedLines) {
+    if (lineNum <= state.doc.lines) {
+      const line = state.doc.line(lineNum);
+      decorations.push(addedLineDecoration.range(line.from));
+    }
+  }
+
+  // Add line decorations for modified lines
+  for (const lineNum of diffData.modifiedLines) {
+    if (lineNum <= state.doc.lines) {
+      const line = state.doc.line(lineNum);
+      decorations.push(modifiedLineDecoration.range(line.from));
+    }
+  }
+
+  // Add widgets for deleted lines
+  for (const deleted of diffData.deletedLines) {
+    const afterLine = deleted.afterLine;
+    let pos: number;
+    
+    if (afterLine === 0) {
+      // Deleted at the very beginning
+      pos = 0;
+    } else if (afterLine <= state.doc.lines) {
+      // Show after the specified line
+      const line = state.doc.line(afterLine);
+      pos = line.to;
+    } else {
+      // After the last line
+      pos = state.doc.length;
+    }
+
+    const widget = Decoration.widget({
+      widget: new DeletedLinesWidget(deleted.content),
+      block: true,
+      side: 1, // After the line
+    });
+    decorations.push(widget.range(pos));
+  }
+
+  // Sort decorations by position
+  decorations.sort((a, b) => a.from - b.from);
+
+  return Decoration.set(decorations);
+}
+
+// Function to update diff decorations
+function updateDiffDecorations(view: EditorView, diffData: DiffData | null) {
+  const decorations = createDiffDecorations(view.state, diffData);
+  view.dispatch({
+    effects: setDiffDecorations.of(decorations),
+  });
+}
 
 /**
  * Get language extension based on file extension or language name
@@ -65,6 +254,67 @@ function postMessage(type: string, data?: any) {
 }
 
 /**
+ * Add diff styles to the document
+ */
+function addDiffStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Diff gutter styles */
+    .cm-diff-gutter {
+      width: 4px !important;
+      min-width: 4px !important;
+      background: transparent;
+    }
+    
+    .diff-gutter-added {
+      width: 4px;
+      height: 100%;
+      background-color: #4CAF50;
+    }
+    
+    .diff-gutter-deleted {
+      width: 4px;
+      height: 100%;
+      background-color: #F44336;
+    }
+    
+    .diff-gutter-modified {
+      width: 4px;
+      height: 100%;
+      background-color: #2196F3;
+    }
+    
+    /* Inline diff styles */
+    .diff-line-added {
+      background-color: rgba(76, 175, 80, 0.15) !important;
+    }
+    
+    .diff-line-modified {
+      background-color: rgba(33, 150, 243, 0.15) !important;
+    }
+    
+    .diff-deleted-lines {
+      background-color: rgba(244, 67, 54, 0.1);
+      border-left: 3px solid #F44336;
+      margin-left: -3px;
+      padding-left: 3px;
+    }
+    
+    .diff-deleted-line {
+      color: #F44336;
+      text-decoration: line-through;
+      opacity: 0.7;
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      white-space: pre;
+      padding: 0 4px;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/**
  * Initialize CodeMirror editor
  */
 function initEditor() {
@@ -73,6 +323,9 @@ function initEditor() {
     console.error('Editor container not found');
     return;
   }
+
+  // Add diff styles
+  addDiffStyles();
 
   // Save command keymap
   const saveKeymap = keymap.of([
@@ -92,6 +345,8 @@ function initEditor() {
       oneDark,
       languageConf.of(getLanguageExtension('javascript')),
       readOnlyConf.of(EditorState.readOnly.of(false)),
+      diffGutterConf.of([]),
+      diffDecorationsField,
       keymap.of([...defaultKeymap, indentWithTab]),
       saveKeymap,
       EditorView.updateListener.of((update) => {
@@ -134,6 +389,15 @@ function handleMessage(event: MessageEvent) {
             },
           });
           editorView.dispatch(transaction);
+          
+          // Re-apply diff decorations after content change
+          if (currentDiffData && currentDiffData.mode === 'inline') {
+            setTimeout(() => {
+              if (editorView) {
+                updateDiffDecorations(editorView, currentDiffData);
+              }
+            }, 0);
+          }
         }
         break;
         
@@ -168,6 +432,34 @@ function handleMessage(event: MessageEvent) {
         }
         break;
         
+      case 'setDiffData':
+        if (editorView && message.data) {
+          currentDiffData = message.data as DiffData;
+          
+          // Update gutter
+          editorView.dispatch({
+            effects: diffGutterConf.reconfigure(createDiffGutter(currentDiffData)),
+          });
+          
+          // Update inline decorations
+          updateDiffDecorations(editorView, currentDiffData);
+        }
+        break;
+        
+      case 'clearDiff':
+        if (editorView) {
+          currentDiffData = null;
+          
+          // Clear gutter
+          editorView.dispatch({
+            effects: diffGutterConf.reconfigure([]),
+          });
+          
+          // Clear inline decorations
+          updateDiffDecorations(editorView, null);
+        }
+        break;
+        
       default:
         console.warn('Unknown message type:', message.type);
     }
@@ -186,4 +478,3 @@ if (document.readyState === 'loading') {
 } else {
   initEditor();
 }
-

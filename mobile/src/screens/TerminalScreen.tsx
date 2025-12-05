@@ -1221,6 +1221,30 @@ export default function TerminalScreen({
       console.log("📨 Socket received code:error");
       codeService.handleIncomingMessage("code:error", payload);
     });
+    socket.on("code:fileCreated", (payload) => {
+      console.log("📨 Socket received code:fileCreated");
+      codeService.handleIncomingMessage("code:fileCreated", payload);
+    });
+    socket.on("code:folderCreated", (payload) => {
+      console.log("📨 Socket received code:folderCreated");
+      codeService.handleIncomingMessage("code:folderCreated", payload);
+    });
+    socket.on("code:itemRenamed", (payload) => {
+      console.log("📨 Socket received code:itemRenamed");
+      codeService.handleIncomingMessage("code:itemRenamed", payload);
+    });
+    socket.on("code:itemDeleted", (payload) => {
+      console.log("📨 Socket received code:itemDeleted");
+      codeService.handleIncomingMessage("code:itemDeleted", payload);
+    });
+    socket.on("code:fileDiff", (payload) => {
+      console.log("📨 Socket received code:fileDiff");
+      codeService.handleIncomingMessage("code:fileDiff", payload);
+    });
+    socket.on("code:fileDiffError", (payload) => {
+      console.log("📨 Socket received code:fileDiffError");
+      codeService.handleIncomingMessage("code:fileDiffError", payload);
+    });
 
     // Listen for terminal output via WebSocket (fallback)
     socket.on("terminal:output", (data: TerminalOutputPayload | string) => {

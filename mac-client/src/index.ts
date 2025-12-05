@@ -613,6 +613,9 @@ function handleCodeMessage(action: string, payload: unknown): void {
       case "deleteItem":
         handleCodeDeleteItem(payload as { itemPath: string });
         break;
+      case "getFileDiff":
+        handleCodeGetFileDiff(payload as { filePath: string });
+        break;
       default:
         console.log(chalk.gray(`Unknown code action: ${action}`));
         sendToClient("code:error", { action, error: "Unknown action" });
@@ -796,6 +799,24 @@ function handleCodeDeleteItem(payload: { itemPath: string }): void {
     sendToClient("code:deleteError", {
       path: payload.itemPath,
       error: error.message || "Delete failed"
+    });
+  }
+}
+
+/**
+ * Handle code.getFileDiff
+ */
+async function handleCodeGetFileDiff(payload: { filePath: string }): Promise<void> {
+  console.log(chalk.cyan(`📊 Getting diff for file: ${payload.filePath}`));
+  try {
+    const diff = await codeManager.getFileDiff(payload.filePath);
+    console.log(chalk.green(`✅ Diff computed: added=${diff.addedLines.length}, deleted=${diff.deletedLines.length}, modified=${diff.modifiedLines.length}`));
+    sendToClient("code:fileDiff", diff);
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Diff error: ${error.message}`));
+    sendToClient("code:fileDiffError", {
+      filePath: payload.filePath,
+      error: error.message || "Failed to get diff"
     });
   }
 }

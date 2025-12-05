@@ -85,6 +85,7 @@ interface TerminalSettings {
   cursorStyle: string;
   fontFamily: string;
   terminalTheme?: string;
+  showTerminalGuide?: boolean;
 }
 
 // Design tokens for the futuristic theme
@@ -120,6 +121,7 @@ export default function ProfileScreen(): React.ReactElement {
     cursorStyle: "block",
     fontFamily: "monospace",
     terminalTheme: "default",
+    showTerminalGuide: true,
   });
   const [loading, setLoading] = useState(true);
   const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
@@ -447,6 +449,35 @@ export default function ProfileScreen(): React.ReactElement {
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
+
+              {/* Divider */}
+              <View style={styles.divider} />
+
+              {/* Show Terminal Guide Toggle */}
+              <View style={[styles.settingItem, { flexDirection: "row", alignItems: "center" }]}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <AppText style={styles.settingLabel} numberOfLines={1}>
+                    Show Welcome Guide
+                  </AppText>
+                  <AppText style={styles.settingDescription} numberOfLines={2}>
+                    Display helpful guide when creating new tabs
+                  </AppText>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.toggle,
+                    settings.showTerminalGuide && styles.toggleActive,
+                  ]}
+                  onPress={() => updateSetting("showTerminalGuide", !settings.showTerminalGuide)}
+                >
+                  <View
+                    style={[
+                      styles.toggleThumb,
+                      settings.showTerminalGuide && styles.toggleThumbActive,
+                    ]}
+                  />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -930,5 +961,36 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: themeColors.text.muted,
+  },
+
+  // Toggle Switch
+  settingDescription: {
+    fontSize: 12,
+    color: themeColors.text.muted,
+    marginTop: 4,
+  },
+  toggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: themeColors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: themeColors.border.subtle,
+    padding: 2,
+    justifyContent: "center",
+  },
+  toggleActive: {
+    backgroundColor: themeColors.accent.primary,
+    borderColor: themeColors.accent.primary,
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: themeColors.text.muted,
+  },
+  toggleThumbActive: {
+    backgroundColor: "#ffffff",
+    alignSelf: "flex-end",
   },
 });

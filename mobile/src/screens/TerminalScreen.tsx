@@ -119,6 +119,7 @@ export default function TerminalScreen({
     cursorStyle: "block",
     fontFamily: "monospace",
     terminalTheme: "default",
+    showTerminalGuide: true,
   });
 
   // Process management state
@@ -133,11 +134,36 @@ export default function TerminalScreen({
   );
   const [syncingTabs, setSyncingTabs] = useState(false); // True while waiting for processes:sync
   const [terminalInitializing, setTerminalInitializing] = useState(false); // True while terminal is initializing after sync
+  const [isExpandedMode, setIsExpandedMode] = useState(false); // True when terminal is in full-screen mode
+  const [newlyCreatedTabs, setNewlyCreatedTabs] = useState<Set<string>>(
+    new Set()
+  ); // Track tabs created in this session (not restored)
 
   // Keep ref in sync with state
   useEffect(() => {
     activeProcessUuidRef.current = activeProcessUuid;
   }, [activeProcessUuid]);
+
+  // Hide/show tab bar based on expanded mode
+  useEffect(() => {
+    if (isExpandedMode) {
+      navigation.setOptions({
+        tabBarStyle: { display: "none" },
+      });
+    } else {
+      // Reset to original tab bar style
+      navigation.setOptions({
+        tabBarStyle: {
+          backgroundColor: "#1a1a1a",
+          borderTopWidth: 1,
+          borderTopColor: "#333",
+          height: Platform.OS === "ios" ? 88 : 64,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === "ios" ? 28 : 8,
+        },
+      });
+    }
+  }, [isExpandedMode, navigation]);
 
   // AI Prompt state
   const [aiModalVisible, setAiModalVisible] = useState(false);
@@ -234,6 +260,9 @@ export default function TerminalScreen({
     setProcesses((prev) => [...prev, newProcess]);
     setActiveProcessUuid(uuid);
     activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
+
+    // Mark this tab as newly created (to show welcome guide)
+    setNewlyCreatedTabs((prev) => new Set(prev).add(uuid));
 
     // Show loading spinner for this process while terminal initializes
     setLoadingProcesses((prev) => new Set(prev).add(uuid));
@@ -1230,6 +1259,7 @@ export default function TerminalScreen({
         const currentActiveUuid = activeProcessUuidRef.current;
         if (paired && currentActiveUuid) {
           const input = message.data;
+
           if (config.DEBUG) {
             console.log(
               `⌨️ Input received from WebView: ${JSON.stringify(input)}`
@@ -1876,313 +1906,534 @@ export default function TerminalScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={isExpandedMode ? styles.containerExpanded : styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#0a0a0f" }}>
-        {/* Header Row */}
-        <View style={styles.statusBar}>
-          <View style={styles.statusContainer}>
-            {/* Status indicator with glow */}
-            <View style={styles.indicatorContainer}>
-              {paired && webrtcConnected && (
-                <View style={styles.indicatorGlow} />
-              )}
-              <View
-                style={[
-                  styles.indicator,
-                  paired && webrtcConnected && styles.indicatorConnected,
-                ]}
-              />
+      <SafeAreaView
+        edges={["top"]}
+        style={{ backgroundColor: "#0a0a0f", flex: 1 }}
+      >
+        {/* Header Row - Hidden in expanded mode */}
+        {!isExpandedMode && (
+          <View style={styles.statusBar}>
+            <View style={styles.statusContainer}>
+              {/* Status indicator with glow */}
+              <View style={styles.indicatorContainer}>
+                {paired && webrtcConnected && (
+                  <View style={styles.indicatorGlow} />
+                )}
+                <View
+                  style={[
+                    styles.indicator,
+                    paired && webrtcConnected && styles.indicatorConnected,
+                  ]}
+                />
+              </View>
+              <Text
+                style={styles.statusText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {copyFeedback
+                  ? "✓ Copied!"
+                  : paired && webrtcConnected
+                  ? targetDeviceName || "Connected"
+                  : paired
+                  ? "Connecting..."
+                  : connected
+                  ? "Relay"
+                  : "Offline"}
+              </Text>
             </View>
-            <Text style={styles.statusText} numberOfLines={1}>
-              {copyFeedback
-                ? "✓ Copied!"
-                : paired && webrtcConnected
-                ? targetDeviceName || "Connected"
-                : paired
-                ? "Connecting..."
-                : connected
-                ? "Relay"
-                : "Offline"}
-            </Text>
-          </View>
 
-          <View style={styles.rightButtons}>
-            {keyboardVisible && (
+            <View style={styles.rightButtons}>
+              {keyboardVisible && (
+                <TouchableOpacity
+                  style={styles.dismissKeyboardButton}
+                  onPress={() => {
+                    sendToTerminal("blur", {});
+                    Keyboard.dismiss();
+                  }}
+                >
+                  <Text style={styles.dismissKeyboardText}>⌄</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={styles.dismissKeyboardButton}
+                style={[
+                  styles.aiButton,
+                  (!paired || aiProcessing) && styles.buttonDisabled,
+                ]}
                 onPress={() => {
                   sendToTerminal("blur", {});
                   Keyboard.dismiss();
+                  setAiModalVisible(true);
+                }}
+                disabled={!paired || aiProcessing}
+              >
+                {aiProcessing ? (
+                  <ActivityIndicator size="small" color="#6200EE" />
+                ) : (
+                  <Text style={styles.aiButtonText}>AI</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.keyComboButton,
+                  !paired && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  setKeyCombModalVisible(true);
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.keyComboButtonText}>⌘</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fitButton}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  sendToTerminal("copy", {});
                 }}
               >
-                <Text style={styles.dismissKeyboardText}>⌨↓</Text>
+                <Text style={styles.fitButtonText}>❐</Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.aiButton,
-                (!paired || aiProcessing) && styles.buttonDisabled,
-              ]}
-              onPress={() => {
-                sendToTerminal("blur", {});
-                Keyboard.dismiss();
-                setAiModalVisible(true);
-              }}
-              disabled={!paired || aiProcessing}
-            >
-              {aiProcessing ? (
-                <ActivityIndicator size="small" color="#6200EE" />
-              ) : (
-                <Text style={styles.aiButtonText}>AI</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.keyComboButton, !paired && styles.buttonDisabled]}
-              onPress={() => {
-                sendToTerminal("blur", {});
-                Keyboard.dismiss();
-                setKeyCombModalVisible(true);
-              }}
-              disabled={!paired}
-            >
-              <View style={styles.keyComboButtonContent}>
-                <Text style={styles.keyComboButtonText}>⌘</Text>
-                <Text style={styles.keyComboButtonTextSmall}>a</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.refreshButton}
-              onPress={() => {
-                sendToTerminal("blur", {});
-                Keyboard.dismiss();
-                handleRefreshDimensions();
-              }}
-            >
-              <Text style={styles.refreshButtonText}>⟳</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fitButton}
-              onPress={() => {
-                sendToTerminal("blur", {});
-                Keyboard.dismiss();
-                sendToTerminal("copy", {});
-              }}
-            >
-              <Text style={styles.fitButtonText}>❐</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tabs Row */}
-        <View style={styles.tabsRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsScrollContent}
-          >
-            {processes.map((process, index) => renderTab(process, index))}
-
-            {/* Add tab button */}
-            <TouchableOpacity
-              style={[styles.addTabButton, !paired && styles.buttonDisabled]}
-              onPress={() => {
-                sendToTerminal("blur", {});
-                Keyboard.dismiss();
-                createProcess();
-              }}
-              disabled={!paired}
-            >
-              <Text style={styles.addTabText}>+</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </SafeAreaView>
-
-      {processes.length > 0 ? (
-        <ScrollView
-          ref={terminalWrapperRef}
-          style={styles.terminalWrapper}
-          contentContainerStyle={
-            terminalHeight ? { height: terminalHeight } : { flex: 1 }
-          }
-          scrollEnabled={keyboardVisible}
-          showsVerticalScrollIndicator={keyboardVisible}
-          keyboardShouldPersistTaps="always"
-          bounces={keyboardVisible}
-          onLayout={handleTerminalWrapperLayout}
-        >
-          <View
-            style={[
-              styles.terminalContainer,
-              terminalHeight ? { height: terminalHeight } : { flex: 1 },
-            ]}
-          >
-            <WebView
-              ref={webViewRef}
-              source={{ html: terminalHtml }}
-              style={styles.webview}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              scrollEnabled={true}
-              showsVerticalScrollIndicator={true}
-              showsHorizontalScrollIndicator={false}
-              keyboardDisplayRequiresUserAction={false}
-              originWhitelist={["*"]}
-              mixedContentMode="always"
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              onError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-                console.error("WebView error:", nativeEvent);
-              }}
-              onHttpError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-                console.error("WebView HTTP error:", nativeEvent);
-              }}
-              hideKeyboardAccessoryView={true}
-            />
-            {/* Loading overlay while terminal initializes - only show for active process */}
-            {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
-              <View style={styles.terminalLoadingOverlay}>
-                <View style={styles.loadingGlow} />
-                <ActivityIndicator size="small" color="#6200EE" />
-                <Text style={styles.terminalLoadingText}>
-                  Starting terminal...
-                </Text>
-              </View>
-            )}
-            {/* Loading overlay during terminal initialization after sync */}
-            {terminalInitializing && (
-              <View style={styles.terminalLoadingOverlay}>
-                <View style={styles.loadingGlow} />
-                <ActivityIndicator size="small" color="#6200EE" />
-                <Text style={styles.terminalLoadingText}>
-                  Restoring terminal...
-                </Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      ) : !paired ? (
-        // Show connecting state before pairing is complete
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.loadingGlow} />
-          <ActivityIndicator size="large" color="#6200EE" />
-          <Text style={styles.syncingTitle}>Connecting to Mac...</Text>
-          <Text style={styles.syncingSubtitle}>
-            Establishing secure connection
-          </Text>
-        </View>
-      ) : syncingTabs ? (
-        // Show loading state while waiting for tabs to sync from Mac
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.loadingGlow} />
-          <ActivityIndicator size="large" color="#6200EE" />
-          <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
-          <Text style={styles.syncingSubtitle}>
-            Loading your terminals from Mac
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.emptyStateContainer}>
-          <View style={notConnectedStyles.iconContainer}>
-            <View style={notConnectedStyles.commandContainer}>
-              <Text
-                style={[
-                  notConnectedStyles.emptyStateCommand,
-                  notConnectedStyles.dollarSign,
-                ]}
+              <TouchableOpacity
+                style={styles.expandButton}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  setIsExpandedMode(!isExpandedMode);
+                }}
               >
-                $
-              </Text>
-              <Text style={notConnectedStyles.emptyStateCommand}>ls</Text>
+                <Text
+                  style={[
+                    styles.expandButtonText,
+                    isExpandedMode
+                      ? { fontSize: 14, marginTop: 2 }
+                      : { fontSize: 20, marginTop: 4 },
+                  ]}
+                >
+                  {isExpandedMode ? "✕" : "⤢"}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            Tap the + button above to open a new terminal tab
-          </Text>
-          <TouchableOpacity
-            style={[styles.emptyStateButton, !paired && styles.buttonDisabled]}
-            onPress={createProcess}
-            disabled={!paired}
+        )}
+
+        {/* Tabs Row - Normal mode */}
+        {!isExpandedMode && (
+          <View style={styles.tabsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabsScrollContent}
+            >
+              {processes.map((process, index) => renderTab(process, index))}
+
+              {/* Add tab button */}
+              <TouchableOpacity
+                style={[styles.addTabButton, !paired && styles.buttonDisabled]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  createProcess();
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.addTabText}>+</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Combined Tabs + Buttons Row - Expanded mode */}
+        {isExpandedMode && (
+          <View style={styles.expandedTabsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabsScrollContent}
+              style={styles.expandedTabsScroll}
+            >
+              {processes.map((process, index) => renderTab(process, index))}
+
+              {/* Add tab button */}
+              <TouchableOpacity
+                style={[styles.addTabButton, !paired && styles.buttonDisabled]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  createProcess();
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.addTabText}>+</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.expandedRightButtons}>
+              {keyboardVisible && (
+                <TouchableOpacity
+                  style={styles.dismissKeyboardButton}
+                  onPress={() => {
+                    sendToTerminal("blur", {});
+                    Keyboard.dismiss();
+                  }}
+                >
+                  <Text style={styles.dismissKeyboardText}>⌄</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.aiButton,
+                  (!paired || aiProcessing) && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  setAiModalVisible(true);
+                }}
+                disabled={!paired || aiProcessing}
+              >
+                {aiProcessing ? (
+                  <ActivityIndicator size="small" color="#6200EE" />
+                ) : (
+                  <Text style={styles.aiButtonText}>AI</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.keyComboButton,
+                  !paired && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  setKeyCombModalVisible(true);
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.keyComboButtonText}>⌘</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fitButton}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  sendToTerminal("copy", {});
+                }}
+              >
+                <Text style={styles.fitButtonText}>❐</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.expandButton}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  setIsExpandedMode(!isExpandedMode);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.expandButtonText,
+                    isExpandedMode
+                      ? { fontSize: 14, marginTop: 2 }
+                      : { fontSize: 20, marginTop: 4 },
+                  ]}
+                >
+                  {isExpandedMode ? "✕" : "⤢"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Terminal Content */}
+        {processes.length > 0 ? (
+          <View style={styles.terminalWrapper}>
+            <View style={styles.terminalContainer}>
+              <WebView
+                ref={webViewRef}
+                source={{ html: terminalHtml }}
+                style={styles.webview}
+                onMessage={handleWebViewMessage}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                scrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                showsHorizontalScrollIndicator={false}
+                keyboardDisplayRequiresUserAction={false}
+                originWhitelist={["*"]}
+                mixedContentMode="always"
+                allowsInlineMediaPlayback={true}
+                mediaPlaybackRequiresUserAction={false}
+                onError={(syntheticEvent) => {
+                  const { nativeEvent } = syntheticEvent;
+                  console.error("WebView error:", nativeEvent);
+                }}
+                onHttpError={(syntheticEvent) => {
+                  const { nativeEvent } = syntheticEvent;
+                  console.error("WebView HTTP error:", nativeEvent);
+                }}
+                hideKeyboardAccessoryView={true}
+              />
+              {/* Loading overlay while terminal initializes - only show for active process */}
+              {activeProcessUuid && loadingProcesses.has(activeProcessUuid) && (
+                <View style={styles.terminalLoadingOverlay}>
+                  <View style={styles.loadingGlow} />
+                  <ActivityIndicator size="small" color="#6200EE" />
+                  <Text style={styles.terminalLoadingText}>
+                    Starting terminal...
+                  </Text>
+                </View>
+              )}
+              {/* Loading overlay during terminal initialization after sync */}
+              {terminalInitializing && (
+                <View style={styles.terminalLoadingOverlay}>
+                  <View style={styles.loadingGlow} />
+                  <ActivityIndicator size="small" color="#6200EE" />
+                  <Text style={styles.terminalLoadingText}>
+                    Restoring terminal...
+                  </Text>
+                </View>
+              )}
+              {/* Welcome guide - show for newly created tabs until tapped */}
+              {activeProcessUuid &&
+                terminalSettings.showTerminalGuide &&
+                newlyCreatedTabs.has(activeProcessUuid) && (
+                  <TouchableOpacity
+                    style={styles.welcomeGuideOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                      if (activeProcessUuid) {
+                        setNewlyCreatedTabs((prev) => {
+                          const next = new Set(prev);
+                          next.delete(activeProcessUuid);
+                          return next;
+                        });
+                      }
+                    }}
+                  >
+                    {/* Close button visual indicator */}
+                    <View style={styles.welcomeCloseButton}>
+                      <Text style={styles.welcomeCloseText}>✕</Text>
+                    </View>
+
+                    <ScrollView
+                      style={styles.welcomeGuideScroll}
+                      contentContainerStyle={styles.welcomeGuideContent}
+                    >
+                      <Text style={styles.welcomeTitle}>
+                        Welcome to MobiFai
+                      </Text>
+                      <Text style={styles.welcomeSubtitle}>
+                        Start typing to begin. Here's a quick guide:
+                      </Text>
+
+                      <View style={styles.welcomeSection}>
+                        <Text style={styles.welcomeSectionTitle}>
+                          Top Bar Buttons:
+                        </Text>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>AI</Text>
+                          <Text style={styles.welcomeText}>
+                            Open AI assistant to help with terminal tasks
+                          </Text>
+                        </View>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>⌘</Text>
+                          <Text style={styles.welcomeText}>
+                            Send key combinations (Ctrl+C, etc.)
+                          </Text>
+                        </View>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>❐</Text>
+                          <Text style={styles.welcomeText}>
+                            Copy all terminal content
+                          </Text>
+                        </View>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>⤢</Text>
+                          <Text style={styles.welcomeText}>
+                            Expand to full screen mode
+                          </Text>
+                        </View>
+                        <View style={styles.welcomeItem}>
+                          <Text style={[styles.welcomeIcon, { marginTop: -4 }]}>
+                            ⌄
+                          </Text>
+                          <Text style={styles.welcomeText}>
+                            Dismiss keyboard (when visible)
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.welcomeSection}>
+                        <Text style={styles.welcomeSectionTitle}>
+                          Quick Commands:
+                        </Text>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>⚡</Text>
+                          <Text style={styles.welcomeText}>
+                            Command combo bar - save & execute frequently used
+                            commands
+                          </Text>
+                        </View>
+                        <View style={styles.welcomeItem}>
+                          <Text style={styles.welcomeIcon}>+</Text>
+                          <Text style={styles.welcomeText}>
+                            Long-press a tab to rename it
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.welcomeFooter}>
+                        Tap anywhere to dismiss this guide
+                      </Text>
+                    </ScrollView>
+                  </TouchableOpacity>
+                )}
+            </View>
+          </View>
+        ) : !paired ? (
+          // Show connecting state before pairing is complete
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.loadingGlow} />
+            <ActivityIndicator size="large" color="#6200EE" />
+            <Text style={styles.syncingTitle}>Connecting to Mac...</Text>
+            <Text style={styles.syncingSubtitle}>
+              Establishing secure connection
+            </Text>
+          </View>
+        ) : syncingTabs ? (
+          // Show loading state while waiting for tabs to sync from Mac
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.loadingGlow} />
+            <ActivityIndicator size="large" color="#6200EE" />
+            <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
+            <Text style={styles.syncingSubtitle}>
+              Loading your terminals from Mac
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <View style={notConnectedStyles.iconContainer}>
+              <View style={notConnectedStyles.commandContainer}>
+                <Text
+                  style={[
+                    notConnectedStyles.emptyStateCommand,
+                    notConnectedStyles.dollarSign,
+                  ]}
+                >
+                  $
+                </Text>
+                <Text style={notConnectedStyles.emptyStateCommand}>ls</Text>
+              </View>
+            </View>
+            <Text style={styles.emptyStateTitle}>No Terminal Open</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              Tap the + button above to open a new terminal tab
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.emptyStateButton,
+                !paired && styles.buttonDisabled,
+              ]}
+              onPress={createProcess}
+              disabled={!paired}
+            >
+              <Text style={styles.emptyStateButtonText}>+ New Terminal</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* AI Toast Notification */}
+        {aiToastMessage && (
+          <View style={styles.aiToast}>
+            <Text style={styles.aiToastText}>{aiToastMessage}</Text>
+          </View>
+        )}
+
+        {/* Command Combo Bar - follows keyboard */}
+        {processes.length > 0 && (
+          <View
+            style={[
+              styles.comboBarContainer,
+              isExpandedMode &&
+                !keyboardVisible && {
+                  bottom: 40,
+                },
+              Platform.OS === "ios" &&
+                keyboardVisible && {
+                  bottom:
+                    keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
+                },
+            ]}
           >
-            <Text style={styles.emptyStateButtonText}>+ New Terminal</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            <CommandComboBar
+              combinations={savedCombinations}
+              expanded={comboBarExpanded}
+              onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
+              onExecute={handleExecuteSavedCombination}
+            />
+          </View>
+        )}
 
-      {/* AI Toast Notification */}
-      {aiToastMessage && (
-        <View style={styles.aiToast}>
-          <Text style={styles.aiToastText}>{aiToastMessage}</Text>
-        </View>
-      )}
+        {/* Arrow Navigation Buttons */}
+        {processes.length > 0 && (
+          <View
+            style={[
+              styles.arrowButtonsContainer,
+              isExpandedMode &&
+                !keyboardVisible && {
+                  bottom: 90,
+                },
+              Platform.OS === "ios" &&
+                keyboardVisible && {
+                  bottom:
+                    keyboardHeight -
+                    insets.bottom -
+                    IOS_QUICKTYPE_BAR_HEIGHT +
+                    50,
+                },
+            ]}
+          >
+            <ArrowButtons onArrowPress={handleArrowPress} disabled={!paired} />
+          </View>
+        )}
 
-      {/* Command Combo Bar - follows keyboard */}
-      {processes.length > 0 && (
-        <View
+        {/* Scroll to Bottom Button */}
+        <Animated.View
           style={[
-            styles.comboBarContainer,
-            Platform.OS === "ios" &&
-              keyboardVisible && {
-                bottom:
-                  keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
+            styles.scrollToBottomButton,
+            {
+              opacity: scrollButtonOpacity,
+            },
+            isExpandedMode &&
+              !keyboardVisible && {
+                bottom: 162,
               },
-          ]}
-        >
-          <CommandComboBar
-            combinations={savedCombinations}
-            expanded={comboBarExpanded}
-            onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
-            onExecute={handleExecuteSavedCombination}
-          />
-        </View>
-      )}
-
-      {/* Arrow Navigation Buttons */}
-      {processes.length > 0 && (
-        <View
-          style={[
-            styles.arrowButtonsContainer,
             Platform.OS === "ios" &&
               keyboardVisible && {
                 bottom:
                   keyboardHeight -
                   insets.bottom -
                   IOS_QUICKTYPE_BAR_HEIGHT +
-                  50,
+                  122,
               },
           ]}
+          pointerEvents={showScrollToBottom ? "auto" : "none"}
         >
-          <ArrowButtons onArrowPress={handleArrowPress} disabled={!paired} />
-        </View>
-      )}
-
-      {/* Scroll to Bottom Button */}
-      <Animated.View
-        style={[
-          styles.scrollToBottomButton,
-          {
-            opacity: scrollButtonOpacity,
-          },
-          Platform.OS === "ios" &&
-            keyboardVisible && {
-              bottom:
-                keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 122,
-            },
-        ]}
-        pointerEvents={showScrollToBottom ? "auto" : "none"}
-      >
-        <TouchableOpacity
-          style={styles.scrollToBottomTouchable}
-          onPress={() => sendToTerminal("scrollToBottom", {})}
-        >
-          <Text style={styles.scrollToBottomText}>↓</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <TouchableOpacity
+            style={styles.scrollToBottomTouchable}
+            onPress={() => sendToTerminal("scrollToBottom", {})}
+          >
+            <Text style={styles.scrollToBottomText}>↓</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
 
       {/* AI Prompt Modal */}
       <Modal
@@ -2308,6 +2559,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0a0a0f",
   },
+  containerExpanded: {
+    flex: 1,
+    backgroundColor: "#0a0a0f",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
   statusBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -2324,6 +2585,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
+    marginRight: 12,
+    minWidth: 0, // Allow flex item to shrink below content size
   },
   rightButtons: {
     flexDirection: "row",
@@ -2358,25 +2621,7 @@ const styles = StyleSheet.create({
     color: "#8888aa",
     fontSize: 13,
     fontWeight: "600",
-    textAlign: "center",
-  },
-  refreshButton: {
-    backgroundColor: "#1a1a25",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2a2a3a",
-  },
-  refreshButtonText: {
-    color: "#BB86FC",
-    fontSize: 18,
-    textAlign: "center",
-    includeFontPadding: false,
-    marginTop: 2,
-    marginLeft: 2.5,
+    flex: 1,
   },
   fitButton: {
     backgroundColor: "#1a1a25",
@@ -2395,6 +2640,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     includeFontPadding: false,
   },
+  expandButton: {
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+  },
+  expandButtonText: {
+    color: "#BB86FC",
+    fontSize: 18,
+    textAlign: "center",
+    includeFontPadding: false,
+  },
   dismissKeyboardButton: {
     backgroundColor: "#1a1a25",
     width: 36,
@@ -2407,9 +2668,11 @@ const styles = StyleSheet.create({
   },
   dismissKeyboardText: {
     color: "#BB86FC",
-    fontSize: 12,
+    fontSize: 18,
     textAlign: "center",
     includeFontPadding: false,
+    lineHeight: 18,
+    marginTop: -8,
   },
   aiButton: {
     backgroundColor: "#6200EE",
@@ -2437,23 +2700,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2a2a3a",
   },
-  keyComboButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: -2,
-  },
   keyComboButtonText: {
     color: "#BB86FC",
     fontSize: 18,
     textAlign: "center",
     includeFontPadding: false,
-  },
-  keyComboButtonTextSmall: {
-    color: "#BB86FC",
-    fontSize: 10,
-    textAlign: "center",
-    includeFontPadding: false,
-    marginTop: 6,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -2464,25 +2715,42 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#2a2a3a",
   },
+  expandedTabsRow: {
+    flexDirection: "row",
+    backgroundColor: "#12121a",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a2a3a",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignItems: "center",
+  },
+  expandedTabsScroll: {
+    flex: 1,
+  },
+  expandedRightButtons: {
+    flexDirection: "row",
+    gap: 8,
+    marginLeft: 12,
+  },
   tabsScrollContent: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    gap: 8,
-    paddingVertical: 6,
+    gap: 6,
+    paddingVertical: 4,
   },
   tab: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 16,
-    paddingRight: 12,
-    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 4,
     backgroundColor: "#1a1a25",
-    borderRadius: 10,
-    gap: 8,
+    borderRadius: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: "#2a2a3a",
-    minHeight: 32,
+    minHeight: 26,
   },
   tabActive: {
     backgroundColor: "rgba(98, 0, 238, 0.15)",
@@ -2496,7 +2764,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: "#8888aa",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "500",
   },
   tabTextActive: {
@@ -2504,18 +2772,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   tabCloseButton: {
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 9,
+    borderRadius: 8,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   tabCloseText: {
     color: "#8888aa",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "300",
-    lineHeight: 16,
+    lineHeight: 14,
   },
   // Empty state styles
   emptyStateContainer: {
@@ -2571,25 +2839,26 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   addTabButton: {
-    width: 32,
-    height: 32,
+    width: 26,
+    height: 26,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#6200EE",
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#BB86FC",
   },
   addTabText: {
     color: "#ffffff",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "600",
-    lineHeight: 20,
+    lineHeight: 16,
   },
   terminalWrapper: {
     flex: 1,
   },
   terminalContainer: {
+    flex: 1,
     position: "relative",
   },
   comboBarContainer: {
@@ -2795,6 +3064,88 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  // Welcome guide styles
+  welcomeGuideOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(10, 10, 15, 0.85)",
+    zIndex: 10,
+  },
+  welcomeCloseButton: {
+    position: "absolute",
+    top: 12,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
+  },
+  welcomeCloseText: {
+    color: "#8888aa",
+    fontSize: 18,
+    fontWeight: "300",
+  },
+  welcomeGuideScroll: {
+    flex: 1,
+  },
+  welcomeGuideContent: {
+    padding: 24,
+    paddingTop: 40,
+  },
+  welcomeTitle: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  welcomeSubtitle: {
+    color: "#8888aa",
+    fontSize: 14,
+    marginBottom: 32,
+    textAlign: "center",
+  },
+  welcomeSection: {
+    marginBottom: 24,
+  },
+  welcomeSectionTitle: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  welcomeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingLeft: 8,
+  },
+  welcomeIcon: {
+    color: "#6200EE",
+    fontSize: 18,
+    fontWeight: "600",
+    width: 40,
+    textAlign: "center",
+  },
+  welcomeText: {
+    color: "#666677",
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  welcomeFooter: {
+    color: "#555566",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 16,
+    fontStyle: "italic",
   },
 });
 

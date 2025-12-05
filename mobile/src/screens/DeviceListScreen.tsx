@@ -270,23 +270,32 @@ export default function DeviceListScreen(): React.ReactElement {
             >
               {item.deviceName}
             </AppText>
-            <AppText style={styles.deviceMeta}>
-              {tabCount === 0 
-                ? "No active tabs" 
-                : `${tabCount} active tab${tabCount !== 1 ? "s" : ""}`}
-            </AppText>
+            <View style={styles.deviceMetaRow}>
+              <AppText style={styles.deviceMeta}>
+                {tabCount === 0 
+                  ? "No active tabs" 
+                  : `${tabCount} active tab${tabCount !== 1 ? "s" : ""}`}
+              </AppText>
+              {isConnected && (
+                <View style={styles.connectedStatus}>
+                  <View style={styles.connectedIndicatorContainer}>
+                    <View style={styles.connectedIndicatorGlow} />
+                    <View style={styles.connectedIndicator} />
+                  </View>
+                  <AppText style={styles.connectedStatusText}>Connected</AppText>
+                </View>
+              )}
+              {isConnecting && (
+                <View style={styles.connectedStatus}>
+                  <View style={styles.connectedIndicatorContainer}>
+                    <View style={styles.connectingIndicatorGlow} />
+                    <View style={styles.connectingIndicator} />
+                  </View>
+                  <AppText style={styles.connectedStatusText}>Connecting</AppText>
+                </View>
+              )}
+            </View>
           </View>
-          {isConnecting && (
-            <View style={styles.connectingBadge}>
-              <ActivityIndicator size="small" color={theme.status.connecting} style={styles.connectingSpinner} />
-              <AppText style={styles.connectingBadgeText}>Connecting</AppText>
-            </View>
-          )}
-          {isConnected && (
-            <View style={styles.connectedBadge}>
-              <AppText style={styles.connectedBadgeText}>Connected</AppText>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     );
@@ -535,37 +544,56 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
     marginBottom: 4,
   },
+  deviceMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   deviceMeta: {
     fontSize: 13,
     color: theme.text.secondary,
   },
-  connectedBadge: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: theme.accent.primary,
-  },
-  connectedBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: theme.text.primary,
-  },
-  connectingBadge: {
+  connectedStatus: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 170, 0, 0.2)",
-    borderWidth: 1,
-    borderColor: theme.border.connecting,
+    marginLeft: 8,
   },
-  connectingSpinner: {
+  connectedIndicatorContainer: {
+    position: "relative",
     marginRight: 6,
   },
-  connectingBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: theme.status.connecting,
+  connectedIndicatorGlow: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(98, 0, 238, 0.4)",
+    top: -4,
+    left: -4,
+  },
+  connectedIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#6200EE",
+  },
+  connectedStatusText: {
+    fontSize: 11,
+    color: "#999",
+  },
+  connectingIndicatorGlow: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(255, 170, 0, 0.4)",
+    top: -4,
+    left: -4,
+  },
+  connectingIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#ffaa00",
   },
 });

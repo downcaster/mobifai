@@ -314,5 +314,162 @@ export class CodeManager {
   public getProjectsHistory(): ProjectHistory[] {
     return this.projectsHistory;
   }
+
+  /**
+   * Create a new file
+   */
+  public createFile(
+    folderPath: string,
+    fileName: string
+  ): { filePath: string; parentFolder: string } {
+    console.log(chalk.cyan(`📝 Creating file: ${fileName} in ${folderPath}`));
+
+    // Check if parent folder exists
+    if (!fs.existsSync(folderPath)) {
+      throw new Error(`Parent folder does not exist: ${folderPath}`);
+    }
+
+    const stat = fs.statSync(folderPath);
+    if (!stat.isDirectory()) {
+      throw new Error(`Path is not a folder: ${folderPath}`);
+    }
+
+    const filePath = path.join(folderPath, fileName);
+
+    // Check if file already exists
+    if (fs.existsSync(filePath)) {
+      throw new Error(`File already exists: ${filePath}`);
+    }
+
+    // Validate file name
+    if (!fileName || fileName.includes("/") || fileName.includes("\\")) {
+      throw new Error(`Invalid file name: ${fileName}`);
+    }
+
+    try {
+      // Create empty file
+      fs.writeFileSync(filePath, "", "utf-8");
+      console.log(chalk.green(`✅ File created: ${filePath}`));
+
+      return { filePath, parentFolder: folderPath };
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to create file: ${filePath}`), error);
+      throw new Error(`Failed to create file: ${error}`);
+    }
+  }
+
+  /**
+   * Create a new folder
+   */
+  public createFolder(
+    parentPath: string,
+    folderName: string
+  ): { folderPath: string; parentFolder: string } {
+    console.log(chalk.cyan(`📁 Creating folder: ${folderName} in ${parentPath}`));
+
+    // Check if parent folder exists
+    if (!fs.existsSync(parentPath)) {
+      throw new Error(`Parent folder does not exist: ${parentPath}`);
+    }
+
+    const stat = fs.statSync(parentPath);
+    if (!stat.isDirectory()) {
+      throw new Error(`Path is not a folder: ${parentPath}`);
+    }
+
+    const folderPath = path.join(parentPath, folderName);
+
+    // Check if folder already exists
+    if (fs.existsSync(folderPath)) {
+      throw new Error(`Folder already exists: ${folderPath}`);
+    }
+
+    // Validate folder name
+    if (!folderName || folderName.includes("/") || folderName.includes("\\")) {
+      throw new Error(`Invalid folder name: ${folderName}`);
+    }
+
+    try {
+      // Create folder
+      fs.mkdirSync(folderPath, { recursive: true });
+      console.log(chalk.green(`✅ Folder created: ${folderPath}`));
+
+      return { folderPath, parentFolder: parentPath };
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to create folder: ${folderPath}`), error);
+      throw new Error(`Failed to create folder: ${error}`);
+    }
+  }
+
+  /**
+   * Rename a file or folder
+   */
+  public renameItem(
+    oldPath: string,
+    newName: string
+  ): { oldPath: string; newPath: string; parentFolder: string } {
+    console.log(chalk.cyan(`✏️ Renaming: ${oldPath} to ${newName}`));
+
+    // Check if item exists
+    if (!fs.existsSync(oldPath)) {
+      throw new Error(`Item does not exist: ${oldPath}`);
+    }
+
+    // Validate new name
+    if (!newName || newName.includes("/") || newName.includes("\\")) {
+      throw new Error(`Invalid name: ${newName}`);
+    }
+
+    const parentFolder = path.dirname(oldPath);
+    const newPath = path.join(parentFolder, newName);
+
+    // Check if new path already exists
+    if (fs.existsSync(newPath)) {
+      throw new Error(`Item already exists: ${newPath}`);
+    }
+
+    try {
+      fs.renameSync(oldPath, newPath);
+      console.log(chalk.green(`✅ Renamed: ${oldPath} → ${newPath}`));
+
+      return { oldPath, newPath, parentFolder };
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to rename: ${oldPath}`), error);
+      throw new Error(`Failed to rename: ${error}`);
+    }
+  }
+
+  /**
+   * Delete a file or folder
+   */
+  public deleteItem(itemPath: string): { deletedPath: string; parentFolder: string } {
+    console.log(chalk.cyan(`🗑️ Deleting: ${itemPath}`));
+
+    // Check if item exists
+    if (!fs.existsSync(itemPath)) {
+      throw new Error(`Item does not exist: ${itemPath}`);
+    }
+
+    const parentFolder = path.dirname(itemPath);
+
+    try {
+      const stat = fs.statSync(itemPath);
+      
+      if (stat.isDirectory()) {
+        // Delete folder recursively
+        fs.rmSync(itemPath, { recursive: true, force: true });
+      } else {
+        // Delete file
+        fs.unlinkSync(itemPath);
+      }
+
+      console.log(chalk.green(`✅ Deleted: ${itemPath}`));
+
+      return { deletedPath: itemPath, parentFolder };
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to delete: ${itemPath}`), error);
+      throw new Error(`Failed to delete: ${error}`);
+    }
+  }
 }
 

@@ -601,6 +601,18 @@ function handleCodeMessage(action: string, payload: unknown): void {
       case "openCurrentDir":
         handleCodeOpenCurrentDir(payload as { uuid: string });
         break;
+      case "createFile":
+        handleCodeCreateFile(payload as { folderPath: string; fileName: string });
+        break;
+      case "createFolder":
+        handleCodeCreateFolder(payload as { parentPath: string; folderName: string });
+        break;
+      case "renameItem":
+        handleCodeRenameItem(payload as { oldPath: string; newName: string });
+        break;
+      case "deleteItem":
+        handleCodeDeleteItem(payload as { itemPath: string });
+        break;
       default:
         console.log(chalk.gray(`Unknown code action: ${action}`));
         sendToClient("code:error", { action, error: "Unknown action" });
@@ -703,6 +715,88 @@ function handleCodeOpenCurrentDir(payload: { uuid: string }): void {
   } catch (error: any) {
     console.error(chalk.red(`❌ Failed to init project: ${error.message}`));
     sendToClient("code:error", { action: "openCurrentDir", error: error.message });
+  }
+}
+
+/**
+ * Handle code.createFile
+ */
+function handleCodeCreateFile(payload: { folderPath: string; fileName: string }): void {
+  try {
+    const result = codeManager.createFile(payload.folderPath, payload.fileName);
+    // Also return updated folder children so UI can refresh
+    const folderChildren = codeManager.getFolderChildren(payload.folderPath);
+    sendToClient("code:fileCreated", {
+      ...result,
+      children: folderChildren.children,
+    });
+  } catch (error: any) {
+    sendToClient("code:createFileError", {
+      folderPath: payload.folderPath,
+      fileName: payload.fileName,
+      error: error.message || "Create failed"
+    });
+  }
+}
+
+/**
+ * Handle code.createFolder
+ */
+function handleCodeCreateFolder(payload: { parentPath: string; folderName: string }): void {
+  try {
+    const result = codeManager.createFolder(payload.parentPath, payload.folderName);
+    // Also return updated parent folder children so UI can refresh
+    const folderChildren = codeManager.getFolderChildren(payload.parentPath);
+    sendToClient("code:folderCreated", {
+      ...result,
+      children: folderChildren.children,
+    });
+  } catch (error: any) {
+    sendToClient("code:createFolderError", {
+      parentPath: payload.parentPath,
+      folderName: payload.folderName,
+      error: error.message || "Create failed"
+    });
+  }
+}
+
+/**
+ * Handle code.renameItem
+ */
+function handleCodeRenameItem(payload: { oldPath: string; newName: string }): void {
+  try {
+    const result = codeManager.renameItem(payload.oldPath, payload.newName);
+    // Also return updated parent folder children so UI can refresh
+    const folderChildren = codeManager.getFolderChildren(result.parentFolder);
+    sendToClient("code:itemRenamed", {
+      ...result,
+      children: folderChildren.children,
+    });
+  } catch (error: any) {
+    sendToClient("code:renameError", {
+      path: payload.oldPath,
+      error: error.message || "Rename failed"
+    });
+  }
+}
+
+/**
+ * Handle code.deleteItem
+ */
+function handleCodeDeleteItem(payload: { itemPath: string }): void {
+  try {
+    const result = codeManager.deleteItem(payload.itemPath);
+    // Also return updated parent folder children so UI can refresh
+    const folderChildren = codeManager.getFolderChildren(result.parentFolder);
+    sendToClient("code:itemDeleted", {
+      ...result,
+      children: folderChildren.children,
+    });
+  } catch (error: any) {
+    sendToClient("code:deleteError", {
+      path: payload.itemPath,
+      error: error.message || "Delete failed"
+    });
   }
 }
 

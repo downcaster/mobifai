@@ -282,6 +282,146 @@ export class CodeService {
   }
 
   /**
+   * Create a new file
+   */
+  public createFile(folderPath: string, fileName: string): Promise<{ filePath: string; parentFolder: string; children: FileNode[] }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:fileCreated', (_action, payload: { filePath: string; parentFolder: string; children: FileNode[] }) => {
+        if (payload.parentFolder === folderPath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:createFileError', (_action, payload: { folderPath: string; fileName: string; error: string }) => {
+        if (payload.folderPath === folderPath && payload.fileName === fileName) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('createFile', { folderPath, fileName });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Create a new folder
+   */
+  public createFolder(parentPath: string, folderName: string): Promise<{ folderPath: string; parentFolder: string; children: FileNode[] }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:folderCreated', (_action, payload: { folderPath: string; parentFolder: string; children: FileNode[] }) => {
+        if (payload.parentFolder === parentPath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:createFolderError', (_action, payload: { parentPath: string; folderName: string; error: string }) => {
+        if (payload.parentPath === parentPath && payload.folderName === folderName) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('createFolder', { parentPath, folderName });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Rename a file or folder
+   */
+  public renameItem(oldPath: string, newName: string): Promise<{ oldPath: string; newPath: string; parentFolder: string; children: FileNode[] }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:itemRenamed', (_action, payload: { oldPath: string; newPath: string; parentFolder: string; children: FileNode[] }) => {
+        if (payload.oldPath === oldPath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:renameError', (_action, payload: { path: string; error: string }) => {
+        if (payload.path === oldPath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('renameItem', { oldPath, newName });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Delete a file or folder
+   */
+  public deleteItem(itemPath: string): Promise<{ deletedPath: string; parentFolder: string; children: FileNode[] }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:itemDeleted', (_action, payload: { deletedPath: string; parentFolder: string; children: FileNode[] }) => {
+        if (payload.deletedPath === itemPath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:deleteError', (_action, payload: { path: string; error: string }) => {
+        if (payload.path === itemPath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('deleteItem', { itemPath });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
    * Cleanup
    */
   public cleanup(): void {

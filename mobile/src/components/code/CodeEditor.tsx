@@ -30,7 +30,9 @@ interface CodeEditorProps {
 
 interface EditorMessage {
   type: string;
-  data?: any;
+  data?: {
+    content?: string;
+  };
 }
 
 export function CodeEditor({
@@ -44,6 +46,10 @@ export function CodeEditor({
   const webviewRef = useRef<WebView>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track content from editor to avoid feedback loop
+  const lastEditorContentRef = useRef<string | null>(null);
+  const hasInitializedRef = useRef(false);
 
   const getLanguage = (lang: string): string => {
     const langMap: Record<string, string> = {
@@ -58,7 +64,7 @@ export function CodeEditor({
     return langMap[lang.toLowerCase()] || lang;
   };
 
-  const sendMessage = useCallback((type: string, data?: any) => {
+  const sendMessage = useCallback((type: string, data?: Record<string, unknown>) => {
     if (webviewRef.current && isReady) {
       const message = JSON.stringify({ type, data });
       webviewRef.current.postMessage(message);
@@ -78,6 +84,8 @@ export function CodeEditor({
 
         case 'contentChanged':
           if (onContentChange && message.data?.content !== undefined) {
+            // Track content from editor to avoid sending it back
+            lastEditorContentRef.current = message.data.content;
             onContentChange(message.data.content);
           }
           break;
@@ -97,9 +105,21 @@ export function CodeEditor({
     }
   }, [onContentChange, onSave]);
 
+  // Set content only when it's from an external source (file switch, initial load)
+  // NOT when it's the same content we just received from the editor
   useEffect(() => {
     if (isReady) {
-      sendMessage('setContent', { content });
+      // Only send setContent if:
+      // 1. We haven't initialized yet (first load)
+      // 2. Content differs from what the editor last sent us (external change like file switch)
+      const isExternalChange = content !== lastEditorContentRef.current;
+      const isFirstLoad = !hasInitializedRef.current;
+      
+      if (isFirstLoad || isExternalChange) {
+        sendMessage('setContent', { content });
+        lastEditorContentRef.current = content;
+        hasInitializedRef.current = true;
+      }
     }
   }, [content, isReady, sendMessage]);
 

@@ -27,12 +27,21 @@ const darkTheme = {
   error: '#CF6679',
 };
 
+export interface SelectedItem {
+  path: string;
+  type: 'file' | 'folder';
+  name: string;
+}
+
 interface FileTreeProps {
   rootPath: string;
   initialChildren: FileNode[];
   onFileSelect: (path: string) => void;
   onFolderExpand?: (path: string) => void;
+  onItemSelect?: (item: SelectedItem | null) => void;
+  onItemLongPress?: (item: SelectedItem) => void;
   selectedFile?: string | null;
+  selectedItem?: SelectedItem | null;
 }
 
 interface TreeNodeProps {
@@ -41,7 +50,10 @@ interface TreeNodeProps {
   level: number;
   onFileSelect: (path: string) => void;
   onFolderExpand?: (path: string) => void;
+  onItemSelect?: (item: SelectedItem | null) => void;
+  onItemLongPress?: (item: SelectedItem) => void;
   selectedFile?: string | null;
+  selectedItem?: SelectedItem | null;
 }
 
 function TreeNode({
@@ -50,11 +62,15 @@ function TreeNode({
   level,
   onFileSelect,
   onFolderExpand,
+  onItemSelect,
+  onItemLongPress,
   selectedFile,
+  selectedItem,
 }: TreeNodeProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
   const fullPath = `${path}/${node.name}`;
-  const isSelected = selectedFile === fullPath;
+  const isFileSelected = selectedFile === fullPath;
+  const isItemSelected = selectedItem?.path === fullPath;
 
   const {
     data: children,
@@ -63,6 +79,11 @@ function TreeNode({
   } = useFolderChildren(node.type === 'folder' && isExpanded ? fullPath : null);
 
   const handlePress = () => {
+    // Always select the item when pressed
+    if (onItemSelect) {
+      onItemSelect({ path: fullPath, type: node.type, name: node.name });
+    }
+
     if (node.type === 'folder') {
       const newExpanded = !isExpanded;
       setIsExpanded(newExpanded);
@@ -71,6 +92,12 @@ function TreeNode({
       }
     } else {
       onFileSelect(fullPath);
+    }
+  };
+
+  const handleLongPress = () => {
+    if (onItemLongPress) {
+      onItemLongPress({ path: fullPath, type: node.type, name: node.name });
     }
   };
 
@@ -102,9 +129,11 @@ function TreeNode({
         style={[
           styles.nodeContainer,
           { paddingLeft: 12 + level * 16 },
-          isSelected && styles.nodeSelected,
+          (isFileSelected || isItemSelected) && styles.nodeSelected,
         ]}
         onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
         activeOpacity={0.6}
       >
         {node.type === 'folder' && (
@@ -114,7 +143,7 @@ function TreeNode({
         )}
         <Text style={styles.nodeIcon}>{getIcon()}</Text>
         <Text
-          style={[styles.nodeName, isSelected && styles.nodeNameSelected]}
+          style={[styles.nodeName, (isFileSelected || isItemSelected) && styles.nodeNameSelected]}
           numberOfLines={1}
         >
           {node.name}
@@ -134,7 +163,10 @@ function TreeNode({
               level={level + 1}
               onFileSelect={onFileSelect}
               onFolderExpand={onFolderExpand}
+              onItemSelect={onItemSelect}
+              onItemLongPress={onItemLongPress}
               selectedFile={selectedFile}
+              selectedItem={selectedItem}
             />
           ))}
         </View>
@@ -159,22 +191,48 @@ export function FileTree({
   initialChildren,
   onFileSelect,
   onFolderExpand,
+  onItemSelect,
+  onItemLongPress,
   selectedFile,
+  selectedItem,
 }: FileTreeProps): React.ReactElement {
+  // Handle tap on background (empty area) to select root
+  const handleBackgroundPress = () => {
+    if (onItemSelect) {
+      const rootName = rootPath.split('/').pop() || 'root';
+      onItemSelect({ path: rootPath, type: 'folder', name: rootName });
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={true}>
-      {initialChildren.map((node, index) => (
-        <TreeNode
-          key={`${node.name}-${index}`}
-          node={node}
-          path={rootPath}
-          level={0}
-          onFileSelect={onFileSelect}
-          onFolderExpand={onFolderExpand}
-          selectedFile={selectedFile}
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {initialChildren.map((node, index) => (
+          <TreeNode
+            key={`${node.name}-${index}`}
+            node={node}
+            path={rootPath}
+            level={0}
+            onFileSelect={onFileSelect}
+            onFolderExpand={onFolderExpand}
+            onItemSelect={onItemSelect}
+            onItemLongPress={onItemLongPress}
+            selectedFile={selectedFile}
+            selectedItem={selectedItem}
+          />
+        ))}
+        {/* Empty spacer at bottom - tappable to select root */}
+        <TouchableOpacity 
+          style={styles.bottomSpacer}
+          onPress={handleBackgroundPress}
+          activeOpacity={1}
         />
-      ))}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -182,6 +240,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: darkTheme.surface,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  bottomSpacer: {
+    minHeight: 100,
+    flex: 1,
   },
   nodeContainer: {
     flexDirection: 'row',

@@ -12,6 +12,8 @@ import type RTCIceCandidateEvent from "react-native-webrtc/lib/typescript/RTCIce
 
 export type WebRTCMessageHandler = (data: any) => void;
 
+export type WebRTCNamespace = 'terminal' | 'code';
+
 export class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
   private dataChannel: RTCDataChannel | null = null;
@@ -252,14 +254,54 @@ export class WebRTCService {
     });
   }
 
-  public sendMessage(type: string, payload: any) {
+  /**
+   * Send message with namespace support (new format)
+   * @param namespace - 'terminal' or 'code'
+   * @param action - action type (e.g., 'input', 'initProject')
+   * @param payload - message payload
+   */
+  public sendMessage(namespace: WebRTCNamespace, action: string, payload: any): boolean;
+  /**
+   * Send message with legacy format (backward compatibility)
+   * @param type - message type
+   * @param payload - message payload
+   */
+  public sendMessage(type: string, payload: any): boolean;
+  
+  public sendMessage(
+    namespaceOrType: WebRTCNamespace | string,
+    actionOrPayload: string | any,
+    payload?: any
+  ): boolean {
     if (
       this.isConnected &&
       this.dataChannel &&
       this.dataChannel.readyState === "open"
     ) {
       try {
-        this.dataChannel.send(JSON.stringify({ type, payload }));
+        let message: any;
+        
+        // Check if using new namespace format (3 arguments)
+        if (payload !== undefined) {
+          // New format: namespace, action, payload
+          message = {
+            namespace: namespaceOrType,
+            action: actionOrPayload,
+            payload: payload
+          };
+        } else {
+          // Legacy format: type, payload
+          // Convert to new format with 'terminal' namespace for backward compatibility
+          message = {
+            namespace: 'terminal',
+            action: namespaceOrType,
+            payload: actionOrPayload,
+            // Keep old format for backward compatibility
+            type: namespaceOrType,
+          };
+        }
+        
+        this.dataChannel.send(JSON.stringify(message));
         return true;
       } catch (error) {
         console.error("❌ Failed to send via WebRTC:", error);

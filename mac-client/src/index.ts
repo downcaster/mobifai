@@ -16,6 +16,7 @@ import {
 } from "./crypto.js";
 import { getAIService, AIPromptPayload } from "./ai/index.js";
 import { ProcessManager } from "./process-manager.js";
+import { CodeManager } from "./code-manager.js";
 
 const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = wrtc;
 
@@ -93,6 +94,9 @@ const processManager = new ProcessManager();
 
 // Start memory monitoring
 processManager.startMemoryMonitoring();
+
+// Code Manager - handles file system operations for code editor
+const codeManager = new CodeManager();
 
 // Store terminal dimensions from mobile
 let terminalCols = 80;
@@ -479,36 +483,226 @@ async function setupWebRTC() {
 /**
  * Handle messages from WebRTC data channel
  */
-function handleWebRTCMessage(message: { type: string; payload: unknown }): void {
-  switch (message.type) {
+function handleWebRTCMessage(message: { 
+  type?: string; 
+  payload?: unknown;
+  namespace?: string;
+  action?: string;
+}): void {
+  // Check for new namespace format first
+  if (message.namespace && message.action) {
+    if (message.namespace === 'code') {
+      handleCodeMessage(message.action, message.payload);
+      return;
+    } else if (message.namespace === 'terminal') {
+      // Route to terminal handlers using action
+      handleTerminalMessage(message.action, message.payload);
+      return;
+    }
+  }
+  
+  // Fallback to legacy type-based routing for backward compatibility
+  if (message.type) {
+    switch (message.type) {
+      case "process:create":
+        handleProcessCreate(message.payload as ProcessCreatePayload);
+        break;
+      case "process:terminate":
+        handleProcessTerminate(message.payload as ProcessTerminatePayload);
+        break;
+      case "process:switch":
+        handleProcessSwitch(message.payload as ProcessSwitchPayload);
+        break;
+      case "process:rename":
+        handleProcessRename(message.payload as ProcessRenamePayload);
+        break;
+      case "terminal:input":
+        handleTerminalInput(message.payload as TerminalInputPayload);
+        break;
+      case "terminal:actions":
+        handleTerminalActions(message.payload as TerminalActionsPayload);
+        break;
+      case "terminal:resize":
+        handleTerminalResize(message.payload as TerminalResizePayload);
+        break;
+      case "ai:prompt":
+        const aiPayload = message.payload as AIPromptPayload;
+        console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`));
+        handleAIPrompt(aiPayload.prompt, aiPayload.uuid);
+        break;
+      default:
+        console.log(chalk.gray(`Unknown WebRTC message type: ${message.type}`));
+    }
+  }
+}
+
+/**
+ * Handle terminal namespace messages
+ */
+function handleTerminalMessage(action: string, payload: unknown): void {
+  switch (action) {
     case "process:create":
-      handleProcessCreate(message.payload as ProcessCreatePayload);
+      handleProcessCreate(payload as ProcessCreatePayload);
       break;
     case "process:terminate":
-      handleProcessTerminate(message.payload as ProcessTerminatePayload);
+      handleProcessTerminate(payload as ProcessTerminatePayload);
       break;
     case "process:switch":
-      handleProcessSwitch(message.payload as ProcessSwitchPayload);
+      handleProcessSwitch(payload as ProcessSwitchPayload);
       break;
     case "process:rename":
-      handleProcessRename(message.payload as ProcessRenamePayload);
+      handleProcessRename(payload as ProcessRenamePayload);
       break;
     case "terminal:input":
-      handleTerminalInput(message.payload as TerminalInputPayload);
+      handleTerminalInput(payload as TerminalInputPayload);
       break;
     case "terminal:actions":
-      handleTerminalActions(message.payload as TerminalActionsPayload);
+      handleTerminalActions(payload as TerminalActionsPayload);
       break;
     case "terminal:resize":
-      handleTerminalResize(message.payload as TerminalResizePayload);
+      handleTerminalResize(payload as TerminalResizePayload);
       break;
     case "ai:prompt":
-      const aiPayload = message.payload as AIPromptPayload;
-      console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`));
+      const aiPayload = payload as AIPromptPayload;
+      console.log(chalk.cyan(`\n🤖 AI Prompt received: "${aiPayload.prompt}"`));
       handleAIPrompt(aiPayload.prompt, aiPayload.uuid);
       break;
     default:
-      console.log(chalk.gray(`Unknown WebRTC message type: ${message.type}`));
+      console.log(chalk.gray(`Unknown terminal action: ${action}`));
+  }
+}
+
+/**
+ * Handle code namespace messages
+ */
+function handleCodeMessage(action: string, payload: unknown): void {
+  console.log(chalk.cyan(`📝 Code action: ${action}`));
+  
+  try {
+    switch (action) {
+      case "initProject":
+        handleCodeInitProject(payload as { projectPath: string });
+        break;
+      case "getFolderChildren":
+        handleCodeGetFolderChildren(payload as { folderPath: string });
+        break;
+      case "getFile":
+        handleCodeGetFile(payload as { filePath: string });
+        break;
+      case "saveFile":
+        handleCodeSaveFile(payload as { filePath: string; newContent: string });
+        break;
+      case "closeProject":
+        handleCodeCloseProject(payload as { projectPath: string });
+        break;
+      case "getProjectsHistory":
+        handleCodeGetProjectsHistory();
+        break;
+      case "openCurrentDir":
+        handleCodeOpenCurrentDir(payload as { uuid: string });
+        break;
+      default:
+        console.log(chalk.gray(`Unknown code action: ${action}`));
+        sendToClient("code:error", { action, error: "Unknown action" });
+    }
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Code action failed: ${action}`), error);
+    sendToClient("code:error", { 
+      action, 
+      error: error.message || "Unknown error",
+      details: error.stack 
+    });
+  }
+}
+
+/**
+ * Handle code.initProject
+ */
+function handleCodeInitProject(payload: { projectPath: string }): void {
+  const result = codeManager.initProject(payload.projectPath);
+  sendToClient("code:projectInitialized", result);
+}
+
+/**
+ * Handle code.getFolderChildren
+ */
+function handleCodeGetFolderChildren(payload: { folderPath: string }): void {
+  const result = codeManager.getFolderChildren(payload.folderPath);
+  sendToClient("code:folderChildren", result);
+}
+
+/**
+ * Handle code.getFile
+ */
+function handleCodeGetFile(payload: { filePath: string }): void {
+  const result = codeManager.getFile(payload.filePath);
+  sendToClient("code:fileContent", result);
+}
+
+/**
+ * Handle code.saveFile
+ */
+function handleCodeSaveFile(payload: { filePath: string; newContent: string }): void {
+  try {
+    const result = codeManager.saveFile(payload.filePath, payload.newContent);
+    sendToClient("code:fileSaved", result);
+  } catch (error: any) {
+    sendToClient("code:fileSaveError", {
+      filePath: payload.filePath,
+      error: error.message || "Save failed"
+    });
+  }
+}
+
+/**
+ * Handle code.closeProject
+ */
+function handleCodeCloseProject(payload: { projectPath: string }): void {
+  codeManager.closeProject(payload.projectPath);
+  sendToClient("code:projectClosed", { projectPath: payload.projectPath });
+}
+
+/**
+ * Handle code.getProjectsHistory
+ */
+function handleCodeGetProjectsHistory(): void {
+  const projects = codeManager.getProjectsHistory();
+  sendToClient("code:projectsHistory", { projects });
+}
+
+/**
+ * Handle code.openCurrentDir - get current directory from a process and init as project
+ */
+function handleCodeOpenCurrentDir(payload: { uuid: string }): void {
+  const { uuid } = payload;
+  
+  console.log(chalk.cyan(`📂 Opening current directory for process ${uuid.substring(0, 8)}`));
+  
+  // Get the process's current working directory
+  const processInfo = processManager.getProcess(uuid);
+  if (!processInfo) {
+    console.log(chalk.yellow(`⚠️ Process ${uuid.substring(0, 8)} not found`));
+    sendToClient("code:error", { action: "openCurrentDir", error: "Process not found" });
+    return;
+  }
+  
+  // Get the cwd from the process
+  const cwd = processInfo.cwd;
+  if (!cwd) {
+    console.log(chalk.yellow(`⚠️ No cwd available for process ${uuid.substring(0, 8)}`));
+    sendToClient("code:error", { action: "openCurrentDir", error: "Could not determine current directory" });
+    return;
+  }
+  
+  console.log(chalk.cyan(`  └─ Current directory: ${cwd}`));
+  
+  // Initialize the project (this also adds to history)
+  try {
+    const result = codeManager.initProject(cwd);
+    sendToClient("code:projectInitialized", result);
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Failed to init project: ${error.message}`));
+    sendToClient("code:error", { action: "openCurrentDir", error: error.message });
   }
 }
 
@@ -983,6 +1177,12 @@ function connectToRelay() {
   socket.on("ai:prompt", (data: AIPromptPayload) => {
     console.log(chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`));
     handleAIPrompt(data.prompt, data.uuid);
+  });
+
+  // Handle code:openCurrentDir via Socket (fallback)
+  socket.on("code:openCurrentDir", (payload: { uuid: string }) => {
+    console.log(chalk.cyan(`📂 code:openCurrentDir received via Socket`));
+    handleCodeOpenCurrentDir(payload);
   });
 }
 

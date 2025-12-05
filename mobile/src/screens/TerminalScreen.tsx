@@ -26,6 +26,7 @@ import {
 } from "@react-navigation/native";
 import { io, Socket } from "socket.io-client";
 import { WebRTCService } from "../services/WebRTCService";
+import { codeService } from "../services/CodeService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   SafeAreaView,
@@ -545,6 +546,37 @@ export default function TerminalScreen({
   };
 
   /**
+   * Handle "Open in Code" button - sends current directory to Mac to init as project
+   */
+  const handleOpenInCode = (): void => {
+    if (!paired) {
+      Alert.alert("Error", "Not connected to Mac client");
+      return;
+    }
+
+    if (!activeProcessUuidRef.current) {
+      Alert.alert("Error", "No active terminal process");
+      return;
+    }
+
+    console.log("📂 Opening current directory in Code editor");
+
+    // Send request to Mac to get current directory and init project using code namespace
+    if (webrtcRef.current?.isWebRTCConnected()) {
+      webrtcRef.current.sendMessage("code", "openCurrentDir", {
+        uuid: activeProcessUuidRef.current,
+      });
+    } else if (socketRef.current) {
+      socketRef.current.emit("code:openCurrentDir", {
+        uuid: activeProcessUuidRef.current,
+      });
+    }
+
+    // Navigate to Code tab - the CodeScreen will handle the projectInitialized response
+    navigation.navigate("Code" as any);
+  };
+
+  /**
    * Handle saved combination execution
    */
   const handleExecuteSavedCombination = (
@@ -993,13 +1025,37 @@ export default function TerminalScreen({
 
       webrtcRef.current = new WebRTCService(socket);
 
-      // Handle WebRTC messages - now with process support
+      // Initialize CodeService with WebRTC
+      codeService.initialize(webrtcRef.current);
+
+      // Handle WebRTC messages - now with process support and code layer
       webrtcRef.current.onMessage((data) => {
         console.log(
           `📡 WebRTC message received: type=${
             data.type
           }, hasPayload=${!!data.payload}`
         );
+
+        // Check for namespace-based routing (new format)
+        if (data.namespace) {
+          if (data.namespace === 'code' && data.action) {
+            // Route code messages to CodeService
+            console.log(`📝 Code message (namespace): ${data.action}`);
+            codeService.handleIncomingMessage(`code:${data.action}`, data.payload);
+            return;
+          } else if (data.namespace === 'terminal' && data.action) {
+            // Handle terminal messages
+            handleProcessMessage(data.action, data.payload ?? data);
+            return;
+          }
+        }
+
+        // Check for code: prefixed type (legacy format from Mac)
+        if (data.type?.startsWith('code:')) {
+          console.log(`📝 Code message (type): ${data.type}`);
+          codeService.handleIncomingMessage(data.type, data.payload);
+          return;
+        }
 
         // Handle processes:sync specially to ensure it's processed
         if (data.type === "processes:sync") {
@@ -1009,6 +1065,7 @@ export default function TerminalScreen({
           );
         }
 
+        // Legacy format routing for terminal messages
         handleProcessMessage(data.type, data.payload ?? data);
       });
 
@@ -1099,6 +1156,40 @@ export default function TerminalScreen({
     socket.on("process:error", (payload) =>
       handleProcessMessage("process:error", payload)
     );
+
+    // Listen for code-related messages via Socket (fallback)
+    socket.on("code:projectsHistory", (payload) => {
+      console.log("📨 Socket received code:projectsHistory");
+      codeService.handleIncomingMessage("code:projectsHistory", payload);
+    });
+    socket.on("code:projectInitialized", (payload) => {
+      console.log("📨 Socket received code:projectInitialized");
+      codeService.handleIncomingMessage("code:projectInitialized", payload);
+    });
+    socket.on("code:folderChildren", (payload) => {
+      console.log("📨 Socket received code:folderChildren");
+      codeService.handleIncomingMessage("code:folderChildren", payload);
+    });
+    socket.on("code:fileContent", (payload) => {
+      console.log("📨 Socket received code:fileContent");
+      codeService.handleIncomingMessage("code:fileContent", payload);
+    });
+    socket.on("code:fileSaved", (payload) => {
+      console.log("📨 Socket received code:fileSaved");
+      codeService.handleIncomingMessage("code:fileSaved", payload);
+    });
+    socket.on("code:fileSaveError", (payload) => {
+      console.log("📨 Socket received code:fileSaveError");
+      codeService.handleIncomingMessage("code:fileSaveError", payload);
+    });
+    socket.on("code:projectClosed", (payload) => {
+      console.log("📨 Socket received code:projectClosed");
+      codeService.handleIncomingMessage("code:projectClosed", payload);
+    });
+    socket.on("code:error", (payload) => {
+      console.log("📨 Socket received code:error");
+      codeService.handleIncomingMessage("code:error", payload);
+    });
 
     // Listen for terminal output via WebSocket (fallback)
     socket.on("terminal:output", (data: TerminalOutputPayload | string) => {
@@ -1959,6 +2050,20 @@ export default function TerminalScreen({
               )}
               <TouchableOpacity
                 style={[
+                  styles.codeButton,
+                  !paired && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  handleOpenInCode();
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.codeButtonText}>{"{ }"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
                   styles.aiButton,
                   (!paired || aiProcessing) && styles.buttonDisabled,
                 ]}
@@ -2085,6 +2190,20 @@ export default function TerminalScreen({
                   <Text style={styles.dismissKeyboardText}>⌄</Text>
                 </TouchableOpacity>
               )}
+              <TouchableOpacity
+                style={[
+                  styles.codeButton,
+                  !paired && styles.buttonDisabled,
+                ]}
+                onPress={() => {
+                  sendToTerminal("blur", {});
+                  Keyboard.dismiss();
+                  handleOpenInCode();
+                }}
+                disabled={!paired}
+              >
+                <Text style={styles.codeButtonText}>{"{ }"}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.aiButton,
@@ -2236,6 +2355,12 @@ export default function TerminalScreen({
                         <Text style={styles.welcomeSectionTitle}>
                           Top Bar Buttons:
                         </Text>
+                        <View style={styles.welcomeItem}>
+                          <Text style={[styles.welcomeIcon, { color: "#03DAC6" }]}>{"{ }"}</Text>
+                          <Text style={styles.welcomeText}>
+                            Open current directory in Code Editor
+                          </Text>
+                        </View>
                         <View style={styles.welcomeItem}>
                           <Text style={styles.welcomeIcon}>AI</Text>
                           <Text style={styles.welcomeText}>
@@ -2673,6 +2798,23 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     lineHeight: 18,
     marginTop: -8,
+  },
+  codeButton: {
+    backgroundColor: "#1a1a25",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a3a",
+  },
+  codeButtonText: {
+    color: "#03DAC6",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    includeFontPadding: false,
   },
   aiButton: {
     backgroundColor: "#6200EE",

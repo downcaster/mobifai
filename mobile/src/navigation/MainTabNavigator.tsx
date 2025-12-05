@@ -3,11 +3,13 @@ import { StyleSheet, View, Text, Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DeviceListScreen from "../screens/DeviceListScreen";
 import TerminalScreen from "../screens/TerminalScreen";
+import CodeScreen from "../screens/CodeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 export type MainTabParamList = {
   Connections: undefined;
   Terminal: { relayServerUrl?: string; targetDeviceId?: string; targetDeviceName?: string } | undefined;
+  Code: undefined;
   Profile: undefined;
 };
 
@@ -59,6 +61,15 @@ export default function MainTabNavigator(): React.ReactElement {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} label="Terminal" icon="▣" />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Code"
+        component={CodeScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} label="Code" icon="{ }" />
           ),
         }}
       />

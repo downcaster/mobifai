@@ -1,6 +1,8 @@
 import * as pty from "node-pty";
 import os from "os";
 import chalk from "chalk";
+import fs from "fs";
+import { execSync } from "child_process";
 
 /**
  * Information about a single terminal process
@@ -13,6 +15,7 @@ export interface ProcessInfo {
   createdAt: number;
   cols: number;
   rows: number;
+  cwd: string;
 }
 
 /**
@@ -108,12 +111,14 @@ export class ProcessManager {
       COLORTERM: "truecolor",
     };
 
+    const initialCwd = process.env.HOME || process.cwd();
+    
     try {
       const ptyProcess = pty.spawn(shell, [], {
         name: "xterm-256color",
         cols,
         rows,
-        cwd: process.env.HOME || process.cwd(),
+        cwd: initialCwd,
         env: env as Record<string, string>,
       });
 
@@ -125,6 +130,7 @@ export class ProcessManager {
         createdAt: Date.now(),
         cols,
         rows,
+        cwd: initialCwd,
       };
 
       this.processMap.set(uuid, processInfo);
@@ -318,7 +324,43 @@ export class ProcessManager {
    * Get a process by UUID
    */
   public getProcess(uuid: string): ProcessInfo | undefined {
-    return this.processMap.get(uuid);
+    const processInfo = this.processMap.get(uuid);
+    if (processInfo) {
+      // Try to update the cwd from the actual process
+      const currentCwd = this.getProcessCwd(processInfo);
+      if (currentCwd) {
+        processInfo.cwd = currentCwd;
+      }
+    }
+    return processInfo;
+  }
+
+  /**
+   * Get the current working directory of a process
+   * Uses platform-specific methods to read the actual cwd
+   */
+  private getProcessCwd(processInfo: ProcessInfo): string | null {
+    const pid = processInfo.pty.pid;
+    if (!pid) return null;
+
+    try {
+      if (os.platform() === "darwin") {
+        // macOS: use lsof to get cwd
+        const result = execSync(`lsof -p ${pid} | grep cwd | awk '{print $NF}'`, {
+          encoding: "utf-8",
+          timeout: 1000,
+        }).trim();
+        return result || null;
+      } else if (os.platform() === "linux") {
+        // Linux: use /proc/{pid}/cwd
+        const cwd = fs.readlinkSync(`/proc/${pid}/cwd`);
+        return cwd;
+      }
+    } catch (error) {
+      // Failed to get cwd, return stored cwd
+      console.log(chalk.gray(`Could not read cwd for pid ${pid}, using stored value`));
+    }
+    return processInfo.cwd;
   }
 
   /**

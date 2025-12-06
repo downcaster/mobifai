@@ -78,6 +78,23 @@ export default function CodeScreen(): React.ReactElement {
   const [createName, setCreateName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
+  // Project state - MUST be declared before any conditional returns
+  const [currentProject, setCurrentProject] = useState<ProjectState | null>(
+    null
+  );
+  const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set());
+
+  // Selected item state (for file/folder creation)
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+
+  // Diff state
+  const [diffMode, setDiffMode] = useState<DiffMode>("off");
+  const [diffData, setDiffData] = useState<FileDiff | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+
   // Context menu state (for long press)
   const [contextMenuItem, setContextMenuItem] = useState<SelectedItem | null>(
     null
@@ -115,23 +132,6 @@ export default function CodeScreen(): React.ReactElement {
       </AppView>
     );
   }
-
-  // Project state
-  const [currentProject, setCurrentProject] = useState<ProjectState | null>(
-    null
-  );
-  const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
-  const [fileContents, setFileContents] = useState<Record<string, string>>({});
-  const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set());
-
-  // Selected item state (for file/folder creation)
-  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
-
-  // Diff state
-  const [diffMode, setDiffMode] = useState<DiffMode>("off");
-  const [diffData, setDiffData] = useState<FileDiff | null>(null);
-  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   // Queries
   const { data: projects, isLoading: isLoadingProjects } = useProjectsHistory();

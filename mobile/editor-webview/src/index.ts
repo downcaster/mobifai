@@ -254,11 +254,64 @@ function postMessage(type: string, data?: any) {
 }
 
 /**
+ * Add loading spinner to the document
+ */
+function addLoadingSpinner() {
+  const spinner = document.createElement('div');
+  spinner.id = 'loading-spinner';
+  spinner.innerHTML = `
+    <div class="spinner"></div>
+  `;
+  document.body.appendChild(spinner);
+}
+
+/**
+ * Hide loading spinner
+ */
+function hideLoadingSpinner() {
+  const spinner = document.getElementById('loading-spinner');
+  if (spinner) {
+    spinner.style.opacity = '0';
+    setTimeout(() => spinner.remove(), 200);
+  }
+}
+
+/**
  * Add diff styles to the document
  */
 function addDiffStyles() {
   const style = document.createElement('style');
   style.textContent = `
+    /* Loading spinner styles */
+    #loading-spinner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #282c34;
+      z-index: 1000;
+      transition: opacity 0.2s ease-out;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(187, 134, 252, 0.2);
+      border-top-color: #BB86FC;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     /* Diff gutter styles */
     .cm-diff-gutter {
       width: 4px !important;
@@ -321,6 +374,9 @@ function addDiffStyles() {
  * Initialize CodeMirror editor
  */
 function initEditor() {
+  // Add loading spinner first
+  addLoadingSpinner();
+  
   const container = document.getElementById('editor');
   if (!container) {
     console.error('Editor container not found');
@@ -342,7 +398,7 @@ function initEditor() {
   ]);
 
   const startState = EditorState.create({
-    doc: '// Loading...',
+    doc: '',
     extensions: [
       basicSetup,
       oneDark,
@@ -392,6 +448,9 @@ function handleMessage(event: MessageEvent) {
             },
           });
           editorView.dispatch(transaction);
+          
+          // Hide loading spinner when content is set
+          hideLoadingSpinner();
           
           // Re-apply diff decorations after content change
           if (currentDiffData && currentDiffData.mode === 'inline') {

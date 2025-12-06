@@ -116,6 +116,22 @@ export default function CodeScreen(): React.ReactElement {
   const [deleteItem, setDeleteItem] = useState<SelectedItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Sidebar tabs state
+  const [sidebarTab, setSidebarTab] = useState<"files" | "changes">("files");
+  const [projectChanges, setProjectChanges] = useState<{
+    staged: Array<{ path: string; type: string }>;
+    unstaged: Array<{ path: string; type: string }>;
+  }>({ staged: [], unstaged: [] });
+
+  // Queries - MUST be called before any conditional returns
+  const { data: projects, isLoading: isLoadingProjects } = useProjectsHistory();
+  const initProjectMutation = useInitProject();
+  const saveFileMutation = useSaveFile();
+
+  // Fetch active file content
+  const { data: activeFileContent, isLoading: isLoadingFile } =
+    useFileContent(activeFile);
+
   // Show "No Active Connection" screen when not connected
   if (!isConnected) {
     return (
@@ -139,11 +155,6 @@ export default function CodeScreen(): React.ReactElement {
       </AppView>
     );
   }
-
-  // Queries
-  const { data: projects, isLoading: isLoadingProjects } = useProjectsHistory();
-  const initProjectMutation = useInitProject();
-  const saveFileMutation = useSaveFile();
 
   // Fetch editor settings when screen comes into focus (to pick up changes from Profile)
   useFocusEffect(
@@ -181,10 +192,6 @@ export default function CodeScreen(): React.ReactElement {
       fetchEditorSettings();
     }, [])
   );
-
-  // Fetch active file content
-  const { data: activeFileContent, isLoading: isLoadingFile } =
-    useFileContent(activeFile);
 
   // Update file content when loaded
   useEffect(() => {
@@ -283,6 +290,31 @@ export default function CodeScreen(): React.ReactElement {
           type: "folder",
           name: project.name,
         });
+        
+        // Sync open files from Mac client for this project
+        try {
+          const syncedState = await codeService.syncOpenFiles(project.path);
+          if (syncedState.files && syncedState.files.length > 0) {
+            // Restore open file tabs
+            const restoredFiles: OpenFile[] = syncedState.files.map((file: { path: string; content: string; isActive: boolean }) => ({
+              path: file.path,
+              name: file.path.split("/").pop() || file.path,
+              isDirty: false,
+            }));
+            setOpenFiles(restoredFiles);
+            
+            // Restore active file and its content
+            const activeFileData = syncedState.files.find((f: { path: string; content: string; isActive: boolean }) => f.isActive);
+            if (activeFileData) {
+              setActiveFile(activeFileData.path);
+              setFileContents({ [activeFileData.path]: activeFileData.content });
+            }
+            console.log(`✅ Restored ${syncedState.files.length} open file(s)`);
+          }
+        } catch (syncError) {
+          console.error("Failed to sync open files:", syncError);
+          // Non-critical error, continue
+        }
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
@@ -294,12 +326,18 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle file selection from tree
   const handleFileSelect = useCallback(
-    (filePath: string) => {
+    async (filePath: string) => {
       const fileName = filePath.split("/").pop() || filePath;
 
       const existingFile = openFiles.find((f) => f.path === filePath);
       if (existingFile) {
         setActiveFile(filePath);
+        // Notify Mac client about active file change
+        try {
+          await codeService.setActiveFile(filePath);
+        } catch (error) {
+          console.error("Failed to set active file on Mac:", error);
+        }
         closeSidebar();
         return;
       }
@@ -311,6 +349,12 @@ export default function CodeScreen(): React.ReactElement {
       };
       setOpenFiles((prev) => [...prev, newFile]);
       setActiveFile(filePath);
+      // Notify Mac client about active file change
+      try {
+        await codeService.setActiveFile(filePath);
+      } catch (error) {
+        console.error("Failed to set active file on Mac:", error);
+      }
       closeSidebar();
     },
     [openFiles, closeSidebar]
@@ -740,7 +784,6 @@ export default function CodeScreen(): React.ReactElement {
     }
   }, []);
 
-
   // Fetch diff when active file changes or diff mode is enabled
   useEffect(() => {
     if (activeFile && diffMode !== "off") {
@@ -749,6 +792,35 @@ export default function CodeScreen(): React.ReactElement {
       setDiffData(null);
     }
   }, [activeFile, diffMode, fetchDiffData]);
+
+  // Fetch project changes when project changes or tab switches to changes
+  useEffect(() => {
+    if (currentProject?.path && sidebarTab === "changes") {
+      codeService
+        .getProjectChanges(currentProject.path)
+        .then((changes) => setProjectChanges(changes))
+        .catch((err) => console.error("Failed to fetch project changes:", err));
+    }
+  }, [currentProject?.path, sidebarTab]);
+
+  // Listen for file updates from Mac (when file changes on disk)
+  useEffect(() => {
+    const unsubscribe = codeService.onMessage(
+      "code:fileUpdated",
+      (_action, payload: { filePath: string; content: string }) => {
+        // Only update if this is the active file
+        if (payload.filePath === activeFile) {
+          console.log("📝 File updated from Mac:", payload.filePath);
+          setFileContents((prev) => ({
+            ...prev,
+            [payload.filePath]: payload.content,
+          }));
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [activeFile]);
 
   // Get language from file path
   const getLanguage = (filePath: string): string => {
@@ -937,7 +1009,6 @@ export default function CodeScreen(): React.ReactElement {
           {currentProject?.name || "Editor"}
         </Text>
 
-
         {activeFile && dirtyFiles.has(activeFile) && (
           <TouchableOpacity
             style={styles.saveButton}
@@ -952,7 +1023,15 @@ export default function CodeScreen(): React.ReactElement {
       <EditorTabs
         files={openFiles}
         activeFile={activeFile}
-        onSelectFile={setActiveFile}
+        onSelectFile={async (filePath) => {
+          setActiveFile(filePath);
+          // Notify Mac client about active file change
+          try {
+            await codeService.setActiveFile(filePath);
+          } catch (error) {
+            console.error("Failed to set active file on Mac:", error);
+          }
+        }}
         onCloseFile={handleCloseFile}
       />
 
@@ -1004,35 +1083,70 @@ export default function CodeScreen(): React.ReactElement {
             { transform: [{ translateX: sidebarTranslateX }] },
           ]}
         >
-          {/* Sidebar Header with create buttons */}
-          <TouchableOpacity
-            style={styles.sidebarHeader}
-            onPress={() =>
-              currentProject &&
-              handleItemSelect({
-                path: currentProject.path,
-                type: "folder",
-                name: currentProject.name,
-              })
-            }
-            activeOpacity={0.8}
-          >
-            <Text style={styles.sidebarTitle}>FILES</Text>
+          {/* Sidebar Header with tabs and actions */}
+          <View style={styles.sidebarHeader}>
+            <View style={styles.sidebarTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.sidebarTab,
+                  sidebarTab === "files" && styles.sidebarTabActive,
+                ]}
+                onPress={() => setSidebarTab("files")}
+              >
+                <Text
+                  style={[
+                    styles.sidebarTabText,
+                    sidebarTab === "files" && styles.sidebarTabTextActive,
+                  ]}
+                >
+                  Files
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sidebarTab,
+                  sidebarTab === "changes" && styles.sidebarTabActive,
+                ]}
+                onPress={() => setSidebarTab("changes")}
+              >
+                <Text
+                  style={[
+                    styles.sidebarTabText,
+                    sidebarTab === "changes" && styles.sidebarTabTextActive,
+                  ]}
+                >
+                  Changes
+                </Text>
+                {projectChanges.staged.length + projectChanges.unstaged.length >
+                  0 && (
+                  <View style={styles.changesBadge}>
+                    <Text style={styles.changesBadgeText}>
+                      {projectChanges.staged.length +
+                        projectChanges.unstaged.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={styles.sidebarActions}>
-              <TouchableOpacity
-                onPress={handleCreateFile}
-                style={styles.createButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.createButtonText}>+📄</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleCreateFolder}
-                style={styles.createButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.createButtonText}>+📁</Text>
-              </TouchableOpacity>
+              {sidebarTab === "files" && (
+                <>
+                  <TouchableOpacity
+                    onPress={handleCreateFile}
+                    style={styles.createButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.createButtonText}>+📄</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleCreateFolder}
+                    style={styles.createButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.createButtonText}>+📁</Text>
+                  </TouchableOpacity>
+                </>
+              )}
               <TouchableOpacity
                 onPress={closeSidebar}
                 style={styles.closeSidebar}
@@ -1040,28 +1154,106 @@ export default function CodeScreen(): React.ReactElement {
                 <Text style={styles.closeSidebarText}>✕</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          {/* Selected folder indicator */}
-          {selectedItem && (
-            <View style={styles.selectedIndicator}>
-              <Text style={styles.selectedIndicatorText}>
-                Selected: {selectedItem.type === "folder" ? "📁" : "📄"}{" "}
-                {selectedItem.name}
-              </Text>
-            </View>
+          {/* Files Tab Content */}
+          {sidebarTab === "files" && (
+            <>
+              {/* Selected folder indicator */}
+              {selectedItem && (
+                <View style={styles.selectedIndicator}>
+                  <Text style={styles.selectedIndicatorText}>
+                    Selected: {selectedItem.type === "folder" ? "📁" : "📄"}{" "}
+                    {selectedItem.name}
+                  </Text>
+                </View>
+              )}
+
+              {currentProject && (
+                <FileTree
+                  rootPath={currentProject.path}
+                  initialChildren={currentProject.rootChildren}
+                  onFileSelect={handleFileSelect}
+                  onItemSelect={handleItemSelect}
+                  onItemLongPress={handleItemLongPress}
+                  selectedFile={activeFile}
+                  selectedItem={selectedItem}
+                />
+              )}
+            </>
           )}
 
-          {currentProject && (
-            <FileTree
-              rootPath={currentProject.path}
-              initialChildren={currentProject.rootChildren}
-              onFileSelect={handleFileSelect}
-              onItemSelect={handleItemSelect}
-              onItemLongPress={handleItemLongPress}
-              selectedFile={activeFile}
-              selectedItem={selectedItem}
-            />
+          {/* Changes Tab Content */}
+          {sidebarTab === "changes" && (
+            <ScrollView style={styles.changesContainer}>
+              {/* Staged Changes */}
+              {projectChanges.staged.length > 0 && (
+                <View style={styles.changesSection}>
+                  <Text style={styles.changesSectionTitle}>STAGED</Text>
+                  {projectChanges.staged.map((change) => (
+                    <TouchableOpacity
+                      key={change.path}
+                      style={styles.changeItem}
+                      onPress={() => handleFileSelect(change.path)}
+                    >
+                      <View
+                        style={[
+                          styles.changeTypeIndicator,
+                          styles.changeTypeStaged,
+                        ]}
+                      />
+                      <Text style={styles.changeTypeBadge}>{change.type}</Text>
+                      <Text style={styles.changeFileName} numberOfLines={1}>
+                        {change.path.split("/").pop()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Unstaged Changes */}
+              {projectChanges.unstaged.length > 0 && (
+                <View style={styles.changesSection}>
+                  <Text style={styles.changesSectionTitle}>UNSTAGED</Text>
+                  {projectChanges.unstaged.map((change) => (
+                    <TouchableOpacity
+                      key={change.path}
+                      style={styles.changeItem}
+                      onPress={() => handleFileSelect(change.path)}
+                    >
+                      <View
+                        style={[
+                          styles.changeTypeIndicator,
+                          change.type === "A"
+                            ? styles.changeTypeAdded
+                            : change.type === "M"
+                            ? styles.changeTypeModified
+                            : change.type === "D"
+                            ? styles.changeTypeDeleted
+                            : styles.changeTypeModified,
+                        ]}
+                      />
+                      <Text style={styles.changeTypeBadge}>{change.type}</Text>
+                      <Text style={styles.changeFileName} numberOfLines={1}>
+                        {change.path.split("/").pop()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Empty State */}
+              {projectChanges.staged.length === 0 &&
+                projectChanges.unstaged.length === 0 && (
+                  <View style={styles.changesEmpty}>
+                    <Text style={styles.changesEmptyIcon}>✓</Text>
+                    <Text style={styles.changesEmptyText}>No changes</Text>
+                    <Text style={styles.changesEmptySubtext}>
+                      Working tree is clean
+                    </Text>
+                  </View>
+                )}
+            </ScrollView>
           )}
         </Animated.View>
       </View>
@@ -1307,8 +1499,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     height: 56,
     backgroundColor: darkTheme.background,
-    borderBottomWidth: 1,
-    borderBottomColor: darkTheme.border,
   },
   headerTitle: {
     flex: 1,
@@ -1516,9 +1706,45 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
+  },
+  sidebarTabs: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  sidebarTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sidebarTabActive: {
+    backgroundColor: darkTheme.primary + "25",
+  },
+  sidebarTabText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: darkTheme.text.secondary,
+  },
+  sidebarTabTextActive: {
+    color: darkTheme.primaryLight,
+  },
+  changesBadge: {
+    marginLeft: 6,
+    backgroundColor: darkTheme.primary,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 18,
+    alignItems: "center",
+  },
+  changesBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: darkTheme.text.primary,
   },
   sidebarTitle: {
     fontSize: 12,
@@ -1564,6 +1790,82 @@ const styles = StyleSheet.create({
   },
   selectedIndicatorText: {
     fontSize: 11,
+    color: darkTheme.text.secondary,
+  },
+
+  // Changes List
+  changesContainer: {
+    flex: 1,
+  },
+  changesSection: {
+    paddingTop: 12,
+  },
+  changesSectionTitle: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: darkTheme.text.secondary,
+    letterSpacing: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  changeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  changeTypeIndicator: {
+    width: 3,
+    height: 16,
+    borderRadius: 1.5,
+    marginRight: 8,
+  },
+  changeTypeStaged: {
+    backgroundColor: "#4CAF50",
+  },
+  changeTypeAdded: {
+    backgroundColor: "#4CAF50",
+  },
+  changeTypeModified: {
+    backgroundColor: "#2196F3",
+  },
+  changeTypeDeleted: {
+    backgroundColor: "#F44336",
+  },
+  changeTypeBadge: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: darkTheme.text.secondary,
+    backgroundColor: darkTheme.surfaceElevated,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+    minWidth: 18,
+    textAlign: "center",
+  },
+  changeFileName: {
+    flex: 1,
+    fontSize: 13,
+    color: darkTheme.text.primary,
+  },
+  changesEmpty: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+  changesEmptyIcon: {
+    fontSize: 32,
+    color: "#4CAF50",
+    marginBottom: 12,
+  },
+  changesEmptyText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: darkTheme.text.primary,
+    marginBottom: 4,
+  },
+  changesEmptySubtext: {
+    fontSize: 12,
     color: darkTheme.text.secondary,
   },
 

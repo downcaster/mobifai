@@ -184,7 +184,7 @@ export default function ProfileScreen(): React.ReactElement {
 
   const updateSetting = useCallback(async (
     key: string,
-    value: string | number
+    value: string | number | boolean
   ): Promise<void> => {
     // Optimistic update
     setSettings((prev) => {

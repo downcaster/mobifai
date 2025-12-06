@@ -198,15 +198,6 @@ export function CodeEditor({
     android: { uri: 'file:///android_asset/editor.html' },
   });
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={darkTheme.primaryLight} />
-        <Text style={styles.loadingText}>Loading file...</Text>
-      </View>
-    );
-  }
-
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -237,7 +228,15 @@ export function CodeEditor({
         showsHorizontalScrollIndicator={false}
         keyboardDisplayRequiresUserAction={false}
       />
-      {!isReady && (
+      {/* Show loading overlay when fetching file */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={darkTheme.primaryLight} />
+          <Text style={styles.loadingText}>Loading file...</Text>
+        </View>
+      )}
+      {/* Show initializing overlay when WebView is starting up */}
+      {!isReady && !loading && (
         <View style={styles.initializingOverlay}>
           <ActivityIndicator size="large" color={darkTheme.primaryLight} />
           <Text style={styles.initializingText}>Initializing editor...</Text>
@@ -278,6 +277,13 @@ const styles = StyleSheet.create({
     color: darkTheme.error,
     textAlign: 'center',
     fontSize: 14,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: darkTheme.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   initializingOverlay: {
     ...StyleSheet.absoluteFillObject,

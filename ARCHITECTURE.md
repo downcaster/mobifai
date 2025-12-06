@@ -2,7 +2,6 @@
 
 ## Overview
 
-
 MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for initial signaling. After devices pair, they communicate **directly** via WebRTC, allowing the relay server to be terminated without breaking the connection.
 
 ## Architecture Diagram
@@ -43,7 +42,7 @@ MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for init
         │ - Runs terminal │ Data  │ - Sends cmds   │
         │ - Sends output  │Channel│ - Shows output │
         └─────────────────┘       └────────────────┘
-        
+
         🎉 Relay server can now be terminated!
         Terminal continues working via WebRTC P2P.
 ```
@@ -57,8 +56,9 @@ MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for init
 **Location:** Deploy anywhere (Heroku, Railway, AWS, VPS, local network)
 
 **Responsibilities:**
+
 - Accept WebSocket connections from Mac and iOS clients
-- Generate and manage pairing codes  
+- Generate and manage pairing codes
 - Pair devices together
 - **WebRTC Signaling:**
   - Relay SDP offers/answers between peers
@@ -77,6 +77,7 @@ MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for init
 **Location:** Your Mac (local machine)
 
 **Responsibilities:**
+
 - Connect to relay server for pairing
 - Receive pairing code
 - **WebRTC (Mac is Offerer):**
@@ -98,6 +99,7 @@ MobiFai uses a **WebRTC peer-to-peer architecture** with a relay server for init
 **Location:** Your phone (iOS or Android)
 
 **Responsibilities:**
+
 - Connect to relay server for pairing
 - Send pairing code to connect with Mac
 - **WebRTC (Mobile is Answerer):**
@@ -190,53 +192,53 @@ Mobile App                 Relay Server              Mac Client
 
 ### Registration Events
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `register` | Client → Server | `{ type: 'mac' \| 'mobile' }` | Register device with server |
-| `registered` | Server → Client | `{ type, pairingCode?, message }` | Confirm registration |
+| Event        | Direction       | Payload                           | Description                 |
+| ------------ | --------------- | --------------------------------- | --------------------------- |
+| `register`   | Client → Server | `{ type: 'mac' \| 'mobile' }`     | Register device with server |
+| `registered` | Server → Client | `{ type, pairingCode?, message }` | Confirm registration        |
 
 ### Pairing Events
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `pair` | Mobile → Server | `{ pairingCode: string, cols, rows }` | Pair with Mac using code |
-| `paired` | Server → Client | `{ message, macId/mobileId }` | Pairing successful |
-| `paired_device_disconnected` | Server → Client | `{ message }` | Paired device disconnected |
+| Event                        | Direction       | Payload                               | Description                |
+| ---------------------------- | --------------- | ------------------------------------- | -------------------------- |
+| `pair`                       | Mobile → Server | `{ pairingCode: string, cols, rows }` | Pair with Mac using code   |
+| `paired`                     | Server → Client | `{ message, macId/mobileId }`         | Pairing successful         |
+| `paired_device_disconnected` | Server → Client | `{ message }`                         | Paired device disconnected |
 
 ### WebRTC Signaling Events (NEW!)
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `webrtc:offer` | Mac → Server → Mobile | `{ offer: {sdp, type} }` | WebRTC SDP offer |
-| `webrtc:answer` | Mobile → Server → Mac | `{ answer: {sdp, type} }` | WebRTC SDP answer |
+| Event                  | Direction                | Payload                              | Description                     |
+| ---------------------- | ------------------------ | ------------------------------------ | ------------------------------- |
+| `webrtc:offer`         | Mac → Server → Mobile    | `{ offer: {sdp, type} }`             | WebRTC SDP offer                |
+| `webrtc:answer`        | Mobile → Server → Mac    | `{ answer: {sdp, type} }`            | WebRTC SDP answer               |
 | `webrtc:ice-candidate` | Client ↔ Server ↔ Client | `{ candidate: {candidate, sdpMid} }` | ICE candidate for NAT traversal |
 
 ### Terminal Events (Fallback Only)
 
 **Note:** These are only used if WebRTC connection fails. When WebRTC is connected, terminal data flows directly via WebRTC data channel!
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `terminal:input` | Mobile → Server → Mac | `string` | Command input (fallback) |
-| `terminal:output` | Mac → Server → Mobile | `string` | Terminal output (fallback) |
-| `terminal:resize` | Mobile → Server → Mac | `{ cols, rows }` | Resize terminal |
-| `terminal:dimensions` | Mobile → Server → Mac | `{ cols, rows }` | Initial terminal dimensions |
-| `system:message` | Client ↔ Server ↔ Client | `{ type, payload? }` | System messages (e.g. terminal_ready) |
+| Event                 | Direction                | Payload              | Description                           |
+| --------------------- | ------------------------ | -------------------- | ------------------------------------- |
+| `terminal:input`      | Mobile → Server → Mac    | `string`             | Command input (fallback)              |
+| `terminal:output`     | Mac → Server → Mobile    | `string`             | Terminal output (fallback)            |
+| `terminal:resize`     | Mobile → Server → Mac    | `{ cols, rows }`     | Resize terminal                       |
+| `terminal:dimensions` | Mobile → Server → Mac    | `{ cols, rows }`     | Initial terminal dimensions           |
+| `system:message`      | Client ↔ Server ↔ Client | `{ type, payload? }` | System messages (e.g. terminal_ready) |
 
 ### WebRTC Data Channel Messages (NEW!)
 
 **These messages flow directly between clients via WebRTC P2P data channel:**
 
-| Message Type | Direction | Payload | Description |
-|-------------|-----------|---------|-------------|
-| `terminal:input` | Mobile → Mac (P2P) | `string` | Command input via WebRTC |
-| `terminal:output` | Mac → Mobile (P2P) | `string` | Terminal output via WebRTC |
+| Message Type      | Direction          | Payload          | Description                |
+| ----------------- | ------------------ | ---------------- | -------------------------- |
+| `terminal:input`  | Mobile → Mac (P2P) | `string`         | Command input via WebRTC   |
+| `terminal:output` | Mac → Mobile (P2P) | `string`         | Terminal output via WebRTC |
 | `terminal:resize` | Mobile → Mac (P2P) | `{ cols, rows }` | Resize terminal via WebRTC |
 
 ### Error Events
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
+| Event   | Direction       | Payload               | Description    |
+| ------- | --------------- | --------------------- | -------------- |
 | `error` | Server → Client | `{ message: string }` | Error occurred |
 
 ## Security Model
@@ -244,17 +246,20 @@ Mobile App                 Relay Server              Mac Client
 ### Current Implementation
 
 1. **Pairing Codes**
+
    - 6-digit random codes
    - Expire after 5 minutes
    - Single-use only
    - Generated by relay server
 
 2. **Device Pairing**
+
    - One mobile device per Mac at a time
    - Codes cleared after use
    - Automatic cleanup on disconnect
 
 3. **WebRTC P2P Encryption** ✅ NEW!
+
    - **DTLS encryption enabled by default** (WebRTC standard)
    - Terminal data encrypted end-to-end between peers
    - **Relay server CANNOT see terminal traffic** after P2P connects
@@ -271,12 +276,14 @@ Mobile App                 Relay Server              Mac Client
 ✅ **Major Security Upgrade:**
 
 1. **End-to-End Encryption**
+
    - ✅ WebRTC uses DTLS (Datagram Transport Layer Security)
    - ✅ Terminal data encrypted between Mac and mobile
    - ✅ Relay server **cannot decrypt** terminal traffic
    - ✅ Even if relay server is compromised, terminal data is safe
 
 2. **Reduced Attack Surface**
+
    - ✅ Relay server doesn't see terminal commands/output
    - ✅ Direct P2P communication after pairing
    - ✅ Server compromise doesn't expose ongoing sessions
@@ -290,17 +297,18 @@ Mobile App                 Relay Server              Mac Client
 ⚠️ **Current Limitations:**
 
 **Still Missing (but less critical now):**
+
 - ⚠️ No authentication beyond pairing code
 - ⚠️ No rate limiting on pairing attempts
 - ⚠️ No audit logging
 - ⚠️ Pairing codes could be brute-forced (6 digits = 1M combinations)
 
 **Recommendations for Production:**
+
 - Use TLS/WSS for signaling (relay server)
 - Implement stronger authentication (OAuth, JWT)
 - Add rate limiting for pairing attempts
 - Use longer pairing codes or add additional auth factors
-
 
 ## Deployment Scenarios
 
@@ -342,11 +350,13 @@ Mac Client ──→ Relay Server (VPS) ──→ Mobile App
 ### Latency
 
 **Typical Latency:**
+
 - Local network: 10-50ms
 - Cloud relay (same region): 50-200ms
 - Cloud relay (different region): 200-500ms
 
 **Optimization:**
+
 - Deploy relay server close to Mac
 - Use WebSocket compression
 - Minimize message frequency
@@ -354,11 +364,13 @@ Mac Client ──→ Relay Server (VPS) ──→ Mobile App
 ### Bandwidth
 
 **Typical Usage:**
+
 - Idle: ~1KB/s (heartbeats)
 - Light terminal use: ~5KB/s
 - Heavy output: ~50KB/s
 
 **Optimization:**
+
 - Buffer small messages
 - Compress terminal output
 - Limit output rate
@@ -366,11 +378,13 @@ Mac Client ──→ Relay Server (VPS) ──→ Mobile App
 ### Scalability
 
 **Current Limits:**
+
 - 1 Mac : 1 Mobile pairing
 - Unlimited Mac clients per relay
 - Unlimited mobile apps per relay
 
 **Scaling Relay Server:**
+
 - Use Redis for session storage
 - Load balance with multiple instances
 - Use sticky sessions for WebSocket
@@ -380,12 +394,14 @@ Mac Client ──→ Relay Server (VPS) ──→ Mobile App
 ### Alternatives Considered
 
 #### 1. Pure Relay Server (Old Approach)
+
 ```
 Mac ←─ WebSocket ─→ Server ←─ WebSocket ─→ Mobile
 ```
 
 **Pros:** Simple, works everywhere
 **Cons:**
+
 - ❌ All traffic goes through server
 - ❌ Server can see all commands/output
 - ❌ Higher latency
@@ -393,24 +409,28 @@ Mac ←─ WebSocket ─→ Server ←─ WebSocket ─→ Mobile
 - ❌ Privacy concerns
 
 #### 2. Mac as Direct Server
+
 ```
 Mac (Server) ←─ Direct ─→ Mobile
 ```
 
 **Pros:** No external server needed
 **Cons:**
+
 - ❌ Can't reach Mac behind NAT/firewall
 - ❌ Dynamic IP issues
 - ❌ Port forwarding required
 - ❌ Complex firewall configuration
 
 #### 3. VPN Tunnel
+
 ```
 Mac ←─ VPN ─→ Mobile
 ```
 
 **Pros:** Secure, works anywhere
 **Cons:**
+
 - ❌ Complex VPN server setup
 - ❌ Requires VPN infrastructure
 - ❌ Another service to maintain
@@ -420,31 +440,37 @@ Mac ←─ VPN ─→ Mobile
 **Best of Both Worlds:**
 
 ✅ **Simple Initial Setup**
+
 - Use relay server for pairing (like old approach)
 - No port forwarding or firewall config needed
 - Works behind NAT (STUN/ICE handles traversal)
 
 ✅ **True P2P After Connection**
+
 - Direct communication after WebRTC establishes
 - **Relay server can be terminated** without breaking connection
 - Lowest possible latency (direct peer-to-peer)
 
 ✅ **Security & Privacy**
+
 - End-to-end encryption (DTLS)
 - Server cannot see terminal traffic
 - Even compromised server can't decrypt data
 
 ✅ **Reliability**
+
 - Fallback to relay if WebRTC fails
 - Best of both worlds: try P2P, fallback to relay
 - Graceful degradation
 
 ✅ **Scalability**
+
 - Relay server only handles signaling (lightweight)
 - Terminal data doesn't burden server
 - Can handle many simultaneous pairings
 
 ✅ **Cost Effective**
+
 - Minimal server bandwidth after P2P connects
 - Reduced hosting costs
 - Can run on free tier services
@@ -498,11 +524,13 @@ Mac ─┬─ User 1 Mobile
 ### Running Locally
 
 1. **Start Relay Server**
+
    ```bash
    cd relay-server && npm run dev
    ```
 
 2. **Start Mac Client**
+
    ```bash
    cd mac-client && npm run dev
    ```

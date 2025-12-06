@@ -665,6 +665,65 @@ export class CodeManager {
   }
 
   /**
+   * Get git status for a project - returns staged and unstaged changes
+   */
+  public getProjectChanges(projectPath: string): Promise<{
+    staged: Array<{ path: string; type: string }>;
+    unstaged: Array<{ path: string; type: string }>;
+  }> {
+    return new Promise((resolve) => {
+      console.log(chalk.cyan(`🔄 Getting project changes: ${projectPath}`));
+
+      // Find git root
+      const gitRoot = this.findGitRoot(projectPath);
+      if (!gitRoot) {
+        console.log(chalk.yellow(`  └─ Not in a git repository`));
+        resolve({ staged: [], unstaged: [] });
+        return;
+      }
+
+      // Run git status --porcelain for machine-readable output
+      exec(
+        "git status --porcelain -u",
+        { cwd: gitRoot, maxBuffer: 10 * 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(chalk.red(`  └─ Git status error: ${error.message}`));
+            resolve({ staged: [], unstaged: [] });
+            return;
+          }
+
+          const staged: Array<{ path: string; type: string }> = [];
+          const unstaged: Array<{ path: string; type: string }> = [];
+
+          const lines = stdout.split("\n").filter((line) => line.trim());
+
+          for (const line of lines) {
+            // Format: XY filename
+            // X = staged status, Y = unstaged status
+            const indexStatus = line[0];
+            const workingStatus = line[1];
+            const filePath = path.join(gitRoot, line.substring(3).trim());
+
+            // Check staged changes (first column)
+            if (indexStatus && indexStatus !== " " && indexStatus !== "?") {
+              staged.push({ path: filePath, type: indexStatus });
+            }
+
+            // Check unstaged changes (second column)
+            if (workingStatus && workingStatus !== " ") {
+              unstaged.push({ path: filePath, type: workingStatus === "?" ? "A" : workingStatus });
+            }
+          }
+
+          console.log(chalk.gray(`  └─ Found ${staged.length} staged, ${unstaged.length} unstaged changes`));
+          resolve({ staged, unstaged });
+        }
+      );
+    });
+  }
+
+  /**
    * Get git diff for a file against HEAD
    */
   public getFileDiff(filePath: string): Promise<FileDiff> {

@@ -17,6 +17,7 @@ import {
 import { getAIService, AIPromptPayload } from "./ai/index.js";
 import { ProcessManager } from "./process-manager.js";
 import { CodeManager } from "./code-manager.js";
+import { OpenFilesManager } from "./open-files-manager.js";
 
 const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = wrtc;
 
@@ -97,6 +98,9 @@ processManager.startMemoryMonitoring();
 
 // Code Manager - handles file system operations for code editor
 const codeManager = new CodeManager();
+
+// Open Files Manager - tracks open files and watches for changes
+const openFilesManager = new OpenFilesManager();
 
 // Store terminal dimensions from mobile
 let terminalCols = 80;
@@ -187,18 +191,29 @@ function setupProcessManagerCallbacks(): void {
 }
 
 /**
+ * Set up OpenFilesManager callbacks
+ */
+function setupOpenFilesManagerCallbacks(): void {
+  // Handle file updates from file watcher
+  openFilesManager.onFileUpdate((filePath, content) => {
+    console.log(chalk.cyan(`📝 File updated: ${path.basename(filePath)}`));
+    sendToClient("code:fileUpdated", { filePath, content });
+  });
+}
+
+/**
  * Handle process:create command from iOS
  */
-function handleProcessCreate(payload: ProcessCreatePayload): void {
+async function handleProcessCreate(payload: ProcessCreatePayload): Promise<void> {
   const { uuid, name, cols = terminalCols, rows = terminalRows } = payload;
   
   console.log(chalk.cyan(`[iOS] Process creation: ${uuid.substring(0, 8)} "${name || 'unnamed'}"`));
   
-  const processInfo = processManager.createProcess(uuid, cols, rows, name);
+  const processInfo = await processManager.createProcess(uuid, cols, rows, name);
   
   if (processInfo) {
     // Set this process as the only active one
-    processManager.switchActiveProcesses([uuid]);
+    await processManager.switchActiveProcesses([uuid]);
     
     // Update AI service with the new terminal
     const aiService = getAIService();
@@ -220,12 +235,12 @@ function handleProcessCreate(payload: ProcessCreatePayload): void {
 /**
  * Handle process:rename command from iOS
  */
-function handleProcessRename(payload: ProcessRenamePayload): void {
+async function handleProcessRename(payload: ProcessRenamePayload): Promise<void> {
   const { uuid, name } = payload;
   
   console.log(chalk.cyan(`[iOS] Process rename: ${uuid.substring(0, 8)} -> "${name}"`));
   
-  const success = processManager.renameProcess(uuid, name);
+  const success = await processManager.renameProcess(uuid, name);
   
   if (success) {
     sendToClient("process:renamed", { uuid, name });
@@ -237,12 +252,12 @@ function handleProcessRename(payload: ProcessRenamePayload): void {
 /**
  * Handle process:terminate command from iOS
  */
-function handleProcessTerminate(payload: ProcessTerminatePayload): void {
+async function handleProcessTerminate(payload: ProcessTerminatePayload): Promise<void> {
   const { uuid } = payload;
   
   console.log(chalk.cyan(`[iOS] Process termination: ${uuid.substring(0, 8)}`));
   
-  const success = processManager.terminateProcess(uuid);
+  const success = await processManager.terminateProcess(uuid);
   
   if (success) {
     sendToClient("process:terminated", { uuid });
@@ -254,12 +269,12 @@ function handleProcessTerminate(payload: ProcessTerminatePayload): void {
 /**
  * Handle process:switch command from iOS
  */
-function handleProcessSwitch(payload: ProcessSwitchPayload): void {
+async function handleProcessSwitch(payload: ProcessSwitchPayload): Promise<void> {
   const { activeUuids } = payload;
   
   console.log(chalk.cyan(`[iOS] Process switch: ${activeUuids.map(u => u.substring(0, 8)).join(", ")}`));
   
-  const snapshots = processManager.switchActiveProcesses(activeUuids);
+  const snapshots = await processManager.switchActiveProcesses(activeUuids);
   
   // Update AI service with the first active terminal
   const activeProcess = processManager.getFirstActiveProcess();
@@ -616,6 +631,21 @@ function handleCodeMessage(action: string, payload: unknown): void {
       case "getFileDiff":
         handleCodeGetFileDiff(payload as { filePath: string });
         break;
+      case "getProjectChanges":
+        handleCodeGetProjectChanges(payload as { projectPath: string });
+        break;
+      case "openFile":
+        handleCodeOpenFile(payload as { projectPath: string; filePath: string });
+        break;
+      case "closeFile":
+        handleCodeCloseFile(payload as { filePath: string });
+        break;
+      case "setActiveFile":
+        handleCodeSetActiveFile(payload as { filePath: string | null });
+        break;
+      case "syncOpenFiles":
+        handleCodeSyncOpenFiles(payload as { projectPath: string });
+        break;
       default:
         console.log(chalk.gray(`Unknown code action: ${action}`));
         sendToClient("code:error", { action, error: "Unknown action" });
@@ -821,6 +851,107 @@ async function handleCodeGetFileDiff(payload: { filePath: string }): Promise<voi
   }
 }
 
+/**
+ * Handle code.getProjectChanges - get git status for a project
+ */
+async function handleCodeGetProjectChanges(payload: { projectPath: string }): Promise<void> {
+  console.log(chalk.cyan(`🔄 Getting project changes: ${payload.projectPath}`));
+  try {
+    const changes = await codeManager.getProjectChanges(payload.projectPath);
+    sendToClient("code:projectChanges", {
+      projectPath: payload.projectPath,
+      ...changes,
+    });
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Project changes error: ${error.message}`));
+    sendToClient("code:projectChangesError", {
+      projectPath: payload.projectPath,
+      error: error.message || "Failed to get project changes"
+    });
+  }
+}
+
+/**
+ * Handle code.openFile - open a file for editing
+ */
+async function handleCodeOpenFile(payload: { projectPath: string; filePath: string }): Promise<void> {
+  console.log(chalk.cyan(`📂 Opening file: ${payload.filePath}`));
+  try {
+    const content = await openFilesManager.openFile(payload.projectPath, payload.filePath);
+    if (content !== null) {
+      sendToClient("code:fileOpened", {
+        filePath: payload.filePath,
+        content,
+      });
+    } else {
+      sendToClient("code:fileOpenError", {
+        filePath: payload.filePath,
+        error: "File not found or cannot be read"
+      });
+    }
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Open file error: ${error.message}`));
+    sendToClient("code:fileOpenError", {
+      filePath: payload.filePath,
+      error: error.message || "Failed to open file"
+    });
+  }
+}
+
+/**
+ * Handle code.closeFile - close an open file
+ */
+async function handleCodeCloseFile(payload: { filePath: string }): Promise<void> {
+  console.log(chalk.cyan(`📁 Closing file: ${payload.filePath}`));
+  try {
+    await openFilesManager.closeFile(payload.filePath);
+    sendToClient("code:fileClosed", { filePath: payload.filePath });
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Close file error: ${error.message}`));
+    sendToClient("code:fileCloseError", {
+      filePath: payload.filePath,
+      error: error.message || "Failed to close file"
+    });
+  }
+}
+
+/**
+ * Handle code.setActiveFile - set the currently active file and start watching
+ */
+async function handleCodeSetActiveFile(payload: { filePath: string | null }): Promise<void> {
+  console.log(chalk.cyan(`👁️ Setting active file: ${payload.filePath || 'none'}`));
+  try {
+    const content = await openFilesManager.setActiveFile(payload.filePath);
+    sendToClient("code:activeFileSet", {
+      filePath: payload.filePath,
+      content,
+    });
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Set active file error: ${error.message}`));
+    sendToClient("code:activeFileError", {
+      filePath: payload.filePath,
+      error: error.message || "Failed to set active file"
+    });
+  }
+}
+
+/**
+ * Handle code.syncOpenFiles - sync open files state for a project
+ */
+async function handleCodeSyncOpenFiles(payload: { projectPath: string }): Promise<void> {
+  console.log(chalk.cyan(`🔄 Syncing open files for project: ${payload.projectPath}`));
+  try {
+    const state = await openFilesManager.syncProject(payload.projectPath);
+    sendToClient("code:openFilesSync", state);
+  } catch (error: any) {
+    console.error(chalk.red(`❌ Sync open files error: ${error.message}`));
+    sendToClient("code:openFilesSyncError", {
+      projectPath: payload.projectPath,
+      error: error.message || "Failed to sync open files"
+    });
+  }
+}
+
 function getToken(): string | undefined {
   try {
     if (fs.existsSync(TOKEN_FILE)) {
@@ -901,7 +1032,7 @@ async function handleAIPrompt(prompt: string, uuid?: string): Promise<void> {
   }
 }
 
-function connectToRelay() {
+async function connectToRelay() {
   console.log(
     chalk.yellow(`→ Connecting to relay server: ${config.RELAY_SERVER_URL}...`)
   );
@@ -914,8 +1045,60 @@ function connectToRelay() {
   console.log(chalk.gray(`Device ID: ${deviceId}`));
   console.log(chalk.gray(`🔐 Generated security keys`));
 
+  // Initialize ProcessManager (load persisted processes and get list to restore)
+  const processesToRestore = await processManager.initialize();
+
+  // Restore processes
+  if (processesToRestore.length > 0) {
+    console.log(chalk.cyan(`🔄 Restoring ${processesToRestore.length} terminal tab(s)...`));
+    const restoredUuids: string[] = [];
+    
+    for (const proc of processesToRestore) {
+      const restored = await processManager.createProcess(
+        proc.uuid,
+        80, // Default cols
+        24, // Default rows
+        proc.name
+      );
+      
+      if (restored) {
+        // Try to restore working directory
+        if (proc.cwd && proc.cwd !== process.env.HOME) {
+          try {
+            restored.pty.write(`cd "${proc.cwd}"\nclear\n`);
+            console.log(chalk.green(`  ✅ Restored "${proc.name}" at ${proc.cwd}`));
+          } catch (error) {
+            console.warn(chalk.yellow(`  ⚠️ Could not restore cwd for "${proc.name}"`));
+          }
+        } else {
+          console.log(chalk.green(`  ✅ Restored "${proc.name}"`));
+        }
+        
+        if (proc.isActive) {
+          restoredUuids.unshift(proc.uuid); // Active process first
+        } else {
+          restoredUuids.push(proc.uuid);
+        }
+      }
+    }
+    
+    // Set active processes
+    if (restoredUuids.length > 0) {
+      await processManager.switchActiveProcesses(restoredUuids);
+    }
+    
+    // After iOS connects, we'll send the restored processes
+    // This is handled in the pairing success handler
+  }
+
+  // Initialize OpenFilesManager (load persisted open files)
+  await openFilesManager.initialize();
+
   // Setup ProcessManager callbacks
   setupProcessManagerCallbacks();
+
+  // Setup OpenFilesManager callbacks
+  setupOpenFilesManagerCallbacks();
 
   socket = io(config.RELAY_SERVER_URL, {
     reconnection: true,

@@ -3,6 +3,7 @@ import os from "os";
 import chalk from "chalk";
 import fs from "fs";
 import { execSync } from "child_process";
+import { getPrismaClient } from "./db.js";
 
 /**
  * Information about a single terminal process
@@ -38,6 +39,19 @@ export type ProcessOutputCallback = (uuid: string, data: string) => void;
 export type ProcessExitCallback = (uuid: string) => void;
 
 /**
+ * Check if a process with given PID exists
+ */
+function isPidRunning(pid: number): boolean {
+  try {
+    // Sending signal 0 doesn't kill the process, just checks if it exists
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * ProcessManager - Mid-layer controller for managing multiple terminal processes
  *
  * Responsibilities:
@@ -45,6 +59,7 @@ export type ProcessExitCallback = (uuid: string) => void;
  * - Track which processes are currently "active" (output forwarded to iOS)
  * - Route commands to specific processes
  * - Only forward output from active processes
+ * - Persist process state to SQLite via Prisma
  */
 export class ProcessManager {
   private processMap: Map<string, ProcessInfo> = new Map();
@@ -53,6 +68,61 @@ export class ProcessManager {
   private exitCallback: ProcessExitCallback | null = null;
   private lastMemoryCheck: number = Date.now();
   private memoryCheckInterval: NodeJS.Timeout | null = null;
+  private initialized: boolean = false;
+
+  /**
+   * Initialize the process manager - load persisted processes
+   * Returns array of processes that should be restored
+   */
+  public async initialize(): Promise<Array<{
+    uuid: string;
+    name: string;
+    cwd: string;
+    isActive: boolean;
+  }>> {
+    if (this.initialized) return [];
+    
+    console.log(chalk.cyan("🔄 Initializing ProcessManager..."));
+    
+    const processesToRestore: Array<{
+      uuid: string;
+      name: string;
+      cwd: string;
+      isActive: boolean;
+    }> = [];
+    
+    try {
+      const prisma = getPrismaClient();
+      const savedProcesses = await prisma.terminalProcess.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
+      
+      console.log(chalk.gray(`  Found ${savedProcesses.length} saved process(es) in DB`));
+      
+      for (const saved of savedProcesses) {
+        console.log(chalk.cyan(`  📋 Restoring tab: "${saved.name}" (was at ${saved.cwd})`));
+        
+        // Add to restoration list
+        processesToRestore.push({
+          uuid: saved.uuid,
+          name: saved.name,
+          cwd: saved.cwd,
+          isActive: saved.isActive,
+        });
+      }
+      
+      // Clear all from DB - we'll recreate them as new processes
+      await prisma.terminalProcess.deleteMany();
+      
+      this.initialized = true;
+      console.log(chalk.green(`✅ ProcessManager initialized - ${processesToRestore.length} tab(s) to restore`));
+      return processesToRestore;
+    } catch (error) {
+      console.error(chalk.red("❌ Failed to initialize ProcessManager:"), error);
+      this.initialized = true; // Mark as initialized to prevent retry loops
+      return [];
+    }
+  }
 
   /**
    * Set the callback for process output
@@ -77,12 +147,12 @@ export class ProcessManager {
    * @param name - Optional display name for the tab
    * @returns The created ProcessInfo or null on failure
    */
-  public createProcess(
+  public async createProcess(
     uuid: string,
     cols: number,
     rows: number,
     name?: string
-  ): ProcessInfo | null {
+  ): Promise<ProcessInfo | null> {
     if (this.processMap.has(uuid)) {
       console.log(chalk.yellow(`⚠️  Process ${uuid} already exists`));
       return this.processMap.get(uuid) || null;
@@ -112,7 +182,7 @@ export class ProcessManager {
     };
 
     const initialCwd = process.env.HOME || process.cwd();
-    
+
     try {
       const ptyProcess = pty.spawn(shell, [], {
         name: "xterm-256color",
@@ -134,6 +204,24 @@ export class ProcessManager {
       };
 
       this.processMap.set(uuid, processInfo);
+
+      // Persist to database
+      try {
+        const prisma = getPrismaClient();
+        await prisma.terminalProcess.create({
+          data: {
+            uuid,
+            name: processName,
+            pid: ptyProcess.pid,
+            cwd: initialCwd,
+            isActive: false,
+            createdAt: new Date(processInfo.createdAt),
+          },
+        });
+        console.log(chalk.gray(`  💾 Persisted process to DB`));
+      } catch (dbError) {
+        console.error(chalk.yellow(`  ⚠️ Failed to persist process to DB:`), dbError);
+      }
 
       // Set up output handler - store reference for cleanup
       const onDataHandler = (data: string) => {
@@ -169,11 +257,7 @@ export class ProcessManager {
       // Set up exit handler
       ptyProcess.onExit(() => {
         console.log(chalk.gray(`Process ${uuid.substring(0, 8)} exited`));
-        this.processMap.delete(uuid);
-        this.activeProcesses = this.activeProcesses.filter((id) => id !== uuid);
-        if (this.exitCallback) {
-          this.exitCallback(uuid);
-        }
+        this.handleProcessExit(uuid);
       });
 
       // Initialize with shell setup commands
@@ -184,6 +268,27 @@ export class ProcessManager {
     } catch (error) {
       console.error(chalk.red(`❌ Failed to create process ${uuid}:`), error);
       return null;
+    }
+  }
+
+  /**
+   * Handle process exit - cleanup and remove from DB
+   */
+  private async handleProcessExit(uuid: string): Promise<void> {
+    this.processMap.delete(uuid);
+    this.activeProcesses = this.activeProcesses.filter((id) => id !== uuid);
+    
+    // Remove from database
+    try {
+      const prisma = getPrismaClient();
+      await prisma.terminalProcess.deleteMany({ where: { uuid } });
+      console.log(chalk.gray(`  💾 Removed process from DB`));
+    } catch (dbError) {
+      console.error(chalk.yellow(`  ⚠️ Failed to remove process from DB:`), dbError);
+    }
+    
+    if (this.exitCallback) {
+      this.exitCallback(uuid);
     }
   }
 
@@ -208,7 +313,7 @@ export class ProcessManager {
    * @param uuid - Process UUID to terminate
    * @returns true if process was terminated, false if not found
    */
-  public terminateProcess(uuid: string): boolean {
+  public async terminateProcess(uuid: string): Promise<boolean> {
     const processInfo = this.processMap.get(uuid);
     if (!processInfo) {
       console.log(chalk.yellow(`⚠️  Process ${uuid} not found`));
@@ -223,6 +328,16 @@ export class ProcessManager {
       processInfo.pty.kill();
       this.processMap.delete(uuid);
       this.activeProcesses = this.activeProcesses.filter((id) => id !== uuid);
+      
+      // Remove from database
+      try {
+        const prisma = getPrismaClient();
+        await prisma.terminalProcess.deleteMany({ where: { uuid } });
+        console.log(chalk.gray(`  💾 Removed process from DB`));
+      } catch (dbError) {
+        console.error(chalk.yellow(`  ⚠️ Failed to remove process from DB:`), dbError);
+      }
+      
       console.log(chalk.green(`✅ Process ${uuid.substring(0, 8)} terminated`));
       return true;
     } catch (error) {
@@ -240,7 +355,7 @@ export class ProcessManager {
    * @param uuids - Array of UUIDs to set as active
    * @returns Screen snapshots for the newly active processes
    */
-  public switchActiveProcesses(uuids: string[]): Map<string, string> {
+  public async switchActiveProcesses(uuids: string[]): Promise<Map<string, string>> {
     console.log(
       chalk.cyan(
         `🔄 Switching active processes to: ${uuids
@@ -251,6 +366,24 @@ export class ProcessManager {
 
     // Update active list
     this.activeProcesses = uuids.filter((uuid) => this.processMap.has(uuid));
+
+    // Update active status in database
+    try {
+      const prisma = getPrismaClient();
+      // Set all to inactive first
+      await prisma.terminalProcess.updateMany({
+        data: { isActive: false },
+      });
+      // Set active ones
+      if (this.activeProcesses.length > 0) {
+        await prisma.terminalProcess.updateMany({
+          where: { uuid: { in: this.activeProcesses } },
+          data: { isActive: true },
+        });
+      }
+    } catch (dbError) {
+      console.error(chalk.yellow(`  ⚠️ Failed to update active status in DB:`), dbError);
+    }
 
     // Collect screen snapshots for newly active processes
     const snapshots = new Map<string, string>();
@@ -346,10 +479,13 @@ export class ProcessManager {
     try {
       if (os.platform() === "darwin") {
         // macOS: use lsof to get cwd
-        const result = execSync(`lsof -p ${pid} | grep cwd | awk '{print $NF}'`, {
-          encoding: "utf-8",
-          timeout: 1000,
-        }).trim();
+        const result = execSync(
+          `lsof -p ${pid} | grep cwd | awk '{print $NF}'`,
+          {
+            encoding: "utf-8",
+            timeout: 1000,
+          }
+        ).trim();
         return result || null;
       } else if (os.platform() === "linux") {
         // Linux: use /proc/{pid}/cwd
@@ -358,7 +494,9 @@ export class ProcessManager {
       }
     } catch (error) {
       // Failed to get cwd, return stored cwd
-      console.log(chalk.gray(`Could not read cwd for pid ${pid}, using stored value`));
+      console.log(
+        chalk.gray(`Could not read cwd for pid ${pid}, using stored value`)
+      );
     }
     return processInfo.cwd;
   }
@@ -417,7 +555,7 @@ export class ProcessManager {
    * @param name - New name for the process
    * @returns true if renamed successfully, false if process not found
    */
-  public renameProcess(uuid: string, name: string): boolean {
+  public async renameProcess(uuid: string, name: string): Promise<boolean> {
     const processInfo = this.processMap.get(uuid);
     if (!processInfo) {
       console.log(chalk.yellow(`⚠️  Cannot rename process ${uuid}: not found`));
@@ -428,6 +566,18 @@ export class ProcessManager {
       chalk.cyan(`📝 Renaming process ${uuid.substring(0, 8)} to "${name}"`)
     );
     processInfo.name = name;
+
+    // Update in database
+    try {
+      const prisma = getPrismaClient();
+      await prisma.terminalProcess.updateMany({
+        where: { uuid },
+        data: { name },
+      });
+    } catch (dbError) {
+      console.error(chalk.yellow(`  ⚠️ Failed to update name in DB:`), dbError);
+    }
+
     return true;
   }
 
@@ -508,10 +658,37 @@ export class ProcessManager {
   }
 
   /**
-   * Clean up all processes
+   * Clean up all processes (but don't kill them - let them run)
+   * This is called on graceful shutdown
    */
   public cleanup(): void {
-    console.log(chalk.yellow("🧹 Cleaning up all processes..."));
+    console.log(chalk.yellow("🧹 Cleaning up ProcessManager..."));
+
+    // Stop memory monitoring
+    if (this.memoryCheckInterval) {
+      clearInterval(this.memoryCheckInterval);
+      this.memoryCheckInterval = null;
+    }
+
+    // Note: We don't kill processes anymore - they will be cleaned up
+    // from the DB on next startup if their PIDs are no longer running
+    
+    // Just clear our local state
+    this.processMap.clear();
+    this.activeProcesses = [];
+
+    // Clear callbacks
+    this.outputCallback = null;
+    this.exitCallback = null;
+
+    console.log(chalk.green("✅ ProcessManager cleaned up (processes left running)"));
+  }
+
+  /**
+   * Force terminate all processes (for hard shutdown)
+   */
+  public forceCleanup(): void {
+    console.log(chalk.yellow("🧹 Force cleaning up all processes..."));
 
     // Stop memory monitoring
     if (this.memoryCheckInterval) {
@@ -538,6 +715,6 @@ export class ProcessManager {
     this.outputCallback = null;
     this.exitCallback = null;
 
-    console.log(chalk.green("✅ All processes cleaned up"));
+    console.log(chalk.green("✅ All processes force cleaned up"));
   }
 }

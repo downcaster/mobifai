@@ -442,6 +442,201 @@ export class CodeService {
   }
 
   /**
+   * Get project changes (git status)
+   */
+  public getProjectChanges(projectPath: string): Promise<{
+    staged: Array<{ path: string; type: string }>;
+    unstaged: Array<{ path: string; type: string }>;
+  }> {
+    return new Promise((resolve, reject) => {
+      console.log(`🔄 CodeService.getProjectChanges called for: ${projectPath}`);
+
+      // Return empty if not connected
+      if (!this.isInitialized()) {
+        console.log('⚠️ CodeService not initialized, returning empty changes');
+        resolve({ staged: [], unstaged: [] });
+        return;
+      }
+
+      const unsubscribe = this.onMessage('code:projectChanges', (_action, payload: { projectPath: string; staged: Array<{ path: string; type: string }>; unstaged: Array<{ path: string; type: string }> }) => {
+        if (payload.projectPath === projectPath) {
+          unsubscribe();
+          resolve({ staged: payload.staged, unstaged: payload.unstaged });
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:projectChangesError', (_action, payload: { projectPath: string; error: string }) => {
+        if (payload.projectPath === projectPath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('getProjectChanges', { projectPath });
+
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({ staged: [], unstaged: [] });
+        return;
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({ staged: [], unstaged: [] });
+      }, 15000); // Longer timeout for git operations
+    });
+  }
+
+  /**
+   * Open a file (tell Mac to start tracking it)
+   */
+  public openFile(projectPath: string, filePath: string): Promise<{ filePath: string; content: string }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:fileOpened', (_action, payload: { filePath: string; content: string }) => {
+        if (payload.filePath === filePath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:fileOpenError', (_action, payload: { filePath: string; error: string }) => {
+        if (payload.filePath === filePath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('openFile', { projectPath, filePath });
+
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Close a file (tell Mac to stop tracking it)
+   */
+  public closeFile(filePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:fileClosed', (_action, payload: { filePath: string }) => {
+        if (payload.filePath === filePath) {
+          unsubscribe();
+          resolve();
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:fileCloseError', (_action, payload: { filePath: string; error: string }) => {
+        if (payload.filePath === filePath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('closeFile', { filePath });
+
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve(); // Resolve even on timeout for close
+      }, 5000);
+    });
+  }
+
+  /**
+   * Set the active file (Mac will start watching it for changes)
+   */
+  public setActiveFile(filePath: string | null): Promise<{ filePath: string | null; content: string | null }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:activeFileSet', (_action, payload: { filePath: string | null; content: string | null }) => {
+        if (payload.filePath === filePath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:activeFileError', (_action, payload: { filePath: string | null; error: string }) => {
+        if (payload.filePath === filePath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('setActiveFile', { filePath });
+
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Sync open files state for a project
+   */
+  public syncOpenFiles(projectPath: string): Promise<{
+    projectPath: string;
+    files: Array<{ path: string; content: string; isActive: boolean }>;
+  }> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:openFilesSync', (_action, payload: {
+        projectPath: string;
+        files: Array<{ path: string; content: string; isActive: boolean }>;
+      }) => {
+        if (payload.projectPath === projectPath) {
+          unsubscribe();
+          resolve(payload);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:openFilesSyncError', (_action, payload: { projectPath: string; error: string }) => {
+        if (payload.projectPath === projectPath) {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('syncOpenFiles', { projectPath });
+
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({ projectPath, files: [] });
+        return;
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        resolve({ projectPath, files: [] });
+      }, 10000);
+    });
+  }
+
+  /**
    * Get git diff for a file
    */
   public getFileDiff(filePath: string): Promise<FileDiff> {

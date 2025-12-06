@@ -49,7 +49,12 @@ export function useFileContent(filePath: string | null) {
 export function useSaveFile() {
   const queryClient = useQueryClient();
 
-  return useMutation<boolean, Error, { filePath: string; content: string }>({
+  return useMutation<
+    boolean,
+    Error,
+    { filePath: string; content: string },
+    { previousContent: string | undefined; filePath: string }
+  >({
     mutationFn: ({ filePath, content }) => codeService.saveFile(filePath, content),
     onMutate: async ({ filePath, content }) => {
       // Cancel outgoing refetches

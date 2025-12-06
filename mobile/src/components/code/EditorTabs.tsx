@@ -1,25 +1,25 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
   Text,
-} from 'react-native';
+} from "react-native";
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
-  background: '#0a0a0f',
-  surface: '#12121a',
-  surfaceElevated: '#1a1a25',
-  border: '#2a2a3a',
-  primary: '#6200EE',
-  primaryLight: '#BB86FC',
-  secondary: '#03DAC6',
+  background: "#0a0a0f",
+  surface: "#12121a",
+  surfaceElevated: "#1a1a25",
+  border: "#2a2a3a",
+  primary: "#6200EE",
+  primaryLight: "#BB86FC",
+  secondary: "#03DAC6",
   text: {
-    primary: '#ffffff',
-    secondary: '#8888aa',
-    disabled: '#555566',
+    primary: "#ffffff",
+    secondary: "#8888aa",
+    disabled: "#555566",
   },
 };
 
@@ -51,104 +51,137 @@ export function EditorTabs({
   }
 
   return (
-    <ScrollView
-      horizontal
-      style={styles.container}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {files.map((file) => {
-        const isActive = activeFile === file.path;
-        
-        return (
-          <View
-            key={file.path}
-            style={[styles.tab, isActive && styles.tabActive]}
-          >
-            <TouchableOpacity
-              style={styles.tabButton}
-              onPress={() => onSelectFile(file.path)}
-              activeOpacity={0.7}
+    <View style={styles.wrapper}>
+      <ScrollView
+        horizontal
+        style={styles.container}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
+      >
+        {files.map((file, index) => {
+          const isActive = activeFile === file.path;
+          const isFirst = index === 0;
+
+          return (
+            <View
+              key={file.path}
+              style={[
+                styles.tab,
+                isActive ? styles.tabActive : styles.tabInactive,
+                isFirst && styles.tabFirst,
+              ]}
             >
-              {file.isDirty && <View style={styles.dirtyIndicator} />}
-              <Text
-                style={[styles.tabName, isActive && styles.tabNameActive]}
-                numberOfLines={1}
+              <TouchableOpacity
+                style={styles.tabButton}
+                onPress={() => onSelectFile(file.path)}
+                activeOpacity={0.7}
               >
-                {file.name}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => onCloseFile(file.path)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-            >
-              <Text style={[styles.closeIcon, isActive && styles.closeIconActive]}>×</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-    </ScrollView>
+                {file.isDirty && <View style={styles.dirtyIndicator} />}
+                <Text
+                  style={[styles.tabName, isActive && styles.tabNameActive]}
+                  numberOfLines={1}
+                >
+                  {file.name}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => onCloseFile(file.path)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Text
+                  style={[styles.closeIcon, isActive && styles.closeIconActive]}
+                >
+                  ×
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </ScrollView>
+      {/* Bottom border line that fills remaining space */}
+      <View style={styles.bottomBorder} />
+    </View>
   );
 }
 
+const TAB_HEIGHT = 36;
+
 const styles = StyleSheet.create({
+  wrapper: {
+    flexDirection: "row",
+    backgroundColor: darkTheme.background,
+  },
   container: {
     backgroundColor: darkTheme.background,
-    borderBottomWidth: 1,
-    borderBottomColor: darkTheme.border,
-    maxHeight: 44,
+    maxHeight: TAB_HEIGHT,
+    flexGrow: 0,
   },
   contentContainer: {
-    paddingHorizontal: 8,
-    alignItems: 'center',
+    alignItems: "flex-end", // Align tabs to bottom
   },
   emptyContainer: {
     backgroundColor: darkTheme.background,
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: TAB_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 12,
     color: darkTheme.text.disabled,
   },
+  bottomBorder: {
+    flex: 1,
+    height: TAB_HEIGHT,
+    borderBottomWidth: 1,
+    borderBottomColor: darkTheme.border,
+  },
   tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: darkTheme.surfaceElevated,
-    borderRadius: 8,
-    marginHorizontal: 4,
-    marginVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    height: TAB_HEIGHT,
     paddingLeft: 12,
     paddingRight: 4,
-    maxWidth: 160,
-    borderWidth: 1,
-    borderColor: darkTheme.border,
+    minWidth: 100,
+    maxWidth: 180,
+    borderRightWidth: 1,
+    borderRightColor: darkTheme.border,
+    borderTopWidth: 1,
+    borderTopColor: darkTheme.border,
+  },
+  tabFirst: {
+    borderLeftWidth: 1,
+    borderLeftColor: darkTheme.border,
   },
   tabActive: {
-    backgroundColor: darkTheme.primary + '25',
-    borderColor: darkTheme.primary,
+    backgroundColor: darkTheme.surface, // Same as content area
+    borderBottomWidth: 0, // No bottom border - connected to content
+  },
+  tabInactive: {
+    backgroundColor: darkTheme.background, // Darker background
+    borderBottomWidth: 1,
+    borderBottomColor: darkTheme.border,
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
   },
   tabName: {
-    fontSize: 12,
+    fontSize: 13,
     color: darkTheme.text.secondary,
-    fontWeight: '500',
+    fontWeight: "500",
     flex: 1,
+    minWidth: 40,
   },
   tabNameActive: {
-    color: darkTheme.primaryLight,
-    fontWeight: '600',
+    color: darkTheme.text.primary, // White text for active
+    fontWeight: "600",
   },
   dirtyIndicator: {
     width: 6,
@@ -160,15 +193,14 @@ const styles = StyleSheet.create({
   closeButton: {
     width: 22,
     height: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginLeft: 4,
-    borderRadius: 11,
   },
   closeIcon: {
     fontSize: 16,
     color: darkTheme.text.disabled,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   closeIconActive: {
     color: darkTheme.text.secondary,

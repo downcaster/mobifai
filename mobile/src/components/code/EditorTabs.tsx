@@ -34,6 +34,7 @@ interface EditorTabsProps {
   activeFile: string | null;
   onSelectFile: (path: string) => void;
   onCloseFile: (path: string) => void;
+  fontSize?: number; // Optional font size from settings
 }
 
 export function EditorTabs({
@@ -41,6 +42,7 @@ export function EditorTabs({
   activeFile,
   onSelectFile,
   onCloseFile,
+  fontSize = 13, // Default to 13 if not provided
 }: EditorTabsProps): React.ReactElement {
   if (files.length === 0) {
     return (
@@ -76,13 +78,17 @@ export function EditorTabs({
                 onPress={() => onSelectFile(file.path)}
                 activeOpacity={0.7}
               >
-                {file.isDirty && <View style={styles.dirtyIndicator} />}
-                <Text
-                  style={[styles.tabName, isActive && styles.tabNameActive]}
-                  numberOfLines={1}
-                >
-                  {file.name}
-                </Text>
+                        {file.isDirty && <View style={styles.dirtyIndicator} />}
+                        <Text
+                          style={[
+                            styles.tabName,
+                            isActive && styles.tabNameActive,
+                            { fontSize: fontSize }, // Apply dynamic font size
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {file.name}
+                        </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -162,7 +168,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0, // No bottom border - connected to content
   },
   tabInactive: {
-    backgroundColor: darkTheme.background, // Darker background
+    backgroundColor: "#06060a", // Even darker than background for inactive tabs
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
   },

@@ -130,7 +130,7 @@ export default function CodeScreen(): React.ReactElement {
 
   // Fetch active file content
   const { data: activeFileContent, isLoading: isLoadingFile } =
-    useFileContent(activeFile);
+    useFileContent(activeFile, currentProject?.path);
 
   // Show "No Active Connection" screen when not connected
   if (!isConnected) {
@@ -308,6 +308,25 @@ export default function CodeScreen(): React.ReactElement {
             if (activeFileData) {
               setActiveFile(activeFileData.path);
               setFileContents({ [activeFileData.path]: activeFileData.content });
+              // Notify Mac client
+              try {
+                await codeService.setActiveFile(activeFileData.path);
+              } catch (error) {
+                console.error("Failed to set active file on Mac:", error);
+              }
+            } else if (restoredFiles.length > 0) {
+              // No active file saved, auto-open the first tab
+              const firstFile = restoredFiles[0];
+              setActiveFile(firstFile.path);
+              const firstFileData = syncedState.files[0];
+              setFileContents({ [firstFile.path]: firstFileData.content });
+              // Notify Mac client
+              try {
+                await codeService.setActiveFile(firstFile.path);
+              } catch (error) {
+                console.error("Failed to set active file on Mac:", error);
+              }
+              console.log(`📂 Auto-opened first file: ${firstFile.name}`);
             }
             console.log(`✅ Restored ${syncedState.files.length} open file(s)`);
           }
@@ -804,6 +823,7 @@ export default function CodeScreen(): React.ReactElement {
   }, [currentProject?.path, sidebarTab]);
 
   // Listen for file updates from Mac (when file changes on disk)
+  // Listen for file updates from Mac
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
       "code:fileUpdated",
@@ -821,6 +841,23 @@ export default function CodeScreen(): React.ReactElement {
 
     return () => unsubscribe();
   }, [activeFile]);
+
+  // Listen for diff updates from Mac (sent automatically after file changes)
+  useEffect(() => {
+    const unsubscribe = codeService.onMessage(
+      "code:fileDiff",
+      (_action, payload: FileDiff) => {
+        // Only update if this is the active file and diff mode is enabled
+        if (payload.filePath === activeFile && diffMode !== "off") {
+          console.log("📊 Received live diff update from Mac:", payload.filePath);
+          console.log(`   Added: ${payload.addedLines.length}, Deleted: ${payload.deletedLines.length}, Modified: ${payload.modifiedLines.length}`);
+          setDiffData(payload);
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [activeFile, diffMode]);
 
   // Get language from file path
   const getLanguage = (filePath: string): string => {
@@ -1033,6 +1070,7 @@ export default function CodeScreen(): React.ReactElement {
           }
         }}
         onCloseFile={handleCloseFile}
+        fontSize={editorFontSize}
       />
 
       {/* Main Content */}

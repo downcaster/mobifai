@@ -214,12 +214,16 @@ export class OpenFilesManager {
     }
 
     console.log(chalk.cyan(`👁️ Setting active file: ${path.basename(filePath)}`));
+    console.log(chalk.gray(`   Full path: ${filePath}`));
 
     // Mark as active
     fileInfo.isActive = true;
+    console.log(chalk.gray(`   Marked as active`));
 
     // Start watching for changes
+    console.log(chalk.gray(`   Starting file watcher...`));
     this.startWatching(fileInfo);
+    console.log(chalk.gray(`   Watcher setup complete`));
 
     // Update in database
     try {
@@ -246,14 +250,19 @@ export class OpenFilesManager {
    */
   private startWatching(fileInfo: OpenFileInfo): void {
     if (fileInfo.watcher) {
+      console.log(chalk.yellow(`  ⚠️ File already being watched: ${path.basename(fileInfo.filePath)}`));
       return; // Already watching
     }
+
+    console.log(chalk.cyan(`  🔍 Starting watcher for: ${path.basename(fileInfo.filePath)}`));
 
     try {
       let lastContent = fs.readFileSync(fileInfo.filePath, "utf-8");
       let debounceTimer: NodeJS.Timeout | null = null;
 
-      fileInfo.watcher = fs.watch(fileInfo.filePath, (eventType) => {
+      fileInfo.watcher = fs.watch(fileInfo.filePath, (eventType, filename) => {
+        console.log(chalk.gray(`    📡 fs.watch event: ${eventType} (filename: ${filename || 'N/A'})`));
+        
         if (eventType === "change") {
           // Debounce rapid changes (e.g., from IDE auto-save)
           if (debounceTimer) {
@@ -264,23 +273,31 @@ export class OpenFilesManager {
             try {
               const newContent = fs.readFileSync(fileInfo.filePath, "utf-8");
               
-              // Only notify if content actually changed
+              // Check if content actually changed
               if (newContent !== lastContent) {
+                const oldLength = lastContent.length;
                 lastContent = newContent;
-                console.log(chalk.cyan(`📝 File changed: ${path.basename(fileInfo.filePath)}`));
+                console.log(chalk.bold.cyan(`📝 File changed: ${path.basename(fileInfo.filePath)}`));
+                console.log(chalk.gray(`   Old length: ${oldLength}, New length: ${newContent.length}`));
                 
                 if (this.fileUpdateCallback) {
+                  console.log(chalk.green(`   ✅ Sending update to iOS`));
                   this.fileUpdateCallback(fileInfo.filePath, newContent);
+                } else {
+                  console.log(chalk.red(`   ❌ No callback set!`));
                 }
+              } else {
+                console.log(chalk.gray(`   ⚠️ Event fired but content unchanged`));
               }
             } catch (error) {
               console.error(chalk.red(`❌ Failed to read changed file:`), error);
             }
-          }, 100); // 100ms debounce
+          }, 200); // Increased debounce to 200ms to reduce multiple triggers
         }
       });
 
-      console.log(chalk.gray(`  👀 Watching for changes`));
+      console.log(chalk.green(`  ✅ Watcher started successfully for: ${path.basename(fileInfo.filePath)}`));
+      console.log(chalk.gray(`     Full path: ${fileInfo.filePath}`));
     } catch (error) {
       console.error(chalk.red(`❌ Failed to watch file: ${fileInfo.filePath}`), error);
     }
@@ -311,29 +328,60 @@ export class OpenFilesManager {
 
   /**
    * Sync project state - returns open files with their contents
+   * Queries the database to get all persisted open files for the project
    */
   public async syncProject(projectPath: string): Promise<{
     projectPath: string;
     files: Array<{ path: string; content: string; isActive: boolean }>;
   }> {
+    console.log(chalk.cyan(`🔄 Syncing project: ${projectPath}`));
+    
     const files: Array<{ path: string; content: string; isActive: boolean }> = [];
 
-    for (const [filePath, fileInfo] of this.openFiles) {
-      if (fileInfo.projectPath === projectPath) {
-        try {
-          const content = fs.readFileSync(filePath, "utf-8");
-          files.push({
-            path: filePath,
-            content,
-            isActive: fileInfo.isActive,
-          });
-        } catch (error) {
-          console.error(chalk.red(`❌ Failed to read file for sync: ${filePath}`), error);
-          // Remove the file if it can't be read
-          await this.closeFile(filePath);
+    try {
+      // Query database for all open files for this project
+      const prisma = getPrismaClient();
+      const savedFiles = await prisma.openFile.findMany({
+        where: { projectPath },
+        orderBy: { openedAt: 'asc' },
+      });
+
+      console.log(chalk.gray(`  Found ${savedFiles.length} saved file(s) in DB`));
+
+      for (const saved of savedFiles) {
+        // Check if file still exists
+        if (fs.existsSync(saved.filePath)) {
+          try {
+            const content = fs.readFileSync(saved.filePath, "utf-8");
+            files.push({
+              path: saved.filePath,
+              content,
+              isActive: saved.isActive,
+            });
+
+            // Also add to in-memory map if not already there
+            if (!this.openFiles.has(saved.filePath)) {
+              this.openFiles.set(saved.filePath, {
+                projectPath: saved.projectPath,
+                filePath: saved.filePath,
+                isActive: saved.isActive,
+              });
+            }
+          } catch (error) {
+            console.error(chalk.red(`❌ Failed to read file for sync: ${saved.filePath}`), error);
+            // Remove the file if it can't be read
+            await prisma.openFile.deleteMany({ where: { filePath: saved.filePath } });
+          }
+        } else {
+          console.log(chalk.yellow(`  ⚠️ File not found, removing: ${saved.filePath}`));
+          await prisma.openFile.deleteMany({ where: { filePath: saved.filePath } });
         }
       }
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to sync project from DB:`), error);
     }
+
+    console.log(chalk.green(`✅ Synced ${files.length} file(s)`));
 
     return {
       projectPath,

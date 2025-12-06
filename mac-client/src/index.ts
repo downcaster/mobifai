@@ -194,11 +194,46 @@ function setupProcessManagerCallbacks(): void {
  * Set up OpenFilesManager callbacks
  */
 function setupOpenFilesManagerCallbacks(): void {
+  console.log(chalk.cyan(`🔧 Setting up OpenFilesManager callbacks...`));
+  
+  // Track last sent content per file to avoid duplicate sends
+  const lastSentContent = new Map<string, string>();
+  
   // Handle file updates from file watcher
-  openFilesManager.onFileUpdate((filePath, content) => {
-    console.log(chalk.cyan(`📝 File updated: ${path.basename(filePath)}`));
-    sendToClient("code:fileUpdated", { filePath, content });
+  openFilesManager.onFileUpdate(async (filePath, content) => {
+    console.log(chalk.bold.cyan(`📝 File updated from watcher: ${path.basename(filePath)}`));
+    
+    // Check if content actually changed from what we last sent
+    const previousContent = lastSentContent.get(filePath);
+    const contentChanged = content !== previousContent;
+    
+    if (contentChanged) {
+      console.log(chalk.gray(`   Content changed, sending to iOS...`));
+      sendToClient("code:fileUpdated", { filePath, content });
+      lastSentContent.set(filePath, content);
+      console.log(chalk.green(`   ✅ Sent content to iOS`));
+    } else {
+      console.log(chalk.yellow(`   ⚠️ Content unchanged from last send, skipping`));
+    }
+    
+    // Always compute and send updated diff (even if content didn't change from our perspective,
+    // the diff might have changed due to git operations)
+    try {
+      console.log(chalk.gray(`   Computing updated diff...`));
+      const diff = await codeManager.getFileDiff(filePath);
+      
+      if (diff.hasChanges) {
+        sendToClient("code:fileDiff", diff);
+        console.log(chalk.green(`   ✅ Sent updated diff to iOS (added=${diff.addedLines.length}, deleted=${diff.deletedLines.length})`));
+      } else {
+        console.log(chalk.gray(`   No diff changes to send`));
+      }
+    } catch (error: any) {
+      console.error(chalk.red(`   ❌ Failed to compute diff:`, error.message));
+    }
   });
+  
+  console.log(chalk.green(`✅ OpenFilesManager callbacks set up`));
 }
 
 /**
@@ -679,8 +714,19 @@ function handleCodeGetFolderChildren(payload: { folderPath: string }): void {
 /**
  * Handle code.getFile
  */
-function handleCodeGetFile(payload: { filePath: string }): void {
+async function handleCodeGetFile(payload: { filePath: string; projectPath?: string }): Promise<void> {
   const result = codeManager.getFile(payload.filePath);
+  
+  // Also register the file with OpenFilesManager if projectPath is provided
+  if (payload.projectPath && result.content) {
+    try {
+      await openFilesManager.openFile(payload.projectPath, payload.filePath);
+      console.log(chalk.gray(`  📋 Registered file with OpenFilesManager`));
+    } catch (error) {
+      console.warn(chalk.yellow(`  ⚠️ Failed to register file:`, error));
+    }
+  }
+  
   sendToClient("code:fileContent", result);
 }
 

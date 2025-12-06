@@ -30,16 +30,20 @@ export function useFolderChildren(folderPath: string | null) {
 
 /**
  * Hook to fetch file content
+ * Always refetches - no caching to ensure latest content
  */
-export function useFileContent(filePath: string | null) {
+export function useFileContent(filePath: string | null, projectPath?: string) {
   return useQuery<string, Error>({
     queryKey: ['file', filePath],
     queryFn: () => {
       if (!filePath) throw new Error('File path is required');
-      return codeService.getFile(filePath);
+      return codeService.getFile(filePath, projectPath);
     },
     enabled: !!filePath,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always consider stale - refetch every time
+    gcTime: 0, // Don't cache at all
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 }
 

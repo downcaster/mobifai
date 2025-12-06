@@ -224,7 +224,7 @@ export class CodeService {
   /**
    * Get file content
    */
-  public getFile(filePath: string): Promise<string> {
+  public getFile(filePath: string, projectPath?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const unsubscribe = this.onMessage('code:fileContent', (_action, payload: FileContentResponse) => {
         if (payload.filePath === filePath) {
@@ -240,7 +240,7 @@ export class CodeService {
         }
       });
 
-      const payload: CodeFilePayload = { filePath };
+      const payload: CodeFilePayload & { projectPath?: string } = { filePath, projectPath };
       const sent = this.sendMessage('getFile', payload);
       
       if (!sent) {

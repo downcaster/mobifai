@@ -17,6 +17,8 @@ import {
 } from "../types/savedCombinations";
 import { TerminalAction } from "../components/KeyCombinationModal";
 
+export const COMBO_BAR_VISIBLE_KEY = "mobifai_combo_bar_visible";
+
 // Design tokens for the futuristic theme
 const themeColors = {
   bg: {
@@ -50,19 +52,36 @@ export default function CommandCombinationsScreen(): React.ReactElement {
   const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(
     null
   );
+  const [comboBarVisible, setComboBarVisible] = useState(true);
 
   useEffect(() => {
-    loadCombinations();
+    loadData();
   }, []);
 
-  const loadCombinations = async (): Promise<void> => {
+  const loadData = async (): Promise<void> => {
     try {
-      const saved = await AsyncStorage.getItem(SAVED_COMBINATIONS_KEY);
+      const [saved, visibleSetting] = await Promise.all([
+        AsyncStorage.getItem(SAVED_COMBINATIONS_KEY),
+        AsyncStorage.getItem(COMBO_BAR_VISIBLE_KEY),
+      ]);
       if (saved) {
         setSavedCombinations(JSON.parse(saved));
       }
+      if (visibleSetting !== null) {
+        setComboBarVisible(visibleSetting === "true");
+      }
     } catch (error) {
-      if (__DEV__) console.error("Error loading combinations:", error);
+      if (__DEV__) console.error("Error loading data:", error);
+    }
+  };
+
+  const toggleComboBarVisible = async (): Promise<void> => {
+    const newValue = !comboBarVisible;
+    setComboBarVisible(newValue);
+    try {
+      await AsyncStorage.setItem(COMBO_BAR_VISIBLE_KEY, String(newValue));
+    } catch (error) {
+      if (__DEV__) console.error("Error saving combo bar visibility:", error);
     }
   };
 
@@ -166,6 +185,31 @@ export default function CommandCombinationsScreen(): React.ReactElement {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Visibility Toggle */}
+        <View style={styles.settingCard}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <AppText style={styles.settingLabel}>
+                Show Combo Bar in Terminal
+              </AppText>
+              <AppText style={styles.settingDescription}>
+                Display quick access buttons above the keyboard
+              </AppText>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggle, comboBarVisible && styles.toggleActive]}
+              onPress={toggleComboBarVisible}
+            >
+              <View
+                style={[
+                  styles.toggleThumb,
+                  comboBarVisible && styles.toggleThumbActive,
+                ]}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Combinations List */}
         <View style={styles.card}>
           {savedCombinations.length > 0 ? (
@@ -304,6 +348,57 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 100,
+  },
+  settingCard: {
+    backgroundColor: themeColors.bg.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: themeColors.border.subtle,
+    marginBottom: 20,
+    overflow: "hidden",
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+  },
+  settingTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: themeColors.text.primary,
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 12,
+    color: themeColors.text.muted,
+  },
+  toggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: themeColors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: themeColors.border.subtle,
+    padding: 2,
+    justifyContent: "center",
+  },
+  toggleActive: {
+    backgroundColor: themeColors.accent.primary,
+    borderColor: themeColors.accent.primary,
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: themeColors.text.muted,
+  },
+  toggleThumbActive: {
+    backgroundColor: "#ffffff",
+    alignSelf: "flex-end",
   },
   card: {
     backgroundColor: themeColors.bg.card,

@@ -68,6 +68,7 @@ import {
   SavedCombination,
   SAVED_COMBINATIONS_KEY,
 } from "../types/savedCombinations";
+import { COMBO_BAR_VISIBLE_KEY } from "./CommandCombinationsScreen";
 
 // Constants
 const IOS_QUICKTYPE_BAR_HEIGHT = 44; // Height of iOS QuickType suggestion bar
@@ -208,7 +209,7 @@ export default function TerminalScreen({
   const [savedCombinations, setSavedCombinations] = useState<
     SavedCombination[]
   >([]);
-  const [comboBarExpanded, setComboBarExpanded] = useState(false);
+  const [comboBarVisible, setComboBarVisible] = useState(true);
 
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -389,20 +390,26 @@ export default function TerminalScreen({
     }
   }, [isFocused, webrtcConnected]);
 
-  // Load saved combinations when screen comes into focus
+  // Load saved combinations and visibility setting when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      const loadSavedCombinations = async (): Promise<void> => {
+      const loadCombinationsData = async (): Promise<void> => {
         try {
-          const saved = await AsyncStorage.getItem(SAVED_COMBINATIONS_KEY);
+          const [saved, visibleSetting] = await Promise.all([
+            AsyncStorage.getItem(SAVED_COMBINATIONS_KEY),
+            AsyncStorage.getItem(COMBO_BAR_VISIBLE_KEY),
+          ]);
           if (saved) {
             setSavedCombinations(JSON.parse(saved));
           }
+          if (visibleSetting !== null) {
+            setComboBarVisible(visibleSetting === "true");
+          }
         } catch (error) {
-          console.error("Failed to load saved combinations:", error);
+          console.error("Failed to load combinations data:", error);
         }
       };
-      loadSavedCombinations();
+      loadCombinationsData();
     }, [])
   );
 
@@ -2537,7 +2544,7 @@ export default function TerminalScreen({
         )}
 
         {/* Command Combo Bar - follows keyboard */}
-        {processes.length > 0 && (
+        {processes.length > 0 && comboBarVisible && (
           <View
             style={[
               styles.comboBarContainer,
@@ -2554,8 +2561,6 @@ export default function TerminalScreen({
           >
             <CommandComboBar
               combinations={savedCombinations}
-              expanded={comboBarExpanded}
-              onToggleExpand={() => setComboBarExpanded(!comboBarExpanded)}
               onExecute={handleExecuteSavedCombination}
             />
           </View>

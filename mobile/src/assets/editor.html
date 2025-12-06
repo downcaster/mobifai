@@ -111,6 +111,8 @@
       border-left: 3px solid #F44336;
       margin-left: -3px;
       padding-left: 3px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .diff-deleted-line {
@@ -120,7 +122,9 @@
       font-family: inherit;
       font-size: inherit;
       line-height: inherit;
-      white-space: pre;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
       padding: 0 4px;
     }
   `,document.head.appendChild(n)}function RO(){const n=document.getElementById("editor");if(!n){console.error("Editor container not found");return}h$();const e=fi.of([{key:"Mod-s",run:()=>(Wr("save",{content:te==null?void 0:te.state.doc.toString()}),!0)}]),t=_.create({doc:"// Loading...",extensions:[ub,Pb,nm.of(om("javascript")),rm.of(_.readOnly.of(!1)),Rl.of([]),s$,fi.of([...fd,C1]),e,T.updateListener.of(i=>{i.docChanged&&Wr("contentChanged",{content:i.state.doc.toString()})}),T.lineWrapping,_.tabSize.of(2)]});te=new T({state:t,parent:n}),Wr("ready")}function lm(n){var e,t,i,r;try{const s=JSON.parse(n.data);switch(s.type){case"setContent":if(te&&((e=s.data)==null?void 0:e.content)!==void 0){const o=te.state.update({changes:{from:0,to:te.state.doc.length,insert:s.data.content}});te.dispatch(o),Jt&&Jt.mode==="inline"&&setTimeout(()=>{te&&Po(te,Jt)},0)}break;case"getContent":te&&Wr("content",{content:te.state.doc.toString()});break;case"setLanguage":te&&((t=s.data)!=null&&t.language)&&(XO=s.data.language,te.dispatch({effects:nm.reconfigure(om(XO))}));break;case"setReadOnly":te&&((i=s.data)==null?void 0:i.readOnly)!==void 0&&te.dispatch({effects:rm.reconfigure(_.readOnly.of(s.data.readOnly))});break;case"focus":te&&te.focus();break;case"setDiffData":te&&s.data&&(Jt=s.data,te.dispatch({effects:Rl.reconfigure(n$(Jt))}),Po(te,Jt));break;case"clearDiff":te&&(Jt=null,te.dispatch({effects:Rl.reconfigure([])}),Po(te,null));break;case"setFontSize":if((r=s.data)!=null&&r.fontSize){const o=s.data.fontSize;document.documentElement.style.setProperty("--editor-font-size",`${o}px`);const l=document.getElementById("editor");l&&(l.style.fontSize=`${o}px`);const a=document.querySelector(".cm-editor");a&&(a.style.fontSize=`${o}px`)}break;case"setTheme":if(s.data){const{background:o,foreground:l,cursor:a}=s.data;document.documentElement.style.setProperty("--editor-bg",o),document.documentElement.style.setProperty("--editor-fg",l),document.documentElement.style.setProperty("--editor-cursor",a),document.body.style.backgroundColor=o;const h=document.createElement("style");h.id="dynamic-theme";const c=document.getElementById("dynamic-theme");c&&c.remove(),h.textContent=`

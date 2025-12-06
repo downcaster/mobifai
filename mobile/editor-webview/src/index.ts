@@ -298,6 +298,8 @@ function addDiffStyles() {
       border-left: 3px solid #F44336;
       margin-left: -3px;
       padding-left: 3px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .diff-deleted-line {
@@ -307,7 +309,9 @@ function addDiffStyles() {
       font-family: inherit;
       font-size: inherit;
       line-height: inherit;
-      white-space: pre;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
       padding: 0 4px;
     }
   `;

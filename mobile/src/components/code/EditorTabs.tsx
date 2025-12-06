@@ -78,17 +78,17 @@ export function EditorTabs({
                 onPress={() => onSelectFile(file.path)}
                 activeOpacity={0.7}
               >
-                        {file.isDirty && <View style={styles.dirtyIndicator} />}
-                        <Text
-                          style={[
-                            styles.tabName,
-                            isActive && styles.tabNameActive,
-                            { fontSize: fontSize }, // Apply dynamic font size
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {file.name}
-                        </Text>
+                {file.isDirty && <View style={styles.dirtyIndicator} />}
+                <Text
+                  style={[
+                    styles.tabName,
+                    isActive && styles.tabNameActive,
+                    { fontSize: fontSize }, // Apply dynamic font size
+                  ]}
+                  numberOfLines={1}
+                >
+                  {file.name}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity

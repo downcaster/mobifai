@@ -26,6 +26,16 @@ export interface FileNode {
   loaded?: boolean;
 }
 
+/**
+ * Represents a file change detected by git
+ */
+export interface FileChange {
+  /** Absolute path to the changed file */
+  path: string;
+  /** Type of change (modified, added, deleted, etc.) */
+  type: string;
+}
+
 // ============================================================================
 // Request Payloads (Mobile -> Mac)
 // ============================================================================

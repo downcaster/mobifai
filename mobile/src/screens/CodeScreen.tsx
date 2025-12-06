@@ -20,7 +20,7 @@ import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { CodeEditor } from "../components/code/CodeEditor";
 import { FileTree, SelectedItem } from "../components/code/FileTree";
 import { EditorTabs, OpenFile } from "../components/code/EditorTabs";
-import { CodeProject, FileNode } from "../types/code";
+import { CodeProject, FileNode, FileChange } from "../types/code";
 import {
   useInitProject,
   useFileContent,
@@ -858,6 +858,26 @@ export default function CodeScreen(): React.ReactElement {
 
     return () => unsubscribe();
   }, [activeFile, diffMode]);
+
+  // Listen for project changes from Git watcher
+  useEffect(() => {
+    const unsubscribe = codeService.onMessage(
+      "code:projectChanges",
+      (_action, payload: { projectPath: string; staged: FileChange[]; unstaged: FileChange[] }) => {
+        // Only update if this is the current project
+        if (payload.projectPath === currentProject?.path) {
+          console.log("🔄 Received project changes from Mac:");
+          console.log(`   Staged: ${payload.staged.length}, Unstaged: ${payload.unstaged.length}`);
+          setProjectChanges({
+            staged: payload.staged,
+            unstaged: payload.unstaged,
+          });
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentProject?.path]);
 
   // Get language from file path
   const getLanguage = (filePath: string): string => {

@@ -18,6 +18,7 @@ import { getAIService, AIPromptPayload } from "./ai/index.js";
 import { ProcessManager } from "./process-manager.js";
 import { CodeManager } from "./code-manager.js";
 import { OpenFilesManager } from "./open-files-manager.js";
+import { GitWatcher } from "./git-watcher.js";
 
 const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = wrtc;
 
@@ -101,6 +102,9 @@ const codeManager = new CodeManager();
 
 // Open Files Manager - tracks open files and watches for changes
 const openFilesManager = new OpenFilesManager();
+
+// Git Watcher - polls git status to detect file changes in projects
+const gitWatcher = new GitWatcher();
 
 // Store terminal dimensions from mobile
 let terminalCols = 80;
@@ -234,6 +238,27 @@ function setupOpenFilesManagerCallbacks(): void {
   });
   
   console.log(chalk.green(`✅ OpenFilesManager callbacks set up`));
+}
+
+function setupGitWatcherCallbacks(): void {
+  console.log(chalk.cyan(`🔧 Setting up GitWatcher callbacks...`));
+  
+  // Handle git changes detected
+  gitWatcher.onChanges((projectPath, changes) => {
+    console.log(chalk.bold.cyan(`📝 Git changes detected: ${path.basename(projectPath)}`));
+    console.log(chalk.gray(`   Staged: ${changes.staged.length}, Unstaged: ${changes.unstaged.length}`));
+    
+    // Send to iOS
+    sendToClient("code:projectChanges", {
+      projectPath,
+      staged: changes.staged,
+      unstaged: changes.unstaged,
+    });
+    
+    console.log(chalk.green(`   ✅ Sent project changes to iOS`));
+  });
+  
+  console.log(chalk.green(`✅ GitWatcher callbacks set up`));
 }
 
 /**
@@ -701,6 +726,9 @@ function handleCodeMessage(action: string, payload: unknown): void {
 function handleCodeInitProject(payload: { projectPath: string }): void {
   const result = codeManager.initProject(payload.projectPath);
   sendToClient("code:projectInitialized", result);
+  
+  // Start watching for git changes in this project
+  gitWatcher.startWatching(payload.projectPath);
 }
 
 /**
@@ -750,6 +778,10 @@ function handleCodeSaveFile(payload: { filePath: string; newContent: string }): 
  */
 function handleCodeCloseProject(payload: { projectPath: string }): void {
   codeManager.closeProject(payload.projectPath);
+  
+  // Stop watching for git changes
+  gitWatcher.stopWatching(payload.projectPath);
+  
   sendToClient("code:projectClosed", { projectPath: payload.projectPath });
 }
 
@@ -1145,6 +1177,9 @@ async function connectToRelay() {
 
   // Setup OpenFilesManager callbacks
   setupOpenFilesManagerCallbacks();
+
+  // Setup GitWatcher callbacks
+  setupGitWatcherCallbacks();
 
   socket = io(config.RELAY_SERVER_URL, {
     reconnection: true,
@@ -1575,6 +1610,9 @@ function handleShutdown(signal: string) {
 
     // Clean up all processes (this also stops process manager's memory monitoring)
     processManager.cleanup();
+
+    // Stop all git watchers
+    gitWatcher.stopAll();
 
     // Close WebRTC connections
     if (dataChannel) {

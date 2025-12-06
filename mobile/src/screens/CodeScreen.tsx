@@ -93,7 +93,7 @@ export default function CodeScreen(): React.ReactElement {
   // Selected item state (for file/folder creation)
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
-  // Diff state
+  // Diff state (loaded from settings)
   const [diffMode, setDiffMode] = useState<DiffMode>("off");
   const [diffData, setDiffData] = useState<FileDiff | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
@@ -168,6 +168,9 @@ export default function CodeScreen(): React.ReactElement {
             }
             if (data.codeTheme) {
               setEditorTheme(getThemeById(data.codeTheme));
+            }
+            if (data.codeDiffMode) {
+              setDiffMode(data.codeDiffMode as DiffMode);
             }
           }
         } catch (error) {
@@ -737,14 +740,6 @@ export default function CodeScreen(): React.ReactElement {
     }
   }, []);
 
-  // Toggle diff mode: off -> gutter -> inline -> off
-  const toggleDiffMode = useCallback(() => {
-    setDiffMode((current) => {
-      if (current === "off") return "gutter";
-      if (current === "gutter") return "inline";
-      return "off";
-    });
-  }, []);
 
   // Fetch diff when active file changes or diff mode is enabled
   useEffect(() => {
@@ -942,29 +937,6 @@ export default function CodeScreen(): React.ReactElement {
           {currentProject?.name || "Editor"}
         </Text>
 
-        {/* Diff toggle button */}
-        {activeFile && (
-          <TouchableOpacity
-            style={[
-              styles.diffButton,
-              diffMode !== "off" && styles.diffButtonActive,
-            ]}
-            onPress={toggleDiffMode}
-          >
-            {isLoadingDiff ? (
-              <ActivityIndicator size="small" color={darkTheme.primaryLight} />
-            ) : (
-              <Text
-                style={[
-                  styles.diffButtonText,
-                  diffMode !== "off" && styles.diffButtonTextActive,
-                ]}
-              >
-                {diffMode === "off" ? "⎇" : diffMode === "gutter" ? "│" : "±"}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
 
         {activeFile && dirtyFiles.has(activeFile) && (
           <TouchableOpacity
@@ -1383,29 +1355,6 @@ const styles = StyleSheet.create({
   },
   hamburgerLineActive: {
     backgroundColor: darkTheme.secondary,
-  },
-  diffButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: darkTheme.surfaceElevated,
-    borderWidth: 1,
-    borderColor: darkTheme.border,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-  diffButtonActive: {
-    backgroundColor: darkTheme.primary + "40",
-    borderColor: darkTheme.primaryLight,
-  },
-  diffButtonText: {
-    fontSize: 16,
-    color: darkTheme.text.secondary,
-    fontWeight: "bold",
-  },
-  diffButtonTextActive: {
-    color: darkTheme.primaryLight,
   },
   saveButton: {
     backgroundColor: darkTheme.primary,

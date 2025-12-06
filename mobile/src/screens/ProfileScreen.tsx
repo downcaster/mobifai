@@ -86,6 +86,7 @@ interface AppSettings {
   fontFamily: string;
   terminalTheme?: string;
   codeTheme?: string;
+  codeDiffMode?: "off" | "gutter" | "inline";
   showTerminalGuide?: boolean;
 }
 
@@ -123,6 +124,7 @@ export default function ProfileScreen(): React.ReactElement {
     fontFamily: "monospace",
     terminalTheme: "default",
     codeTheme: "default",
+    codeDiffMode: "off",
     showTerminalGuide: true,
   });
   const [loading, setLoading] = useState(true);
@@ -341,6 +343,52 @@ export default function ProfileScreen(): React.ReactElement {
                     />
                   ))}
                 </ScrollView>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Git Diff Mode */}
+              <View style={styles.settingItem}>
+                <AppText style={styles.settingLabel}>Git Diff Display</AppText>
+                <View style={styles.diffModeGroup}>
+                  {(["off", "gutter", "inline"] as const).map((mode) => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[
+                        styles.diffModeOption,
+                        settings.codeDiffMode === mode &&
+                          styles.diffModeOptionActive,
+                      ]}
+                      onPress={() => updateSetting("codeDiffMode", mode)}
+                    >
+                      <View style={styles.diffModePreview}>
+                        {mode === "off" && (
+                          <AppText style={styles.diffModeIcon}>○</AppText>
+                        )}
+                        {mode === "gutter" && (
+                          <View style={styles.gutterPreview}>
+                            <View style={styles.gutterLine} />
+                          </View>
+                        )}
+                        {mode === "inline" && (
+                          <View style={styles.inlinePreview}>
+                            <View style={styles.inlineLineAdded} />
+                            <View style={styles.inlineLineDeleted} />
+                          </View>
+                        )}
+                      </View>
+                      <AppText
+                        style={[
+                          styles.diffModeLabel,
+                          settings.codeDiffMode === mode &&
+                            styles.diffModeLabelActive,
+                        ]}
+                      >
+                        {mode === "off" ? "Off" : mode === "gutter" ? "Gutter" : "Inline"}
+                      </AppText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           </View>
@@ -734,6 +782,71 @@ const styles = StyleSheet.create({
     color: themeColors.text.muted,
   },
   cursorLabelActive: {
+    color: themeColors.text.primary,
+  },
+
+  // Diff Mode Options
+  diffModeGroup: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  diffModeOption: {
+    flex: 1,
+    backgroundColor: themeColors.bg.tertiary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  diffModeOptionActive: {
+    borderColor: themeColors.accent.primary,
+    backgroundColor: themeColors.accent.glow,
+  },
+  diffModePreview: {
+    width: 40,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  diffModeIcon: {
+    fontSize: 20,
+    color: themeColors.text.muted,
+  },
+  gutterPreview: {
+    width: 4,
+    height: 24,
+    backgroundColor: themeColors.bg.secondary,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  gutterLine: {
+    width: 4,
+    height: "100%",
+    backgroundColor: "#4CAF50",
+  },
+  inlinePreview: {
+    width: 32,
+    height: 24,
+    gap: 2,
+  },
+  inlineLineAdded: {
+    flex: 1,
+    backgroundColor: "rgba(76, 175, 80, 0.3)",
+    borderRadius: 2,
+  },
+  inlineLineDeleted: {
+    flex: 1,
+    backgroundColor: "rgba(244, 67, 54, 0.3)",
+    borderRadius: 2,
+  },
+  diffModeLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: themeColors.text.muted,
+  },
+  diffModeLabelActive: {
     color: themeColors.text.primary,
   },
 

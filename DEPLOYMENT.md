@@ -127,7 +127,7 @@ npx react-native run-ios
 ---
 
 ## 6. Important Notes on Free Tier
-
-- **Spin Down:** Render's free tier sleeps after 15 minutes of inactivity.
-  - _Symptom:_ When you open the mobile app after a break, it might take **45-60 seconds** to connect while the server wakes up.
+- asdasdasdasd
+- sdas
+- **Spin Down:** Render's ssfree tier sleeps after 15 minutes of inactivity.
   - _Solution:_ Be patient on the first connect, or upgrade to the $7/mo Starter plan for "Always On".

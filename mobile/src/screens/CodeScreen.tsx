@@ -15,7 +15,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { CodeEditor } from "../components/code/CodeEditor";
 import { FileTree, SelectedItem } from "../components/code/FileTree";
@@ -145,37 +145,39 @@ export default function CodeScreen(): React.ReactElement {
   const initProjectMutation = useInitProject();
   const saveFileMutation = useSaveFile();
 
-  // Fetch editor settings on mount
-  useEffect(() => {
-    const fetchEditorSettings = async () => {
-      try {
-        const token = await AsyncStorage.getItem("mobifai_auth_token");
-        if (!token) return;
+  // Fetch editor settings when screen comes into focus (to pick up changes from Profile)
+  useFocusEffect(
+    useCallback(() => {
+      const fetchEditorSettings = async () => {
+        try {
+          const token = await AsyncStorage.getItem("mobifai_auth_token");
+          if (!token) return;
 
-        const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
+          const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
 
-        if (response.ok) {
-          const data = await response.json();
+          if (response.ok) {
+            const data = await response.json();
           if (data.fontSize) {
             setEditorFontSize(data.fontSize);
           }
-          if (data.terminalTheme) {
-            setEditorTheme(getThemeById(data.terminalTheme));
+          if (data.codeTheme) {
+            setEditorTheme(getThemeById(data.codeTheme));
           }
+          }
+        } catch (error) {
+          console.error("Error fetching editor settings:", error);
         }
-      } catch (error) {
-        console.error("Error fetching editor settings:", error);
-      }
-    };
+      };
 
-    fetchEditorSettings();
-  }, []);
+      fetchEditorSettings();
+    }, [])
+  );
 
   // Fetch active file content
   const { data: activeFileContent, isLoading: isLoadingFile } =

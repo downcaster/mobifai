@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DeviceListScreen from "../screens/DeviceListScreen";
 import TerminalScreen from "../screens/TerminalScreen";
 import CodeScreen from "../screens/CodeScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import ProfileStackNavigator from "./ProfileStackNavigator";
 
 export type MainTabParamList = {
   Connections: undefined;
@@ -75,7 +75,7 @@ export default function MainTabNavigator(): React.ReactElement {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} label="Profile" icon="●" />

@@ -13,10 +13,10 @@ import { AppText, Slider } from "../components/ui";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RELAY_SERVER_URL } from "../config";
 import { useNavigation, CommonActions } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { terminalThemes, TerminalTheme } from "../theme/terminalThemes";
-import { SaveCombinationModal } from "../components/SaveCombinationModal";
 import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
-import { TerminalAction } from "../components/KeyCombinationModal";
+import { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -79,12 +79,13 @@ interface UserInfo {
   picture?: string;
 }
 
-interface TerminalSettings {
+interface AppSettings {
   theme: string;
   fontSize: number;
   cursorStyle: string;
   fontFamily: string;
   terminalTheme?: string;
+  codeTheme?: string;
   showTerminalGuide?: boolean;
 }
 
@@ -113,20 +114,19 @@ const themeColors = {
 };
 
 export default function ProfileScreen(): React.ReactElement {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [settings, setSettings] = useState<TerminalSettings>({
+  const [settings, setSettings] = useState<AppSettings>({
     theme: "dark",
     fontSize: 14,
     cursorStyle: "block",
     fontFamily: "monospace",
     terminalTheme: "default",
+    codeTheme: "default",
     showTerminalGuide: true,
   });
   const [loading, setLoading] = useState(true);
   const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
-  const [saveModalVisible, setSaveModalVisible] = useState(false);
-  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(null);
 
   useEffect(() => {
     loadData();
@@ -215,75 +215,6 @@ export default function ProfileScreen(): React.ReactElement {
       return newSettings;
     });
   }, []);
-
-  const handleSaveCombination = async (title: string, actions: TerminalAction[]): Promise<void> => {
-    try {
-      let updated: SavedCombination[];
-      
-      if (editingCombo) {
-        // Update existing combination
-        updated = savedCombinations.map((c) =>
-          c.id === editingCombo.id ? { ...c, title, actions } : c
-        );
-      } else {
-        // Create new combination
-        const newCombination: SavedCombination = {
-          id: Date.now().toString(),
-          title,
-          actions,
-        };
-        updated = [...savedCombinations, newCombination];
-      }
-      
-      setSavedCombinations(updated);
-      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
-      setEditingCombo(null);
-    } catch (error) {
-      if (__DEV__) console.error("Error saving combination:", error);
-      Alert.alert("Error", "Failed to save combination");
-    }
-  };
-
-  const handleEditCombination = (combo: SavedCombination): void => {
-    setEditingCombo(combo);
-    setSaveModalVisible(true);
-  };
-
-  const handleMoveCombination = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    try {
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= savedCombinations.length) return;
-      
-      const updated = [...savedCombinations];
-      const [moved] = updated.splice(index, 1);
-      updated.splice(newIndex, 0, moved);
-      
-      setSavedCombinations(updated);
-      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
-    } catch (error) {
-      if (__DEV__) console.error("Error reordering combinations:", error);
-      Alert.alert("Error", "Failed to reorder");
-    }
-  };
-
-  const handleDeleteCombination = (id: string): void => {
-    Alert.alert("Delete Combination", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const updated = savedCombinations.filter((c) => c.id !== id);
-            setSavedCombinations(updated);
-            await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
-          } catch (error) {
-            if (__DEV__) console.error("Error deleting combination:", error);
-          }
-        },
-      },
-    ]);
-  };
 
   const handleLogout = useCallback((): void => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -378,9 +309,52 @@ export default function ProfileScreen(): React.ReactElement {
                   />
                 </View>
               </View>
+            </View>
+          </View>
 
-              <View style={styles.divider} />
+          {/* Code Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <AppText style={styles.sectionIconText}>{ }</AppText>
+              </View>
+              <AppText style={styles.sectionTitle}>Code Editor</AppText>
+            </View>
 
+            <View style={styles.card}>
+              {/* Code Theme Picker */}
+              <View style={styles.settingItem}>
+                <AppText style={styles.settingLabel}>Code Theme</AppText>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.themesContainer}
+                  removeClippedSubviews={true}
+                >
+                  {terminalThemes.map((terminalTheme) => (
+                    <ThemePreviewItem
+                      key={terminalTheme.id}
+                      terminalTheme={terminalTheme}
+                      isSelected={settings.codeTheme === terminalTheme.id}
+                      onSelect={(id) => updateSetting("codeTheme", id)}
+                      theme={themeColors}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </View>
+
+          {/* Terminal Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <AppText style={styles.sectionIconText}>▣</AppText>
+              </View>
+              <AppText style={styles.sectionTitle}>Terminal</AppText>
+            </View>
+
+            <View style={styles.card}>
               {/* Terminal Theme Picker */}
               <View style={styles.settingItem}>
                 <AppText style={styles.settingLabel}>Terminal Theme</AppText>
@@ -401,19 +375,9 @@ export default function ProfileScreen(): React.ReactElement {
                   ))}
                 </ScrollView>
               </View>
-            </View>
-          </View>
 
-          {/* Terminal Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionIcon}>
-                <AppText style={styles.sectionIconText}>▣</AppText>
-              </View>
-              <AppText style={styles.sectionTitle}>Terminal</AppText>
-            </View>
+              <View style={styles.divider} />
 
-            <View style={styles.card}>
               {/* Cursor Style */}
               <View style={styles.settingItem}>
                 <AppText style={styles.settingLabel}>Cursor Style</AppText>
@@ -451,7 +415,6 @@ export default function ProfileScreen(): React.ReactElement {
                 </View>
               </View>
 
-              {/* Divider */}
               <View style={styles.divider} />
 
               {/* Show Terminal Guide Toggle */}
@@ -479,85 +442,25 @@ export default function ProfileScreen(): React.ReactElement {
                   />
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
 
-          {/* Command Combinations Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionIcon}>
-                <AppText style={styles.sectionIconText}>⌘</AppText>
-              </View>
-              <AppText style={styles.sectionTitle}>Command Combinations</AppText>
-            </View>
+              <View style={styles.divider} />
 
-            <View style={styles.card}>
-              {savedCombinations.length > 0 ? (
-                savedCombinations.map((combo, index) => {
-                  const preview = combo.actions
-                    .map((a) => (a.type === 'text' ? a.value : a.label || ''))
-                    .join(' ');
-                  
-                  return (
-                    <View key={combo.id}>
-                      {index > 0 && <View style={styles.divider} />}
-                      <View style={styles.comboItem}>
-                        <View style={styles.reorderButtons}>
-                          <TouchableOpacity
-                            style={[
-                              styles.reorderButton,
-                              index === 0 && styles.reorderButtonDisabled,
-                            ]}
-                            onPress={() => handleMoveCombination(index, 'up')}
-                            disabled={index === 0}
-                          >
-                            <AppText style={styles.reorderButtonText}>↑</AppText>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[
-                              styles.reorderButton,
-                              index === savedCombinations.length - 1 && styles.reorderButtonDisabled,
-                            ]}
-                            onPress={() => handleMoveCombination(index, 'down')}
-                            disabled={index === savedCombinations.length - 1}
-                          >
-                            <AppText style={styles.reorderButtonText}>↓</AppText>
-                          </TouchableOpacity>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.comboContent}
-                          onPress={() => handleEditCombination(combo)}
-                        >
-                          <AppText style={styles.comboTitle}>{combo.title}</AppText>
-                          <AppText style={styles.comboPreview} numberOfLines={1}>
-                            {preview}
-                          </AppText>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => handleDeleteCombination(combo.id)}
-                        >
-                          <AppText style={styles.deleteButtonText}>×</AppText>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })
-              ) : (
-                <View style={styles.emptyComboState}>
-                  <AppText style={styles.emptyComboText}>
-                    No saved combinations yet
+              {/* Command Combinations - Navigate to list */}
+              <TouchableOpacity
+                style={styles.navRow}
+                onPress={() => navigation.navigate("CommandCombinations")}
+              >
+                <View style={styles.navRowContent}>
+                  <AppText style={styles.settingLabel}>Command Combinations</AppText>
+                  <AppText style={styles.settingDescription}>
+                    {savedCombinations.length === 0
+                      ? "No saved combinations"
+                      : `${savedCombinations.length} combination${savedCombinations.length !== 1 ? "s" : ""}`}
                   </AppText>
                 </View>
-              )}
+                <AppText style={styles.navRowArrow}>→</AppText>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.addComboButton}
-              onPress={() => setSaveModalVisible(true)}
-            >
-              <AppText style={styles.addComboButtonText}>+ New Combination</AppText>
-            </TouchableOpacity>
           </View>
 
           {/* Account Section */}
@@ -581,18 +484,6 @@ export default function ProfileScreen(): React.ReactElement {
           <AppText style={styles.versionText}>v1.0.0 · AI-Powered Terminal</AppText>
         </View>
       </ScrollView>
-
-      {/* Save Combination Modal */}
-      <SaveCombinationModal
-        visible={saveModalVisible}
-        onClose={() => {
-          setSaveModalVisible(false);
-          setEditingCombo(null);
-        }}
-        onSave={handleSaveCombination}
-        initialTitle={editingCombo?.title}
-        initialActions={editingCombo?.actions}
-      />
     </View>
   );
 }
@@ -846,89 +737,19 @@ const styles = StyleSheet.create({
     color: themeColors.text.primary,
   },
 
-  // Command Combinations
-  comboItem: {
+  // Navigation Row (for clickable settings that navigate)
+  navRow: {
     flexDirection: "row",
     alignItems: "center",
     padding: 20,
   },
-  reorderButtons: {
-    flexDirection: "column",
-    gap: 4,
-    marginRight: 12,
-  },
-  reorderButton: {
-    width: 28,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: themeColors.bg.tertiary,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: themeColors.border.subtle,
-  },
-  reorderButtonDisabled: {
-    opacity: 0.3,
-  },
-  reorderButtonText: {
-    fontSize: 14,
-    color: themeColors.accent.secondary,
-    fontWeight: "700",
-    marginTop: -2,
-  },
-  comboContent: {
+  navRowContent: {
     flex: 1,
-    marginRight: 12,
   },
-  comboTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: themeColors.text.primary,
-    marginBottom: 4,
-  },
-  comboPreview: {
-    fontSize: 12,
-    fontWeight: "400",
+  navRowArrow: {
+    fontSize: 18,
     color: themeColors.text.muted,
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 68, 68, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 68, 68, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#ff4444",
-    marginTop: -2,
-  },
-  emptyComboState: {
-    padding: 40,
-    alignItems: "center",
-  },
-  emptyComboText: {
-    fontSize: 14,
-    color: themeColors.text.muted,
-    fontStyle: "italic",
-  },
-  addComboButton: {
-    marginTop: 12,
-    backgroundColor: themeColors.accent.glow,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: themeColors.accent.primary,
-    padding: 16,
-    alignItems: "center",
-  },
-  addComboButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: themeColors.accent.secondary,
+    marginLeft: 12,
   },
 
   // Sign Out

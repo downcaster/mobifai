@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { FileDiff } from '../../services/CodeService';
+import { TerminalTheme } from '../../theme/terminalThemes';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
@@ -31,6 +32,8 @@ interface CodeEditorProps {
   loading?: boolean;
   diffMode?: DiffMode;
   diffData?: FileDiff | null;
+  fontSize?: number;
+  theme?: TerminalTheme | null;
 }
 
 interface EditorMessage {
@@ -49,6 +52,8 @@ export function CodeEditor({
   loading = false,
   diffMode = 'off',
   diffData = null,
+  fontSize = 14,
+  theme = null,
 }: CodeEditorProps): React.ReactElement {
   const webviewRef = useRef<WebView>(null);
   const [isReady, setIsReady] = useState(false);
@@ -164,6 +169,24 @@ export function CodeEditor({
       }
     }
   }, [isReady, diffMode, diffData, sendMessage]);
+
+  // Send font size to the editor when it changes
+  useEffect(() => {
+    if (isReady) {
+      sendMessage('setFontSize', { fontSize });
+    }
+  }, [fontSize, isReady, sendMessage]);
+
+  // Send theme to the editor when it changes
+  useEffect(() => {
+    if (isReady && theme) {
+      sendMessage('setTheme', {
+        background: theme.background,
+        foreground: theme.foreground,
+        cursor: theme.cursor,
+      });
+    }
+  }, [theme, isReady, sendMessage]);
 
   const handleError = useCallback(() => {
     setError('Failed to load editor');

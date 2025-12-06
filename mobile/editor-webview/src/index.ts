@@ -460,6 +460,82 @@ function handleMessage(event: MessageEvent) {
         }
         break;
         
+      case 'setFontSize':
+        if (message.data?.fontSize) {
+          const fontSize = message.data.fontSize as number;
+          document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
+          // Update the editor container font size
+          const editorEl = document.getElementById('editor');
+          if (editorEl) {
+            editorEl.style.fontSize = `${fontSize}px`;
+          }
+          // Update CodeMirror's base font size
+          const cmEditor = document.querySelector('.cm-editor') as HTMLElement;
+          if (cmEditor) {
+            cmEditor.style.fontSize = `${fontSize}px`;
+          }
+        }
+        break;
+        
+      case 'setTheme':
+        if (message.data) {
+          const { background, foreground, cursor } = message.data as { background: string; foreground: string; cursor: string };
+          // Apply theme colors to the editor
+          document.documentElement.style.setProperty('--editor-bg', background);
+          document.documentElement.style.setProperty('--editor-fg', foreground);
+          document.documentElement.style.setProperty('--editor-cursor', cursor);
+          
+          // Update body background
+          document.body.style.backgroundColor = background;
+          
+          // Update CodeMirror theme dynamically via CSS custom properties
+          const style = document.createElement('style');
+          style.id = 'dynamic-theme';
+          // Remove old dynamic theme if exists
+          const oldStyle = document.getElementById('dynamic-theme');
+          if (oldStyle) {
+            oldStyle.remove();
+          }
+          style.textContent = `
+            .cm-editor {
+              background-color: ${background} !important;
+            }
+            .cm-scroller {
+              background-color: ${background} !important;
+            }
+            .cm-gutters {
+              background-color: ${background} !important;
+              border-right-color: ${foreground}20 !important;
+            }
+            .cm-activeLineGutter {
+              background-color: ${foreground}10 !important;
+            }
+            .cm-cursor {
+              border-left-color: ${cursor} !important;
+            }
+            .cm-content {
+              caret-color: ${cursor} !important;
+            }
+            .cm-line {
+              color: ${foreground} !important;
+            }
+            .cm-activeLine {
+              background-color: ${foreground}08 !important;
+            }
+            .cm-selectionBackground {
+              background-color: ${cursor}30 !important;
+            }
+            .cm-editor .cm-selectionMatch {
+              background-color: ${cursor}20 !important;
+            }
+            .cm-lineNumbers .cm-gutterElement {
+              color: ${foreground}60 !important;
+            }
+          `;
+          document.head.appendChild(style);
+        }
+        break;
+        
       default:
         console.warn('Unknown message type:', message.type);
     }

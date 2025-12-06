@@ -33,6 +33,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsConnected } from "../services/ConnectionContext";
 import { MainTabParamList } from "../navigation/MainTabNavigator";
 import { AppView, AppText, AppButton } from "../components/ui";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { RELAY_SERVER_URL } from "../config";
+import { getThemeById, TerminalTheme } from "../theme/terminalThemes";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SIDEBAR_WIDTH = 280;
@@ -95,6 +98,10 @@ export default function CodeScreen(): React.ReactElement {
   const [diffData, setDiffData] = useState<FileDiff | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
+  // Editor settings (from user preferences)
+  const [editorFontSize, setEditorFontSize] = useState(14);
+  const [editorTheme, setEditorTheme] = useState<TerminalTheme | null>(null);
+
   // Context menu state (for long press)
   const [contextMenuItem, setContextMenuItem] = useState<SelectedItem | null>(
     null
@@ -137,6 +144,38 @@ export default function CodeScreen(): React.ReactElement {
   const { data: projects, isLoading: isLoadingProjects } = useProjectsHistory();
   const initProjectMutation = useInitProject();
   const saveFileMutation = useSaveFile();
+
+  // Fetch editor settings on mount
+  useEffect(() => {
+    const fetchEditorSettings = async () => {
+      try {
+        const token = await AsyncStorage.getItem("mobifai_auth_token");
+        if (!token) return;
+
+        const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.fontSize) {
+            setEditorFontSize(data.fontSize);
+          }
+          if (data.terminalTheme) {
+            setEditorTheme(getThemeById(data.terminalTheme));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching editor settings:", error);
+      }
+    };
+
+    fetchEditorSettings();
+  }, []);
 
   // Fetch active file content
   const { data: activeFileContent, isLoading: isLoadingFile } =
@@ -955,6 +994,8 @@ export default function CodeScreen(): React.ReactElement {
             loading={isLoadingFile}
             diffMode={diffMode}
             diffData={diffData}
+            fontSize={editorFontSize}
+            theme={editorTheme}
           />
         ) : (
           <View style={styles.noFileSelected}>

@@ -11,7 +11,10 @@ import { useNavigation } from "@react-navigation/native";
 import { AppText } from "../components/ui";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SaveCombinationModal } from "../components/SaveCombinationModal";
-import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
+import {
+  SavedCombination,
+  SAVED_COMBINATIONS_KEY,
+} from "../types/savedCombinations";
 import { TerminalAction } from "../components/KeyCombinationModal";
 
 // Design tokens for the futuristic theme
@@ -40,9 +43,13 @@ const themeColors = {
 
 export default function CommandCombinationsScreen(): React.ReactElement {
   const navigation = useNavigation();
-  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
+  const [savedCombinations, setSavedCombinations] = useState<
+    SavedCombination[]
+  >([]);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
-  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(null);
+  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(
+    null
+  );
 
   useEffect(() => {
     loadCombinations();
@@ -59,10 +66,13 @@ export default function CommandCombinationsScreen(): React.ReactElement {
     }
   };
 
-  const handleSaveCombination = async (title: string, actions: TerminalAction[]): Promise<void> => {
+  const handleSaveCombination = async (
+    title: string,
+    actions: TerminalAction[]
+  ): Promise<void> => {
     try {
       let updated: SavedCombination[];
-      
+
       if (editingCombo) {
         updated = savedCombinations.map((c) =>
           c.id === editingCombo.id ? { ...c, title, actions } : c
@@ -75,9 +85,12 @@ export default function CommandCombinationsScreen(): React.ReactElement {
         };
         updated = [...savedCombinations, newCombination];
       }
-      
+
       setSavedCombinations(updated);
-      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(
+        SAVED_COMBINATIONS_KEY,
+        JSON.stringify(updated)
+      );
       setEditingCombo(null);
     } catch (error) {
       if (__DEV__) console.error("Error saving combination:", error);
@@ -90,17 +103,23 @@ export default function CommandCombinationsScreen(): React.ReactElement {
     setSaveModalVisible(true);
   };
 
-  const handleMoveCombination = async (index: number, direction: 'up' | 'down'): Promise<void> => {
+  const handleMoveCombination = async (
+    index: number,
+    direction: "up" | "down"
+  ): Promise<void> => {
     try {
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      const newIndex = direction === "up" ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= savedCombinations.length) return;
-      
+
       const updated = [...savedCombinations];
       const [moved] = updated.splice(index, 1);
       updated.splice(newIndex, 0, moved);
-      
+
       setSavedCombinations(updated);
-      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(
+        SAVED_COMBINATIONS_KEY,
+        JSON.stringify(updated)
+      );
     } catch (error) {
       if (__DEV__) console.error("Error reordering combinations:", error);
       Alert.alert("Error", "Failed to reorder");
@@ -117,7 +136,10 @@ export default function CommandCombinationsScreen(): React.ReactElement {
           try {
             const updated = savedCombinations.filter((c) => c.id !== id);
             setSavedCombinations(updated);
-            await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
+            await AsyncStorage.setItem(
+              SAVED_COMBINATIONS_KEY,
+              JSON.stringify(updated)
+            );
           } catch (error) {
             if (__DEV__) console.error("Error deleting combination:", error);
           }
@@ -149,9 +171,9 @@ export default function CommandCombinationsScreen(): React.ReactElement {
           {savedCombinations.length > 0 ? (
             savedCombinations.map((combo, index) => {
               const preview = combo.actions
-                .map((a) => (a.type === 'text' ? a.value : a.label || ''))
-                .join(' ');
-              
+                .map((a) => (a.type === "text" ? a.value : a.label || ""))
+                .join(" ");
+
               return (
                 <View key={combo.id}>
                   {index > 0 && <View style={styles.divider} />}
@@ -162,7 +184,7 @@ export default function CommandCombinationsScreen(): React.ReactElement {
                           styles.reorderButton,
                           index === 0 && styles.reorderButtonDisabled,
                         ]}
-                        onPress={() => handleMoveCombination(index, 'up')}
+                        onPress={() => handleMoveCombination(index, "up")}
                         disabled={index === 0}
                       >
                         <AppText style={styles.reorderButtonText}>↑</AppText>
@@ -170,9 +192,10 @@ export default function CommandCombinationsScreen(): React.ReactElement {
                       <TouchableOpacity
                         style={[
                           styles.reorderButton,
-                          index === savedCombinations.length - 1 && styles.reorderButtonDisabled,
+                          index === savedCombinations.length - 1 &&
+                            styles.reorderButtonDisabled,
                         ]}
-                        onPress={() => handleMoveCombination(index, 'down')}
+                        onPress={() => handleMoveCombination(index, "down")}
                         disabled={index === savedCombinations.length - 1}
                       >
                         <AppText style={styles.reorderButtonText}>↓</AppText>
@@ -202,7 +225,8 @@ export default function CommandCombinationsScreen(): React.ReactElement {
               <AppText style={styles.emptyIcon}>⌘</AppText>
               <AppText style={styles.emptyTitle}>No Combinations Yet</AppText>
               <AppText style={styles.emptyText}>
-                Create command combinations to quickly execute{"\n"}multi-step terminal operations
+                Create command combinations to quickly execute{"\n"}multi-step
+                terminal operations
               </AppText>
             </View>
           )}
@@ -220,9 +244,9 @@ export default function CommandCombinationsScreen(): React.ReactElement {
         <View style={styles.helpSection}>
           <AppText style={styles.helpTitle}>How it works</AppText>
           <AppText style={styles.helpText}>
-            Command combinations allow you to chain multiple terminal actions together.
-            Use text input for commands, and special keys for control sequences like
-            Enter, Tab, or Ctrl+C.
+            Command combinations allow you to chain multiple terminal actions
+            together. Use text input for commands, and special keys for control
+            sequences like Enter, Tab, or Ctrl+C.
           </AppText>
         </View>
       </ScrollView>
@@ -408,4 +432,3 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
-

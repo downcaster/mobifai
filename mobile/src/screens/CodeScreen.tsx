@@ -163,12 +163,12 @@ export default function CodeScreen(): React.ReactElement {
 
           if (response.ok) {
             const data = await response.json();
-          if (data.fontSize) {
-            setEditorFontSize(data.fontSize);
-          }
-          if (data.codeTheme) {
-            setEditorTheme(getThemeById(data.codeTheme));
-          }
+            if (data.fontSize) {
+              setEditorFontSize(data.fontSize);
+            }
+            if (data.codeTheme) {
+              setEditorTheme(getThemeById(data.codeTheme));
+            }
           }
         } catch (error) {
           console.error("Error fetching editor settings:", error);

@@ -195,19 +195,17 @@ export default function CodeScreen(): React.ReactElement {
 
   // Update file content when loaded
   useEffect(() => {
-    // Only set content if the file isn't already in fileContents
-    // Use 'in' operator to check key existence (handles empty string content)
-    if (
-      activeFile &&
-      activeFileContent !== undefined &&
-      !(activeFile in fileContents)
-    ) {
+    // Always update content when it changes
+    // This ensures we get fresh content every time, even when reopening files
+    if (activeFile && activeFileContent !== undefined) {
+      console.log(`📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`);
+      
       setFileContents((prev) => ({
         ...prev,
         [activeFile]: activeFileContent,
       }));
     }
-  }, [activeFile, activeFileContent, fileContents]);
+  }, [activeFile, activeFileContent]);
 
   // Animate sidebar
   const toggleSidebar = useCallback(() => {
@@ -346,14 +344,17 @@ export default function CodeScreen(): React.ReactElement {
   // Handle file selection from tree
   const handleFileSelect = useCallback(
     async (filePath: string) => {
+      console.log(`📂 Opening file: ${filePath}`);
       const fileName = filePath.split("/").pop() || filePath;
 
       const existingFile = openFiles.find((f) => f.path === filePath);
       if (existingFile) {
+        console.log(`   File already open, switching to it`);
         setActiveFile(filePath);
         // Notify Mac client about active file change
         try {
           await codeService.setActiveFile(filePath);
+          console.log(`   ✅ Notified Mac about active file`);
         } catch (error) {
           console.error("Failed to set active file on Mac:", error);
         }
@@ -361,6 +362,7 @@ export default function CodeScreen(): React.ReactElement {
         return;
       }
 
+      console.log(`   Opening new file`);
       const newFile: OpenFile = {
         path: filePath,
         name: fileName,
@@ -371,6 +373,7 @@ export default function CodeScreen(): React.ReactElement {
       // Notify Mac client about active file change
       try {
         await codeService.setActiveFile(filePath);
+        console.log(`   ✅ Notified Mac about active file`);
       } catch (error) {
         console.error("Failed to set active file on Mac:", error);
       }

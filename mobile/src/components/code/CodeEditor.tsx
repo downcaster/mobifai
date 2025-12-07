@@ -62,6 +62,7 @@ export function CodeEditor({
   // Track content from editor to avoid feedback loop
   const lastEditorContentRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
+  const lastContentPropRef = useRef<string>(''); // Track the last content prop we received
 
   const getLanguage = (lang: string): string => {
     const langMap: Record<string, string> = {
@@ -121,15 +122,26 @@ export function CodeEditor({
   // NOT when it's the same content we just received from the editor
   useEffect(() => {
     if (isReady) {
+      // Detect if this is a different file (content prop changed to something completely different)
+      const isDifferentFile = lastContentPropRef.current !== '' && 
+                              content !== lastContentPropRef.current &&
+                              content !== lastEditorContentRef.current;
+      
       // Only send setContent if:
       // 1. We haven't initialized yet (first load)
-      // 2. Content differs from what the editor last sent us (external change like file switch)
+      // 2. Content differs from what the editor last sent us (external change)
+      // 3. This is a different file (file switch detected)
       const isExternalChange = content !== lastEditorContentRef.current;
       const isFirstLoad = !hasInitializedRef.current;
       
-      if (isFirstLoad || isExternalChange) {
+      if (isFirstLoad || isExternalChange || isDifferentFile) {
+        console.log(`📝 Updating editor content (${content.length} bytes)`);
+        if (isDifferentFile) {
+          console.log(`   Detected file switch - forcing content update`);
+        }
         sendMessage('setContent', { content });
         lastEditorContentRef.current = content;
+        lastContentPropRef.current = content;
         hasInitializedRef.current = true;
       }
     }

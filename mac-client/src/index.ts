@@ -749,19 +749,26 @@ function handleCodeGetFolderChildren(payload: { folderPath: string }): void {
  * Handle code.getFile
  */
 async function handleCodeGetFile(payload: { filePath: string; projectPath?: string }): Promise<void> {
+  console.log(chalk.cyan(`📄 Getting file: ${path.basename(payload.filePath)}`));
+  console.log(chalk.gray(`   Full path: ${payload.filePath}`));
+  console.log(chalk.gray(`   Project path: ${payload.projectPath || 'not provided'}`));
+  
   const result = codeManager.getFile(payload.filePath);
   
   // Also register the file with OpenFilesManager if projectPath is provided
   if (payload.projectPath && result.content) {
     try {
       await openFilesManager.openFile(payload.projectPath, payload.filePath);
-      console.log(chalk.gray(`  📋 Registered file with OpenFilesManager`));
+      console.log(chalk.green(`  ✅ Registered file with OpenFilesManager`));
     } catch (error) {
       console.warn(chalk.yellow(`  ⚠️ Failed to register file:`, error));
     }
+  } else if (!payload.projectPath) {
+    console.log(chalk.yellow(`  ⚠️ No projectPath provided - file won't be tracked or watched`));
   }
   
   sendToClient("code:fileContent", result);
+  console.log(chalk.gray(`  📤 Sent content to iOS (${result.content.length} bytes)`));
 }
 
 /**

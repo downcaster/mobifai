@@ -673,6 +673,9 @@ function handleCodeMessage(action: string, payload: unknown): void {
       case "getProjectsHistory":
         handleCodeGetProjectsHistory();
         break;
+      case "removeFromHistory":
+        handleCodeRemoveFromHistory(payload as { projectPath: string });
+        break;
       case "openCurrentDir":
         handleCodeOpenCurrentDir(payload as { uuid: string });
         break;
@@ -791,6 +794,19 @@ function handleCodeCloseProject(payload: { projectPath: string }): void {
 async function handleCodeGetProjectsHistory(): Promise<void> {
   const projects = await codeManager.getProjectsHistory();
   sendToClient("code:projectsHistory", { projects });
+}
+
+/**
+ * Handle code.removeFromHistory
+ */
+async function handleCodeRemoveFromHistory(payload: { projectPath: string }): Promise<void> {
+  console.log(chalk.cyan(`🗑️  Removing from history: ${path.basename(payload.projectPath)}`));
+  const success = await codeManager.removeFromHistory(payload.projectPath);
+  if (success) {
+    sendToClient("code:projectRemovedFromHistory", { projectPath: payload.projectPath });
+  } else {
+    sendToClient("code:error", { action: "removeFromHistory", error: "Failed to remove project" });
+  }
 }
 
 /**

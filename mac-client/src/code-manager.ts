@@ -86,13 +86,13 @@ export class CodeManager {
         },
       });
 
-      // Keep only last 20 projects
+      // Keep only last 10 projects
       const allProjects = await prisma.projectHistory.findMany({
         orderBy: { lastOpened: 'desc' },
       });
 
-      if (allProjects.length > 20) {
-        const projectsToDelete = allProjects.slice(20);
+      if (allProjects.length > 10) {
+        const projectsToDelete = allProjects.slice(10);
         await prisma.projectHistory.deleteMany({
           where: {
             id: {
@@ -335,6 +335,23 @@ export class CodeManager {
     } catch (error) {
       console.error(chalk.red("❌ Failed to load projects history:"), error);
       return [];
+    }
+  }
+
+  /**
+   * Remove a project from history
+   */
+  public async removeFromHistory(projectPath: string): Promise<boolean> {
+    const prisma = getPrismaClient();
+    try {
+      await prisma.projectHistory.delete({
+        where: { path: projectPath },
+      });
+      console.log(chalk.green(`✅ Removed project from history: ${path.basename(projectPath)}`));
+      return true;
+    } catch (error) {
+      console.error(chalk.red("❌ Failed to remove project from history:"), error);
+      return false;
     }
   }
 

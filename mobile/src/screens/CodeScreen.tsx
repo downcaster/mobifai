@@ -922,6 +922,24 @@ export default function CodeScreen(): React.ReactElement {
     return "Just now";
   };
 
+  // Handle removing a project from history
+  const handleRemoveProject = useCallback(
+    async (projectPath: string, event: any) => {
+      // Stop propagation so it doesn't trigger project selection
+      event.stopPropagation();
+
+      try {
+        await codeService.removeFromHistory(projectPath);
+        // Invalidate projects query to refresh the list
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      } catch (error) {
+        console.error("Failed to remove project:", error);
+        Alert.alert("Error", "Failed to remove project from history");
+      }
+    },
+    [queryClient]
+  );
+
   // Sidebar slide animation
   const sidebarTranslateX = sidebarAnim.interpolate({
     inputRange: [0, 1],
@@ -975,27 +993,35 @@ export default function CodeScreen(): React.ReactElement {
           {!isLoadingProjects && projects && projects.length > 0 && (
             <View style={styles.projectsList}>
               {projects.map((project) => (
-                <TouchableOpacity
-                  key={project.path}
-                  onPress={() => handleProjectSelect(project)}
-                  activeOpacity={0.7}
-                  style={styles.projectCard}
-                >
-                  <View style={styles.projectIconWrapper}>
-                    <Text style={styles.projectIcon}>📁</Text>
-                  </View>
-                  <View style={styles.projectInfo}>
-                    <Text style={styles.projectName} numberOfLines={1}>
-                      {project.name}
+                <View key={project.path} style={styles.projectCardWrapper}>
+                  <TouchableOpacity
+                    onPress={() => handleProjectSelect(project)}
+                    activeOpacity={0.7}
+                    style={styles.projectCard}
+                  >
+                    <View style={styles.projectIconWrapper}>
+                      <Text style={styles.projectIcon}>📁</Text>
+                    </View>
+                    <View style={styles.projectInfo}>
+                      <Text style={styles.projectName} numberOfLines={1}>
+                        {project.name}
+                      </Text>
+                      <Text style={styles.projectPath} numberOfLines={1}>
+                        {project.path}
+                      </Text>
+                    </View>
+                    <Text style={styles.projectTime}>
+                      {getTimeAgo(project.lastOpened)}
                     </Text>
-                    <Text style={styles.projectPath} numberOfLines={1}>
-                      {project.path}
-                    </Text>
-                  </View>
-                  <Text style={styles.projectTime}>
-                    {getTimeAgo(project.lastOpened)}
-                  </Text>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={(e) => handleRemoveProject(project.path, e)}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Text style={styles.removeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -1641,15 +1667,39 @@ const styles = StyleSheet.create({
   projectsList: {
     gap: 8,
   },
+  projectCardWrapper: {
+    position: "relative",
+    marginBottom: 8,
+  },
   projectCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    marginBottom: 8,
+    paddingRight: 48, // Make room for remove button
     backgroundColor: darkTheme.surfaceElevated,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: darkTheme.border,
+  },
+  removeButton: {
+    position: "absolute",
+    right: 8,
+    top: "50%",
+    transform: [{ translateY: -16 }],
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: darkTheme.background,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: darkTheme.border,
+  },
+  removeButtonText: {
+    fontSize: 20,
+    color: darkTheme.text.secondary,
+    fontWeight: "500",
+    lineHeight: 20,
   },
   projectIconWrapper: {
     width: 44,

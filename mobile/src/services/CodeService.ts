@@ -152,6 +152,41 @@ export class CodeService {
   }
 
   /**
+   * Remove a project from history
+   */
+  public removeFromHistory(projectPath: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      const unsubscribe = this.onMessage('code:projectRemovedFromHistory', (_action, payload: { projectPath: string }) => {
+        if (payload.projectPath === projectPath) {
+          unsubscribe();
+          resolve(true);
+        }
+      });
+
+      const errorUnsubscribe = this.onMessage('code:error', (_action, payload: CodeErrorResponse) => {
+        if (payload.action === 'removeFromHistory') {
+          errorUnsubscribe();
+          reject(new Error(payload.error));
+        }
+      });
+
+      const sent = this.sendMessage('removeFromHistory', { projectPath });
+      
+      if (!sent) {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Failed to send message'));
+      }
+
+      setTimeout(() => {
+        unsubscribe();
+        errorUnsubscribe();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
    * Initialize a project
    */
   public initProject(projectPath: string): Promise<ProjectInitializedResponse> {

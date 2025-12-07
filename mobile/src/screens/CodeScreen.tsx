@@ -421,7 +421,8 @@ export default function CodeScreen(): React.ReactElement {
     [dirtyFiles]
   );
 
-  const performCloseFile = (filePath: string) => {
+  const performCloseFile = async (filePath: string) => {
+    // Remove from local state
     setOpenFiles((prev) => prev.filter((f) => f.path !== filePath));
     setFileContents((prev) => {
       const newContents = { ...prev };
@@ -436,7 +437,23 @@ export default function CodeScreen(): React.ReactElement {
 
     if (activeFile === filePath) {
       const remainingFiles = openFiles.filter((f) => f.path !== filePath);
-      setActiveFile(remainingFiles.length > 0 ? remainingFiles[0].path : null);
+      const newActiveFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
+      setActiveFile(newActiveFile);
+      
+      // Notify Mac about the new active file
+      try {
+        await codeService.setActiveFile(newActiveFile);
+      } catch (error) {
+        console.error("Failed to set active file on Mac:", error);
+      }
+    }
+
+    // Notify Mac client to remove from database and stop watching
+    try {
+      await codeService.closeFile(filePath);
+      console.log(`✅ Closed file on Mac: ${filePath}`);
+    } catch (error) {
+      console.error("Failed to close file on Mac:", error);
     }
   };
 

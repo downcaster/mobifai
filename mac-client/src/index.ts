@@ -226,11 +226,14 @@ function setupOpenFilesManagerCallbacks(): void {
       console.log(chalk.gray(`   Computing updated diff...`));
       const diff = await codeManager.getFileDiff(filePath);
       
+      // ALWAYS send the diff, even if there are no changes
+      // iOS needs to know when to clear the diff highlights
+      sendToClient("code:fileDiff", diff);
+      
       if (diff.hasChanges) {
-        sendToClient("code:fileDiff", diff);
         console.log(chalk.green(`   ✅ Sent updated diff to iOS (added=${diff.addedLines.length}, deleted=${diff.deletedLines.length})`));
       } else {
-        console.log(chalk.gray(`   No diff changes to send`));
+        console.log(chalk.gray(`   ✅ Sent empty diff to iOS (file back to original state)`));
       }
     } catch (error: any) {
       console.error(chalk.red(`   ❌ Failed to compute diff:`, error.message));

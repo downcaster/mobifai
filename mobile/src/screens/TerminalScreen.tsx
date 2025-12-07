@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -15,31 +15,18 @@ import {
   ScrollView,
   Keyboard,
   LayoutChangeEvent,
-} from "react-native";
-import Clipboard from "@react-native-clipboard/clipboard";
-import { WebView } from "react-native-webview";
-import {
-  RouteProp,
-  useNavigation,
-  useRoute,
-  useIsFocused,
-} from "@react-navigation/native";
-import { io, Socket } from "socket.io-client";
-import { WebRTCService } from "../services/WebRTCService";
-import { codeService } from "../services/CodeService";
-import { useConnection } from "../services/ConnectionContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import {
-  generateKeyPair,
-  deriveSharedSecret,
-  signChallenge,
-  KeyPair,
-} from "../utils/crypto";
-import { config } from "../config";
+} from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import {WebView} from 'react-native-webview';
+import {RouteProp, useNavigation, useRoute, useIsFocused} from '@react-navigation/native';
+import {io, Socket} from 'socket.io-client';
+import {WebRTCService} from '../services/WebRTCService';
+import {codeService} from '../services/CodeService';
+import {useConnection} from '../services/ConnectionContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {generateKeyPair, deriveSharedSecret, signChallenge, KeyPair} from '../utils/crypto';
+import {config} from '../config';
 import {
   TerminalProcess,
   ProcessCreatePayload,
@@ -50,56 +37,48 @@ import {
   ProcessScreenPayload,
   ProcessExitedPayload,
   ProcessesSyncPayload,
-} from "../types/process";
-import { MainTabParamList } from "../navigation/MainTabNavigator";
-import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "@react-navigation/native";
-import { AppView, AppText, AppButton, AppCard } from "../components/ui";
-import { colors } from "../theme/colors";
-import { spacing } from "../theme/spacing";
-import { getThemeById } from "../theme/terminalThemes";
-import {
-  KeyCombinationModal,
-  TerminalAction,
-} from "../components/KeyCombinationModal";
-import { CommandComboBar } from "../components/CommandComboBar";
-import { ArrowButtons } from "../components/ArrowButtons";
-import {
-  SavedCombination,
-  SAVED_COMBINATIONS_KEY,
-} from "../types/savedCombinations";
-import { COMBO_BAR_VISIBLE_KEY } from "./CommandCombinationsScreen";
+} from '../types/process';
+import {MainTabParamList} from '../navigation/MainTabNavigator';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {useFocusEffect} from '@react-navigation/native';
+import {AppView, AppText, AppButton, AppCard} from '../components/ui';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {getThemeById} from '../theme/terminalThemes';
+import {KeyCombinationModal, TerminalAction} from '../components/KeyCombinationModal';
+import {CommandComboBar} from '../components/CommandComboBar';
+import {ArrowButtons} from '../components/ArrowButtons';
+import {SavedCombination, SAVED_COMBINATIONS_KEY} from '../types/savedCombinations';
+import {COMBO_BAR_VISIBLE_KEY} from './CommandCombinationsScreen';
 
 // Constants
 const IOS_QUICKTYPE_BAR_HEIGHT = 44; // Height of iOS QuickType suggestion bar
 
 // UUID generator for process IDs
 const generateUUID = (): string => {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
 
 type TerminalScreenProps = {
-  navigation?: BottomTabNavigationProp<MainTabParamList, "Terminal">;
-  route?: RouteProp<MainTabParamList, "Terminal">;
+  navigation?: BottomTabNavigationProp<MainTabParamList, 'Terminal'>;
+  route?: RouteProp<MainTabParamList, 'Terminal'>;
 };
 
-const TOKEN_KEY = "mobifai_auth_token";
-const DEVICE_ID_KEY = "mobifai_device_id";
-const CONNECTION_STATUS_KEY = "mobifai_connection_status";
+const TOKEN_KEY = 'mobifai_auth_token';
+const DEVICE_ID_KEY = 'mobifai_device_id';
+const CONNECTION_STATUS_KEY = 'mobifai_connection_status';
 
 export default function TerminalScreen({
   navigation: propNavigation,
   route: propRoute,
 }: TerminalScreenProps): React.ReactElement {
   const navigation =
-    propNavigation ||
-    useNavigation<BottomTabNavigationProp<MainTabParamList, "Terminal">>();
-  const route =
-    propRoute || useRoute<RouteProp<MainTabParamList, "Terminal">>();
+    propNavigation || useNavigation<BottomTabNavigationProp<MainTabParamList, 'Terminal'>>();
+  const route = propRoute || useRoute<RouteProp<MainTabParamList, 'Terminal'>>();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
 
@@ -133,33 +112,27 @@ export default function TerminalScreen({
     setWebrtcConnectedState(value);
     connectionContext.setWebRTCConnected(value);
   };
-  const [connectionStatus, setConnectionStatus] = useState("Connecting...");
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [terminalSettings, setTerminalSettings] = useState({
-    theme: "dark",
+    theme: 'dark',
     fontSize: 14,
-    cursorStyle: "block",
-    fontFamily: "monospace",
-    terminalTheme: "default",
+    cursorStyle: 'block',
+    fontFamily: 'monospace',
+    terminalTheme: 'default',
     showTerminalGuide: true,
   });
 
   // Process management state
   const [processes, setProcesses] = useState<TerminalProcess[]>([]);
-  const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(
-    null
-  );
+  const [activeProcessUuid, setActiveProcessUuid] = useState<string | null>(null);
   const activeProcessUuidRef = useRef<string | null>(null); // Ref to avoid stale closures
   const processCounterRef = useRef(0);
-  const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(
-    new Set()
-  );
+  const [loadingProcesses, setLoadingProcesses] = useState<Set<string>>(new Set());
   const [syncingTabs, setSyncingTabs] = useState(false); // True while waiting for processes:sync
   const [terminalInitializing, setTerminalInitializing] = useState(false); // True while terminal is initializing after sync
   const [isExpandedMode, setIsExpandedMode] = useState(false); // True when terminal is in full-screen mode
-  const [newlyCreatedTabs, setNewlyCreatedTabs] = useState<Set<string>>(
-    new Set()
-  ); // Track tabs created in this session (not restored)
+  const [newlyCreatedTabs, setNewlyCreatedTabs] = useState<Set<string>>(new Set()); // Track tabs created in this session (not restored)
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -170,18 +143,18 @@ export default function TerminalScreen({
   useEffect(() => {
     if (isExpandedMode) {
       navigation.setOptions({
-        tabBarStyle: { display: "none" },
+        tabBarStyle: {display: 'none'},
       });
     } else {
       // Reset to original tab bar style
       navigation.setOptions({
         tabBarStyle: {
-          backgroundColor: "#1a1a1a",
+          backgroundColor: '#1a1a1a',
           borderTopWidth: 1,
-          borderTopColor: "#333",
-          height: Platform.OS === "ios" ? 88 : 64,
+          borderTopColor: '#333',
+          height: Platform.OS === 'ios' ? 88 : 64,
           paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
         },
       });
     }
@@ -189,7 +162,7 @@ export default function TerminalScreen({
 
   // AI Prompt state
   const [aiModalVisible, setAiModalVisible] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPrompt, setAiPrompt] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiToastMessage, setAiToastMessage] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -200,31 +173,23 @@ export default function TerminalScreen({
 
   // Rename Tab Modal state
   const [renameModalVisible, setRenameModalVisible] = useState(false);
-  const [renamingProcessUuid, setRenamingProcessUuid] = useState<string | null>(
-    null
-  );
-  const [newTabName, setNewTabName] = useState("");
+  const [renamingProcessUuid, setRenamingProcessUuid] = useState<string | null>(null);
+  const [newTabName, setNewTabName] = useState('');
 
   // Saved Combinations state
-  const [savedCombinations, setSavedCombinations] = useState<
-    SavedCombination[]
-  >([]);
+  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
   const [comboBarVisible, setComboBarVisible] = useState(true);
 
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(
-    null
-  );
+  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(null);
   const terminalWrapperRef = useRef<ScrollView>(null);
 
   const webViewRef = useRef<WebView>(null);
   const socketRef = useRef<Socket | null>(null);
   const webrtcRef = useRef<WebRTCService | null>(null);
-  const terminalDimensionsRef = useRef<{ cols: number; rows: number } | null>(
-    null
-  );
+  const terminalDimensionsRef = useRef<{cols: number; rows: number} | null>(null);
   const firstProcessCreatedRef = useRef(false);
 
   // Security keys
@@ -253,7 +218,7 @@ export default function TerminalScreen({
    */
   const createProcess = useCallback((): string | null => {
     if (!paired) {
-      console.log("❌ Cannot create process: not paired");
+      console.log('❌ Cannot create process: not paired');
       return null;
     }
 
@@ -279,15 +244,15 @@ export default function TerminalScreen({
     };
 
     // Add to local state immediately
-    setProcesses((prev) => [...prev, newProcess]);
+    setProcesses(prev => [...prev, newProcess]);
     setActiveProcessUuid(uuid);
     activeProcessUuidRef.current = uuid; // Update ref immediately for callbacks
 
     // Mark this tab as newly created (to show welcome guide)
-    setNewlyCreatedTabs((prev) => new Set(prev).add(uuid));
+    setNewlyCreatedTabs(prev => new Set(prev).add(uuid));
 
     // Show loading spinner for this process while terminal initializes
-    setLoadingProcesses((prev) => new Set(prev).add(uuid));
+    setLoadingProcesses(prev => new Set(prev).add(uuid));
 
     // Send create command to Mac (include name)
     const payload: ProcessCreatePayload = {
@@ -296,15 +261,15 @@ export default function TerminalScreen({
       cols: terminalDimensionsRef.current?.cols,
       rows: terminalDimensionsRef.current?.rows,
     };
-    sendToMac("process:create", payload);
+    sendToMac('process:create', payload);
 
     // Clear terminal for new process and reset cursor visibility
-    sendToTerminal("clear", {});
-    sendToTerminal("resetCursor", {}); // Reset cursor visibility without triggering responses
+    sendToTerminal('clear', {});
+    sendToTerminal('resetCursor', {}); // Reset cursor visibility without triggering responses
 
     // Hide loading spinner after shell initialization completes
     setTimeout(() => {
-      setLoadingProcesses((prev) => {
+      setLoadingProcesses(prev => {
         const next = new Set(prev);
         next.delete(uuid);
         return next;
@@ -322,12 +287,12 @@ export default function TerminalScreen({
       console.log(`📱 Terminating process: ${uuid.substring(0, 8)}`);
 
       // Send terminate command to Mac
-      const payload: ProcessTerminatePayload = { uuid };
-      sendToMac("process:terminate", payload);
+      const payload: ProcessTerminatePayload = {uuid};
+      sendToMac('process:terminate', payload);
 
       // Remove from local state
-      setProcesses((prev) => {
-        const newProcesses = prev.filter((p) => p.uuid !== uuid);
+      setProcesses(prev => {
+        const newProcesses = prev.filter(p => p.uuid !== uuid);
 
         // If we're terminating the active process, switch to another one
         // Use ref to get current value inside callback
@@ -341,7 +306,7 @@ export default function TerminalScreen({
           const switchPayload: ProcessSwitchPayload = {
             activeUuids: [nextProcess.uuid],
           };
-          sendToMac("process:switch", switchPayload);
+          sendToMac('process:switch', switchPayload);
         } else if (newProcesses.length === 0) {
           setActiveProcessUuid(null);
           activeProcessUuidRef.current = null; // Update ref immediately
@@ -350,7 +315,7 @@ export default function TerminalScreen({
         return newProcesses;
       });
     },
-    [sendToMac]
+    [sendToMac],
   );
 
   /**
@@ -359,7 +324,9 @@ export default function TerminalScreen({
   const switchProcess = useCallback(
     (uuid: string) => {
       // Use ref to check current active process
-      if (uuid === activeProcessUuidRef.current) return;
+      if (uuid === activeProcessUuidRef.current) {
+        return;
+      }
 
       console.log(`📱 Switching to process: ${uuid.substring(0, 8)}`);
 
@@ -370,22 +337,20 @@ export default function TerminalScreen({
       setTerminalInitializing(false);
 
       // Send switch command to Mac
-      const payload: ProcessSwitchPayload = { activeUuids: [uuid] };
-      sendToMac("process:switch", payload);
+      const payload: ProcessSwitchPayload = {activeUuids: [uuid]};
+      sendToMac('process:switch', payload);
 
       // Clear terminal screen and reset cursor visibility - Mac will send the snapshot
-      sendToTerminal("clear", {});
-      sendToTerminal("resetCursor", {}); // Reset cursor visibility without triggering responses
+      sendToTerminal('clear', {});
+      sendToTerminal('resetCursor', {}); // Reset cursor visibility without triggering responses
     },
-    [sendToMac]
+    [sendToMac],
   );
 
   // Clear connection status when screen loses focus and not connected
   useEffect(() => {
     if (!isFocused && !webrtcConnected) {
-      console.log(
-        "🔄 Terminal screen unfocused and not connected, clearing status"
-      );
+      console.log('🔄 Terminal screen unfocused and not connected, clearing status');
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
     }
   }, [isFocused, webrtcConnected]);
@@ -403,20 +368,20 @@ export default function TerminalScreen({
             setSavedCombinations(JSON.parse(saved));
           }
           if (visibleSetting !== null) {
-            setComboBarVisible(visibleSetting === "true");
+            setComboBarVisible(visibleSetting === 'true');
           }
         } catch (error) {
-          console.error("Failed to load combinations data:", error);
+          console.error('Failed to load combinations data:', error);
         }
       };
       loadCombinationsData();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
     // Only connect if we have connection params
     if (!hasConnectionParams) {
-      console.log("⚠️  No connection params, skipping relay connection");
+      console.log('⚠️  No connection params, skipping relay connection');
       // Clear any stale connection status
       AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
       return;
@@ -425,10 +390,10 @@ export default function TerminalScreen({
     // Generate keys for this session
     try {
       keyPairRef.current = generateKeyPair();
-      console.log("🔐 Terminal: Generated session keys");
+      console.log('🔐 Terminal: Generated session keys');
     } catch (error) {
-      console.error("❌ Terminal: Failed to generate keys:", error);
-      Alert.alert("Security Error", "Failed to generate encryption keys");
+      console.error('❌ Terminal: Failed to generate keys:', error);
+      Alert.alert('Security Error', 'Failed to generate encryption keys');
     }
 
     connectToRelay();
@@ -453,7 +418,7 @@ export default function TerminalScreen({
   useEffect(() => {
     if (terminalSettings.terminalTheme) {
       const theme = getThemeById(terminalSettings.terminalTheme);
-      sendToTerminal("theme", {
+      sendToTerminal('theme', {
         background: theme.background,
         foreground: theme.foreground,
         cursor: theme.cursor,
@@ -464,67 +429,65 @@ export default function TerminalScreen({
 
   const fetchSettings = async () => {
     try {
-      if (!relayServerUrl) return;
+      if (!relayServerUrl) {
+        return;
+      }
 
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token) return;
+      if (!token) {
+        return;
+      }
 
       const response = await fetch(`${relayServerUrl}/api/settings`, {
-        method: "GET",
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setTerminalSettings((prev) => {
-          const merged = { ...prev, ...data };
-          sendToTerminal("settings", merged);
+        setTerminalSettings(prev => {
+          const merged = {...prev, ...data};
+          sendToTerminal('settings', merged);
           return merged;
         });
-        console.log("⚙️ Fetched settings via HTTP:", data);
+        console.log('⚙️ Fetched settings via HTTP:', data);
       }
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      console.error('Error fetching settings:', error);
     }
   };
 
   const sendToTerminal = (type: string, data: unknown) => {
     if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ type, data }));
+      webViewRef.current.postMessage(JSON.stringify({type, data}));
     }
   };
 
   const handleRefreshDimensions = () => {
-    sendToTerminal("fit", {});
+    sendToTerminal('fit', {});
 
     if (terminalDimensionsRef.current && paired && socketRef.current) {
-      console.log(
-        "📐 Manually refreshing dimensions:",
-        terminalDimensionsRef.current
-      );
-      socketRef.current.emit(
-        "terminal:dimensions",
-        terminalDimensionsRef.current
-      );
-      socketRef.current.emit("terminal:resize", terminalDimensionsRef.current);
+      console.log('📐 Manually refreshing dimensions:', terminalDimensionsRef.current);
+      socketRef.current.emit('terminal:dimensions', terminalDimensionsRef.current);
+      socketRef.current.emit('terminal:resize', terminalDimensionsRef.current);
     }
   };
 
   const handleAiPromptSubmit = () => {
     if (!aiPrompt.trim()) {
-      Alert.alert("Error", "Please enter a prompt");
+      Alert.alert('Error', 'Please enter a prompt');
       return;
     }
 
     if (!paired) {
-      Alert.alert("Error", "Not connected to Mac client");
+      Alert.alert('Error', 'Not connected to Mac client');
       return;
     }
 
-    console.log("🤖 Sending AI prompt:", aiPrompt);
+    console.log('🤖 Sending AI prompt:', aiPrompt);
     setAiProcessing(true);
 
     // Include active process UUID so Mac knows which terminal to target
@@ -532,11 +495,11 @@ export default function TerminalScreen({
       prompt: aiPrompt.trim(),
       uuid: activeProcessUuidRef.current,
     };
-    sendToMac("ai:prompt", promptData);
+    sendToMac('ai:prompt', promptData);
 
     // Show toast notification instead of terminal output
     const toastMsg = `🤖 AI: "${aiPrompt.trim().substring(0, 50)}${
-      aiPrompt.trim().length > 50 ? "..." : ""
+      aiPrompt.trim().length > 50 ? '...' : ''
     }"`;
     setAiToastMessage(toastMsg);
 
@@ -545,7 +508,7 @@ export default function TerminalScreen({
 
     // Close modal and reset
     setAiModalVisible(false);
-    setAiPrompt("");
+    setAiPrompt('');
 
     // Reset processing state after a delay (the Mac client will handle the actual processing)
     setTimeout(() => setAiProcessing(false), 2000);
@@ -556,19 +519,19 @@ export default function TerminalScreen({
    */
   const handleKeyCombinationSend = (actions: TerminalAction[]): void => {
     if (!paired) {
-      Alert.alert("Error", "Not connected to Mac client");
+      Alert.alert('Error', 'Not connected to Mac client');
       return;
     }
 
     if (!activeProcessUuidRef.current) {
-      Alert.alert("Error", "No active terminal process");
+      Alert.alert('Error', 'No active terminal process');
       return;
     }
 
-    console.log("⌨️ Sending actions:", actions);
+    console.log('⌨️ Sending actions:', actions);
 
     // Send the action array to the Mac client
-    sendToMac("terminal:actions", {
+    sendToMac('terminal:actions', {
       uuid: activeProcessUuidRef.current,
       actions,
     });
@@ -579,56 +542,52 @@ export default function TerminalScreen({
    */
   const handleOpenInCode = (): void => {
     if (!paired) {
-      Alert.alert("Error", "Not connected to Mac client");
+      Alert.alert('Error', 'Not connected to Mac client');
       return;
     }
 
     if (!activeProcessUuidRef.current) {
-      Alert.alert("Error", "No active terminal process");
+      Alert.alert('Error', 'No active terminal process');
       return;
     }
 
-    console.log("📂 Opening current directory in Code editor");
+    console.log('📂 Opening current directory in Code editor');
 
     // Send request to Mac to get current directory and init project using code namespace
     if (webrtcRef.current?.isWebRTCConnected()) {
-      webrtcRef.current.sendMessage("code", "openCurrentDir", {
+      webrtcRef.current.sendMessage('code', 'openCurrentDir', {
         uuid: activeProcessUuidRef.current,
       });
     } else if (socketRef.current) {
-      socketRef.current.emit("code:openCurrentDir", {
+      socketRef.current.emit('code:openCurrentDir', {
         uuid: activeProcessUuidRef.current,
       });
     }
 
     // Navigate to Code tab - the CodeScreen will handle the projectInitialized response
-    navigation.navigate("Code" as any);
+    navigation.navigate('Code' as any);
   };
 
   /**
    * Handle saved combination execution
    */
-  const handleExecuteSavedCombination = (
-    combination: SavedCombination
-  ): void => {
+  const handleExecuteSavedCombination = (combination: SavedCombination): void => {
     handleKeyCombinationSend(combination.actions);
   };
 
   /**
    * Handle arrow button presses
    */
-  const handleArrowPress = (
-    direction: "up" | "down" | "left" | "right"
-  ): void => {
+  const handleArrowPress = (direction: 'up' | 'down' | 'left' | 'right'): void => {
     const escapeSequences = {
-      up: "\x1b[A",
-      down: "\x1b[B",
-      right: "\x1b[C",
-      left: "\x1b[D",
+      up: '\x1b[A',
+      down: '\x1b[B',
+      right: '\x1b[C',
+      left: '\x1b[D',
     };
 
     const action: TerminalAction = {
-      type: "command",
+      type: 'command',
       value: escapeSequences[direction],
       label: direction.toUpperCase(),
     };
@@ -656,14 +615,12 @@ export default function TerminalScreen({
     const trimmedName = newTabName.trim();
 
     // Update local state
-    setProcesses((prev) =>
-      prev.map((p) =>
-        p.uuid === renamingProcessUuid ? { ...p, label: trimmedName } : p
-      )
+    setProcesses(prev =>
+      prev.map(p => (p.uuid === renamingProcessUuid ? {...p, label: trimmedName} : p)),
     );
 
     // Send rename command to Mac
-    sendToMac("process:rename", {
+    sendToMac('process:rename', {
       uuid: renamingProcessUuid,
       name: trimmedName,
     });
@@ -671,7 +628,7 @@ export default function TerminalScreen({
     // Close modal
     setRenameModalVisible(false);
     setRenamingProcessUuid(null);
-    setNewTabName("");
+    setNewTabName('');
   }, [renamingProcessUuid, newTabName, sendToMac]);
 
   const getDeviceId = async () => {
@@ -692,13 +649,13 @@ export default function TerminalScreen({
       console.log(`🔄 handleProcessMessage called: type=${type}`);
 
       switch (type) {
-        case "processes:sync": {
+        case 'processes:sync': {
           // Restore tabs from Mac on reconnection
           const syncPayload = payload as ProcessesSyncPayload;
           console.log(
-            `📋 Received processes:sync with ${syncPayload.processes.length} process(es)`
+            `📋 Received processes:sync with ${syncPayload.processes.length} process(es)`,
           );
-          console.log(`📋 Sync payload:`, JSON.stringify(syncPayload));
+          console.log('📋 Sync payload:', JSON.stringify(syncPayload));
 
           // End syncing state - we've received the sync data
           setSyncingTabs(false);
@@ -711,12 +668,11 @@ export default function TerminalScreen({
             setTerminalInitializing(true);
 
             // Restore processes from Mac
-            const restoredProcesses: TerminalProcess[] =
-              syncPayload.processes.map((p) => ({
-                uuid: p.uuid,
-                createdAt: p.createdAt,
-                label: p.name,
-              }));
+            const restoredProcesses: TerminalProcess[] = syncPayload.processes.map(p => ({
+              uuid: p.uuid,
+              createdAt: p.createdAt,
+              label: p.name,
+            }));
 
             setProcesses(restoredProcesses);
 
@@ -734,13 +690,13 @@ export default function TerminalScreen({
               activeProcessUuidRef.current = activeUuid;
 
               // Request screen snapshot for active process
-              sendToMac("process:switch", { activeUuids: [activeUuid] });
+              sendToMac('process:switch', {activeUuids: [activeUuid]});
             } else if (restoredProcesses.length > 0) {
               // Default to first process if none active
               const firstUuid = restoredProcesses[0].uuid;
               setActiveProcessUuid(firstUuid);
               activeProcessUuidRef.current = firstUuid;
-              sendToMac("process:switch", { activeUuids: [firstUuid] });
+              sendToMac('process:switch', {activeUuids: [firstUuid]});
             }
 
             // Hide initializing overlay after terminal has time to apply theme and dimensions
@@ -749,56 +705,36 @@ export default function TerminalScreen({
               setTerminalInitializing(false);
             }, 1000);
 
-            console.log(
-              `✅ Restored ${restoredProcesses.length} tab(s) from Mac`
-            );
+            console.log(`✅ Restored ${restoredProcesses.length} tab(s) from Mac`);
           } else {
-            console.log(
-              `📋 No existing tabs on Mac - user can create a new one`
-            );
+            console.log('📋 No existing tabs on Mac - user can create a new one');
           }
           break;
         }
-        case "process:created": {
-          const { uuid } = payload as { uuid: string };
-          console.log(
-            `✅ Mac confirmed process created: ${uuid.substring(0, 8)}`
-          );
+        case 'process:created': {
+          const {uuid} = payload as {uuid: string};
+          console.log(`✅ Mac confirmed process created: ${uuid.substring(0, 8)}`);
           break;
         }
-        case "process:terminated": {
-          const { uuid } = payload as { uuid: string };
-          console.log(
-            `✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`
-          );
+        case 'process:terminated': {
+          const {uuid} = payload as {uuid: string};
+          console.log(`✅ Mac confirmed process terminated: ${uuid.substring(0, 8)}`);
           break;
         }
-        case "process:renamed": {
-          const { uuid, name } = payload as { uuid: string; name: string };
-          console.log(
-            `✅ Mac confirmed process renamed: ${uuid.substring(
-              0,
-              8
-            )} -> ${name}`
-          );
+        case 'process:renamed': {
+          const {uuid, name} = payload as {uuid: string; name: string};
+          console.log(`✅ Mac confirmed process renamed: ${uuid.substring(0, 8)} -> ${name}`);
           // Update local state with confirmed name from Mac
-          setProcesses((prev) =>
-            prev.map((p) => (p.uuid === uuid ? { ...p, label: name } : p))
-          );
+          setProcesses(prev => prev.map(p => (p.uuid === uuid ? {...p, label: name} : p)));
           break;
         }
-        case "process:exited": {
-          const { uuid } = payload as ProcessExitedPayload;
-          console.log(
-            `⚠️ Process exited unexpectedly: ${uuid.substring(0, 8)}`
-          );
+        case 'process:exited': {
+          const {uuid} = payload as ProcessExitedPayload;
+          console.log(`⚠️ Process exited unexpectedly: ${uuid.substring(0, 8)}`);
           // Remove from local state
-          setProcesses((prev) => {
-            const newProcesses = prev.filter((p) => p.uuid !== uuid);
-            if (
-              activeProcessUuidRef.current === uuid &&
-              newProcesses.length > 0
-            ) {
+          setProcesses(prev => {
+            const newProcesses = prev.filter(p => p.uuid !== uuid);
+            if (activeProcessUuidRef.current === uuid && newProcesses.length > 0) {
               const nextProcess = newProcesses[newProcesses.length - 1];
               setActiveProcessUuid(nextProcess.uuid);
               activeProcessUuidRef.current = nextProcess.uuid; // Update ref immediately
@@ -810,14 +746,12 @@ export default function TerminalScreen({
           });
           break;
         }
-        case "process:screen": {
-          const { uuid, data } = payload as ProcessScreenPayload;
-          console.log(
-            `📺 Received screen snapshot for ${uuid.substring(0, 8)}`
-          );
+        case 'process:screen': {
+          const {uuid, data} = payload as ProcessScreenPayload;
+          console.log(`📺 Received screen snapshot for ${uuid.substring(0, 8)}`);
           // Only display if this is the active process (use ref for current value)
           if (uuid === activeProcessUuidRef.current) {
-            sendToTerminal("output", data);
+            sendToTerminal('output', data);
             // Clear terminal initialization overlay since we've received content
             // Add small delay to ensure theme/dimensions are applied first
             setTimeout(() => {
@@ -826,63 +760,58 @@ export default function TerminalScreen({
           }
           break;
         }
-        case "process:error": {
-          const { uuid, error } = payload as { uuid: string; error: string };
-          console.error(
-            `❌ Process error for ${uuid.substring(0, 8)}: ${error}`
-          );
-          Alert.alert("Process Error", error);
+        case 'process:error': {
+          const {uuid, error} = payload as {uuid: string; error: string};
+          console.error(`❌ Process error for ${uuid.substring(0, 8)}: ${error}`);
+          Alert.alert('Process Error', error);
           break;
         }
-        case "terminal:output": {
+        case 'terminal:output': {
           // Handle output with uuid
           const outputPayload = payload as TerminalOutputPayload | string;
           if (config.DEBUG) {
             console.log(
               `📥 Received terminal:output, payload type: ${typeof outputPayload}, activeUuid: ${activeProcessUuidRef.current?.substring(
                 0,
-                8
-              )}`
+                8,
+              )}`,
             );
           }
 
-          if (typeof outputPayload === "object" && outputPayload.uuid) {
+          if (typeof outputPayload === 'object' && outputPayload.uuid) {
             if (config.DEBUG) {
               console.log(
                 `   Output from process: ${outputPayload.uuid.substring(
                   0,
-                  8
-                )}, data length: ${outputPayload.data?.length}`
+                  8,
+                )}, data length: ${outputPayload.data?.length}`,
               );
             }
             // Only display if from active process (use ref for current value)
             if (outputPayload.uuid === activeProcessUuidRef.current) {
               if (config.DEBUG) {
-                console.log(`   ✅ Displaying output`);
+                console.log('   ✅ Displaying output');
               }
-              sendToTerminal("output", outputPayload.data);
+              sendToTerminal('output', outputPayload.data);
             } else {
               console.log(
-                `   🔇 Ignoring output from inactive process ${outputPayload.uuid.substring(
-                  0,
-                  8
-                )}`
+                `   🔇 Ignoring output from inactive process ${outputPayload.uuid.substring(0, 8)}`,
               );
             }
           } else {
             // Legacy format (no uuid) - display directly
-            console.log(`   Legacy format, displaying directly`);
-            sendToTerminal("output", outputPayload);
+            console.log('   Legacy format, displaying directly');
+            sendToTerminal('output', outputPayload);
           }
           break;
         }
       }
     },
-    [sendToMac]
+    [sendToMac],
   ); // Added sendToMac dependency for process:switch call
 
   const connectToRelay = async () => {
-    setConnectionStatus("📡 Connecting to relay server...");
+    setConnectionStatus('📡 Connecting to relay server...');
 
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     const deviceId = await getDeviceId();
@@ -894,18 +823,18 @@ export default function TerminalScreen({
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
-      transports: ["websocket"],
-      auth: { token },
+      transports: ['websocket'],
+      auth: {token},
     });
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
+    socket.on('connect', () => {
       setConnected(true);
-      setConnectionStatus("✅ Connected to relay server");
+      setConnectionStatus('✅ Connected to relay server');
       // Register as mobile device with token and deviceId AND publicKey
-      socket.emit("register", {
-        type: "mobile",
+      socket.emit('register', {
+        type: 'mobile',
         token,
         deviceId,
         publicKey: keyPairRef.current?.publicKey,
@@ -914,7 +843,7 @@ export default function TerminalScreen({
 
     // Handle Secure Handshake
     socket.on(
-      "handshake:initiate",
+      'handshake:initiate',
       ({
         peerId,
         peerPublicKey,
@@ -925,121 +854,109 @@ export default function TerminalScreen({
         challenge: string;
       }) => {
         console.log(`🔐 Starting secure handshake with ${peerId}...`);
-        setConnectionStatus("🔐 Verifying security...");
+        setConnectionStatus('🔐 Verifying security...');
 
         try {
           if (!keyPairRef.current) {
-            throw new Error("No key pair available");
+            throw new Error('No key pair available');
           }
 
           // Derive shared secret
-          const sharedSecret = deriveSharedSecret(
-            keyPairRef.current.privateKey,
-            peerPublicKey
-          );
+          const sharedSecret = deriveSharedSecret(keyPairRef.current.privateKey, peerPublicKey);
           sharedSecretRef.current = sharedSecret;
-          console.log("✅ Derived shared secret");
+          console.log('✅ Derived shared secret');
 
           // Sign the challenge
           const signature = signChallenge(challenge, sharedSecret);
 
           // Send response
-          socket.emit("handshake:response", {
+          socket.emit('handshake:response', {
             peerId,
             signature,
           });
 
-          console.log("📤 Sent challenge response");
+          console.log('📤 Sent challenge response');
         } catch (error) {
-          console.error("❌ Handshake failed:", error);
-          setConnectionStatus("❌ Security handshake failed");
-          socket.emit("error", { message: "Handshake failed" });
+          console.error('❌ Handshake failed:', error);
+          setConnectionStatus('❌ Security handshake failed');
+          socket.emit('error', {message: 'Handshake failed'});
         }
-      }
+      },
     );
 
-    socket.on(
-      "handshake:verify",
-      ({ peerId }: { peerId: string; signature: string }) => {
-        console.log(`✅ Handshake verified for ${peerId}`);
-        // In a full implementation, we would verify the signature here.
-        // For now, confirm the handshake to complete the pairing.
-        socket.emit("handshake:confirmed");
-      }
-    );
+    socket.on('handshake:verify', ({peerId}: {peerId: string; signature: string}) => {
+      console.log(`✅ Handshake verified for ${peerId}`);
+      // In a full implementation, we would verify the signature here.
+      // For now, confirm the handshake to complete the pairing.
+      socket.emit('handshake:confirmed');
+    });
 
-    socket.on("settings:updated", (newSettings) => {
+    socket.on('settings:updated', newSettings => {
       if (newSettings) {
-        console.log("⚙️ Received settings update:", newSettings);
-        setTerminalSettings((prev) => {
-          const merged = { ...prev, ...newSettings };
-          sendToTerminal("settings", merged);
+        console.log('⚙️ Received settings update:', newSettings);
+        setTerminalSettings(prev => {
+          const merged = {...prev, ...newSettings};
+          sendToTerminal('settings', merged);
           return merged;
         });
       }
     });
 
-    socket.on("login_required", ({ loginUrl }) => {
-      setConnectionStatus(
-        "🔒 Authentication Required\nPlease log in via browser"
-      );
-      Alert.alert(
-        "Authentication Required",
-        "You need to log in with Google to connect.",
-        [
-          {
-            text: "Log In",
-            onPress: () => {
-              const fullUrl = `${relayServerUrl}${loginUrl}`;
-              Linking.openURL(fullUrl);
-            },
+    socket.on('login_required', ({loginUrl}) => {
+      setConnectionStatus('🔒 Authentication Required\nPlease log in via browser');
+      Alert.alert('Authentication Required', 'You need to log in with Google to connect.', [
+        {
+          text: 'Log In',
+          onPress: () => {
+            const fullUrl = `${relayServerUrl}${loginUrl}`;
+            Linking.openURL(fullUrl);
           },
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     });
 
-    socket.on("authenticated", async ({ token, user }) => {
+    socket.on('authenticated', async ({token, user}) => {
       console.log(`✅ Authenticated as ${user.email}`);
       await AsyncStorage.setItem(TOKEN_KEY, token);
       setConnectionStatus(`✅ Logged in as ${user.email}`);
 
       // Now that we are authenticated, request connection
       if (targetDeviceId) {
-        console.log("🔌 Requesting connection to:", targetDeviceId);
-        setConnectionStatus("🔗 Requesting connection...");
-        socket.emit("request_connection", { targetDeviceId });
+        console.log('🔌 Requesting connection to:', targetDeviceId);
+        setConnectionStatus('🔗 Requesting connection...');
+        socket.emit('request_connection', {targetDeviceId});
       }
     });
 
-    socket.on("auth_error", async ({ message }) => {
+    socket.on('auth_error', async ({message}) => {
       console.log(`❌ Auth Error: ${message}`);
       await AsyncStorage.removeItem(TOKEN_KEY);
       // Will trigger login_required on next attempt
-      socket.emit("register", { type: "mobile", deviceId });
+      socket.emit('register', {type: 'mobile', deviceId});
     });
 
-    socket.on("waiting_for_peer", ({ message }) => {
+    socket.on('waiting_for_peer', ({message}) => {
       setConnectionStatus(`⏳ ${message}`);
     });
 
-    socket.on("available_devices", () => {
+    socket.on('available_devices', () => {
       // Terminal screen received list update - peer might have disconnected/reconnected
       // We could potentially check if our target is still there, but for now ignore
     });
 
-    socket.on("paired", ({ message }) => {
+    socket.on('paired', ({message}) => {
       setPaired(true);
       setSyncingTabs(true); // Start syncing state - waiting for processes:sync from Mac
       console.log(`✅ ${message}`);
-      setConnectionStatus("");
+      setConnectionStatus('');
 
       // Initialize WebRTC P2P connection
-      console.log("🔗 Initializing WebRTC P2P connection...");
+      console.log('🔗 Initializing WebRTC P2P connection...');
 
       // Store connecting status
       if (targetDeviceId) {
@@ -1047,8 +964,8 @@ export default function TerminalScreen({
           CONNECTION_STATUS_KEY,
           JSON.stringify({
             deviceId: targetDeviceId,
-            status: "connecting",
-          })
+            status: 'connecting',
+          }),
         );
       }
 
@@ -1067,12 +984,8 @@ export default function TerminalScreen({
       codeService.initialize(webrtcRef.current);
 
       // Handle WebRTC messages - now with process support and code layer
-      webrtcRef.current.onMessage((data) => {
-        console.log(
-          `📡 WebRTC message received: type=${
-            data.type
-          }, hasPayload=${!!data.payload}`
-        );
+      webrtcRef.current.onMessage(data => {
+        console.log(`📡 WebRTC message received: type=${data.type}, hasPayload=${!!data.payload}`);
 
         // Check for namespace-based routing (new format)
         if (data.namespace) {
@@ -1096,11 +1009,8 @@ export default function TerminalScreen({
         }
 
         // Handle processes:sync specially to ensure it's processed
-        if (data.type === "processes:sync") {
-          console.log(
-            `📋 WebRTC processes:sync payload:`,
-            JSON.stringify(data.payload)
-          );
+        if (data.type === 'processes:sync') {
+          console.log('📋 WebRTC processes:sync payload:', JSON.stringify(data.payload));
         }
 
         // Legacy format routing for terminal messages
@@ -1108,8 +1018,8 @@ export default function TerminalScreen({
       });
 
       // Handle WebRTC connection state
-      webrtcRef.current.onStateChange(async (state) => {
-        if (state === "connected") {
+      webrtcRef.current.onStateChange(async state => {
+        if (state === 'connected') {
           setWebrtcConnected(true);
           // Store connected status with device ID
           if (targetDeviceId) {
@@ -1117,157 +1027,133 @@ export default function TerminalScreen({
               CONNECTION_STATUS_KEY,
               JSON.stringify({
                 deviceId: targetDeviceId,
-                status: "connected",
-              })
+                status: 'connected',
+              }),
             );
           }
-          console.log("🎉 WebRTC P2P connected!");
-        } else if (state === "connecting") {
+          console.log('🎉 WebRTC P2P connected!');
+        } else if (state === 'connecting') {
           // Store connecting status
           if (targetDeviceId) {
             AsyncStorage.setItem(
               CONNECTION_STATUS_KEY,
               JSON.stringify({
                 deviceId: targetDeviceId,
-                status: "connecting",
-              })
+                status: 'connecting',
+              }),
             );
           }
-        } else if (
-          state === "disconnected" ||
-          state === "failed" ||
-          state === "closed"
-        ) {
+        } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
           setWebrtcConnected(false);
           // Clear connection status
           AsyncStorage.removeItem(CONNECTION_STATUS_KEY);
-          console.log("⚠️  WebRTC disconnected, using relay server fallback");
+          console.log('⚠️  WebRTC disconnected, using relay server fallback');
         }
       });
     });
 
-    socket.on("system:message", (data: { type: string; payload?: unknown }) => {
-      if (data.type === "terminal_ready") {
-        console.log("✅ Terminal ready on Mac side");
+    socket.on('system:message', (data: {type: string; payload?: unknown}) => {
+      if (data.type === 'terminal_ready') {
+        console.log('✅ Terminal ready on Mac side');
         setTerminalReady(true);
-        setConnectionStatus("");
+        setConnectionStatus('');
 
         // Send terminal dimensions to Mac client now that it's ready
         if (terminalDimensionsRef.current) {
-          console.log(
-            "📐 Sending initial dimensions to Mac:",
-            terminalDimensionsRef.current
-          );
-          socket.emit("terminal:dimensions", terminalDimensionsRef.current);
-          socket.emit("terminal:resize", terminalDimensionsRef.current);
+          console.log('📐 Sending initial dimensions to Mac:', terminalDimensionsRef.current);
+          socket.emit('terminal:dimensions', terminalDimensionsRef.current);
+          socket.emit('terminal:resize', terminalDimensionsRef.current);
         } else {
           // Request dimensions from WebView if not yet available
-          console.log("📐 Requesting dimensions from terminal WebView");
-          sendToTerminal("fit", {});
+          console.log('📐 Requesting dimensions from terminal WebView');
+          sendToTerminal('fit', {});
         }
       }
     });
 
     // Listen for process-related messages via Socket
-    socket.on("processes:sync", (payload) => {
-      console.log(
-        "📨 Socket received processes:sync:",
-        JSON.stringify(payload)
-      );
-      handleProcessMessage("processes:sync", payload);
+    socket.on('processes:sync', payload => {
+      console.log('📨 Socket received processes:sync:', JSON.stringify(payload));
+      handleProcessMessage('processes:sync', payload);
     });
-    socket.on("process:created", (payload) =>
-      handleProcessMessage("process:created", payload)
-    );
-    socket.on("process:terminated", (payload) =>
-      handleProcessMessage("process:terminated", payload)
-    );
-    socket.on("process:renamed", (payload) =>
-      handleProcessMessage("process:renamed", payload)
-    );
-    socket.on("process:exited", (payload) =>
-      handleProcessMessage("process:exited", payload)
-    );
-    socket.on("process:screen", (payload) =>
-      handleProcessMessage("process:screen", payload)
-    );
-    socket.on("process:error", (payload) =>
-      handleProcessMessage("process:error", payload)
-    );
+    socket.on('process:created', payload => handleProcessMessage('process:created', payload));
+    socket.on('process:terminated', payload => handleProcessMessage('process:terminated', payload));
+    socket.on('process:renamed', payload => handleProcessMessage('process:renamed', payload));
+    socket.on('process:exited', payload => handleProcessMessage('process:exited', payload));
+    socket.on('process:screen', payload => handleProcessMessage('process:screen', payload));
+    socket.on('process:error', payload => handleProcessMessage('process:error', payload));
 
     // Listen for code-related messages via Socket (fallback)
-    socket.on("code:projectsHistory", (payload) => {
-      console.log("📨 Socket received code:projectsHistory");
-      codeService.handleIncomingMessage("code:projectsHistory", payload);
+    socket.on('code:projectsHistory', payload => {
+      console.log('📨 Socket received code:projectsHistory');
+      codeService.handleIncomingMessage('code:projectsHistory', payload);
     });
-    socket.on("code:projectInitialized", (payload) => {
-      console.log("📨 Socket received code:projectInitialized");
-      codeService.handleIncomingMessage("code:projectInitialized", payload);
+    socket.on('code:projectInitialized', payload => {
+      console.log('📨 Socket received code:projectInitialized');
+      codeService.handleIncomingMessage('code:projectInitialized', payload);
     });
-    socket.on("code:folderChildren", (payload) => {
-      console.log("📨 Socket received code:folderChildren");
-      codeService.handleIncomingMessage("code:folderChildren", payload);
+    socket.on('code:folderChildren', payload => {
+      console.log('📨 Socket received code:folderChildren');
+      codeService.handleIncomingMessage('code:folderChildren', payload);
     });
-    socket.on("code:fileContent", (payload) => {
-      console.log("📨 Socket received code:fileContent");
-      codeService.handleIncomingMessage("code:fileContent", payload);
+    socket.on('code:fileContent', payload => {
+      console.log('📨 Socket received code:fileContent');
+      codeService.handleIncomingMessage('code:fileContent', payload);
     });
-    socket.on("code:fileSaved", (payload) => {
-      console.log("📨 Socket received code:fileSaved");
-      codeService.handleIncomingMessage("code:fileSaved", payload);
+    socket.on('code:fileSaved', payload => {
+      console.log('📨 Socket received code:fileSaved');
+      codeService.handleIncomingMessage('code:fileSaved', payload);
     });
-    socket.on("code:fileSaveError", (payload) => {
-      console.log("📨 Socket received code:fileSaveError");
-      codeService.handleIncomingMessage("code:fileSaveError", payload);
+    socket.on('code:fileSaveError', payload => {
+      console.log('📨 Socket received code:fileSaveError');
+      codeService.handleIncomingMessage('code:fileSaveError', payload);
     });
-    socket.on("code:projectClosed", (payload) => {
-      console.log("📨 Socket received code:projectClosed");
-      codeService.handleIncomingMessage("code:projectClosed", payload);
+    socket.on('code:projectClosed', payload => {
+      console.log('📨 Socket received code:projectClosed');
+      codeService.handleIncomingMessage('code:projectClosed', payload);
     });
-    socket.on("code:error", (payload) => {
-      console.log("📨 Socket received code:error");
-      codeService.handleIncomingMessage("code:error", payload);
+    socket.on('code:error', payload => {
+      console.log('📨 Socket received code:error');
+      codeService.handleIncomingMessage('code:error', payload);
     });
-    socket.on("code:fileCreated", (payload) => {
-      console.log("📨 Socket received code:fileCreated");
-      codeService.handleIncomingMessage("code:fileCreated", payload);
+    socket.on('code:fileCreated', payload => {
+      console.log('📨 Socket received code:fileCreated');
+      codeService.handleIncomingMessage('code:fileCreated', payload);
     });
-    socket.on("code:folderCreated", (payload) => {
-      console.log("📨 Socket received code:folderCreated");
-      codeService.handleIncomingMessage("code:folderCreated", payload);
+    socket.on('code:folderCreated', payload => {
+      console.log('📨 Socket received code:folderCreated');
+      codeService.handleIncomingMessage('code:folderCreated', payload);
     });
-    socket.on("code:itemRenamed", (payload) => {
-      console.log("📨 Socket received code:itemRenamed");
-      codeService.handleIncomingMessage("code:itemRenamed", payload);
+    socket.on('code:itemRenamed', payload => {
+      console.log('📨 Socket received code:itemRenamed');
+      codeService.handleIncomingMessage('code:itemRenamed', payload);
     });
-    socket.on("code:itemDeleted", (payload) => {
-      console.log("📨 Socket received code:itemDeleted");
-      codeService.handleIncomingMessage("code:itemDeleted", payload);
+    socket.on('code:itemDeleted', payload => {
+      console.log('📨 Socket received code:itemDeleted');
+      codeService.handleIncomingMessage('code:itemDeleted', payload);
     });
-    socket.on("code:fileDiff", (payload) => {
-      console.log("📨 Socket received code:fileDiff");
-      codeService.handleIncomingMessage("code:fileDiff", payload);
+    socket.on('code:fileDiff', payload => {
+      console.log('📨 Socket received code:fileDiff');
+      codeService.handleIncomingMessage('code:fileDiff', payload);
     });
-    socket.on("code:fileDiffError", (payload) => {
-      console.log("📨 Socket received code:fileDiffError");
-      codeService.handleIncomingMessage("code:fileDiffError", payload);
+    socket.on('code:fileDiffError', payload => {
+      console.log('📨 Socket received code:fileDiffError');
+      codeService.handleIncomingMessage('code:fileDiffError', payload);
     });
 
     // Listen for terminal output via WebSocket (fallback)
-    socket.on("terminal:output", (data: TerminalOutputPayload | string) => {
+    socket.on('terminal:output', (data: TerminalOutputPayload | string) => {
       if (!webrtcRef.current?.isWebRTCConnected()) {
-        handleProcessMessage("terminal:output", data);
+        handleProcessMessage('terminal:output', data);
       }
     });
 
-    socket.on("paired_device_disconnected", ({ message }) => {
+    socket.on('paired_device_disconnected', ({message}) => {
       if (webrtcRef.current?.isWebRTCConnected()) {
-        console.log(
-          "⚠️  Relay server disconnected, but P2P connection is still active"
-        );
+        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
         sendToTerminal(
-          "output",
-          "\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n"
+          'output',
+          '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n',
         );
         return;
       }
@@ -1287,32 +1173,30 @@ export default function TerminalScreen({
       setActiveProcessUuid(null);
       activeProcessUuidRef.current = null;
 
-      sendToTerminal("output", `\r\n\x1b[33m⚠️ ${message}\x1b[0m\r\n`);
+      sendToTerminal('output', `\r\n\x1b[33m⚠️ ${message}\x1b[0m\r\n`);
       sendToTerminal(
-        "output",
-        `\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n`
+        'output',
+        '\r\n\x1b[36mTerminals are kept alive on Mac. Reconnect to restore.\x1b[0m\r\n',
       );
       Alert.alert(
-        "Disconnected",
+        'Disconnected',
         `${message}\n\nYour terminals are still running on the Mac. Reconnect to restore them.`,
         [
           {
-            text: "OK",
+            text: 'OK',
             onPress: () => navigation.goBack(),
           },
-        ]
+        ],
       );
     });
 
-    socket.on("disconnect", (reason) => {
+    socket.on('disconnect', reason => {
       if (webrtcRef.current?.isWebRTCConnected()) {
-        console.log(
-          "⚠️  Relay server disconnected, but P2P connection is still active"
-        );
+        console.log('⚠️  Relay server disconnected, but P2P connection is still active');
         setConnected(false);
         sendToTerminal(
-          "output",
-          "\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n"
+          'output',
+          '\r\n\x1b[33m⚠️  Relay server disconnected (P2P still active)\x1b[0m\r\n',
         );
         return;
       }
@@ -1321,31 +1205,26 @@ export default function TerminalScreen({
       setPaired(false);
       setProcesses([]);
       setActiveProcessUuid(null);
-      sendToTerminal(
-        "output",
-        `\r\n\x1b[31m❌ Disconnected: ${reason}\x1b[0m\r\n`
-      );
+      sendToTerminal('output', `\r\n\x1b[31m❌ Disconnected: ${reason}\x1b[0m\r\n`);
     });
 
-    socket.on("connect_error", (error) => {
-      setConnectionStatus(
-        `❌ Connection error: ${error.message}\nURL: ${relayServerUrl}`
-      );
+    socket.on('connect_error', error => {
+      setConnectionStatus(`❌ Connection error: ${error.message}\nURL: ${relayServerUrl}`);
       Alert.alert(
-        "Connection Error",
+        'Connection Error',
         `Failed to connect to relay server:\n${error.message}\n\nURL: ${relayServerUrl}`,
         [
           {
-            text: "OK",
+            text: 'OK',
             onPress: () => navigation.goBack(),
           },
-        ]
+        ],
       );
     });
 
-    socket.on("error", ({ message }) => {
-      sendToTerminal("output", `\r\n\x1b[31m❌ Error: ${message}\x1b[0m\r\n`);
-      Alert.alert("Error", message);
+    socket.on('error', ({message}) => {
+      sendToTerminal('output', `\r\n\x1b[31m❌ Error: ${message}\x1b[0m\r\n`);
+      Alert.alert('Error', message);
     });
   };
 
@@ -1358,7 +1237,7 @@ export default function TerminalScreen({
       terminalDimensionsRef.current
     ) {
       firstProcessCreatedRef.current = true;
-      console.log("📱 Auto-creating first process after WebRTC connected...");
+      console.log('📱 Auto-creating first process after WebRTC connected...');
       // Small delay to ensure everything is stable
       setTimeout(() => {
         createProcess();
@@ -1366,27 +1245,27 @@ export default function TerminalScreen({
     }
   }, [paired, webrtcConnected, createProcess]);
 
-  const handleWebViewMessage = (event: { nativeEvent: { data: string } }) => {
+  const handleWebViewMessage = (event: {nativeEvent: {data: string}}) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
 
       // Forward WebView console logs to React Native console
-      if (message.type === "console") {
+      if (message.type === 'console') {
         console.log(`[WebView] ${message.data}`);
         return;
       }
 
-      if (message.type === "ready") {
-        console.log("📱 Terminal WebView ready:", message.data);
+      if (message.type === 'ready') {
+        console.log('📱 Terminal WebView ready:', message.data);
         terminalDimensionsRef.current = message.data;
 
         // Send current settings (without theme - theme handled separately)
-        sendToTerminal("settings", terminalSettings);
+        sendToTerminal('settings', terminalSettings);
 
         // Apply terminal theme if set
         if (terminalSettings.terminalTheme) {
           const theme = getThemeById(terminalSettings.terminalTheme);
-          sendToTerminal("theme", {
+          sendToTerminal('theme', {
             background: theme.background,
             foreground: theme.foreground,
             cursor: theme.cursor,
@@ -1395,28 +1274,24 @@ export default function TerminalScreen({
         }
 
         if (paired && socketRef.current) {
-          console.log("📤 Sending terminal dimensions:", message.data);
-          socketRef.current.emit("terminal:dimensions", message.data);
+          console.log('📤 Sending terminal dimensions:', message.data);
+          socketRef.current.emit('terminal:dimensions', message.data);
         }
 
         // If paired with WebRTC but no process created yet, create first process now
         if (paired && webrtcConnected && !firstProcessCreatedRef.current) {
           firstProcessCreatedRef.current = true;
-          console.log(
-            "📱 Creating first process (dimensions ready, WebRTC connected)..."
-          );
+          console.log('📱 Creating first process (dimensions ready, WebRTC connected)...');
           setTimeout(() => createProcess(), 100);
         }
-      } else if (message.type === "input") {
+      } else if (message.type === 'input') {
         // Use ref for current active process UUID to avoid stale closure
         const currentActiveUuid = activeProcessUuidRef.current;
         if (paired && currentActiveUuid) {
           const input = message.data;
 
           if (config.DEBUG) {
-            console.log(
-              `⌨️ Input received from WebView: ${JSON.stringify(input)}`
-            );
+            console.log(`⌨️ Input received from WebView: ${JSON.stringify(input)}`);
           }
 
           // Send input with process uuid
@@ -1427,51 +1302,48 @@ export default function TerminalScreen({
 
           if (webrtcRef.current?.isWebRTCConnected()) {
             if (config.DEBUG) {
-              console.log("📤 Sending via WebRTC P2P");
+              console.log('📤 Sending via WebRTC P2P');
             }
-            const success = webrtcRef.current.sendMessage(
-              "terminal:input",
-              payload
-            );
+            const success = webrtcRef.current.sendMessage('terminal:input', payload);
             if (!success && socketRef.current) {
-              console.log("⚠️ WebRTC send failed, falling back to Socket");
-              socketRef.current.emit("terminal:input", payload);
+              console.log('⚠️ WebRTC send failed, falling back to Socket');
+              socketRef.current.emit('terminal:input', payload);
             }
           } else if (socketRef.current) {
-            console.log("📤 Sending via Socket (Fallback)");
-            socketRef.current.emit("terminal:input", payload);
+            console.log('📤 Sending via Socket (Fallback)');
+            socketRef.current.emit('terminal:input', payload);
           }
         } else {
-          console.log("❌ Input ignored: Not paired or no active process");
+          console.log('❌ Input ignored: Not paired or no active process');
         }
-      } else if (message.type === "dimensions") {
+      } else if (message.type === 'dimensions') {
         terminalDimensionsRef.current = message.data;
         if (paired && socketRef.current) {
-          socketRef.current.emit("terminal:dimensions", message.data);
+          socketRef.current.emit('terminal:dimensions', message.data);
         }
-      } else if (message.type === "resize") {
+      } else if (message.type === 'resize') {
         if (paired && socketRef.current) {
-          socketRef.current.emit("terminal:resize", message.data);
+          socketRef.current.emit('terminal:resize', message.data);
         }
-      } else if (message.type === "clipboard") {
+      } else if (message.type === 'clipboard') {
         if (message.data) {
           Clipboard.setString(message.data);
           setCopyFeedback(true);
           setTimeout(() => setCopyFeedback(false), 1500);
         }
-      } else if (message.type === "scroll") {
+      } else if (message.type === 'scroll') {
         // Show/hide scroll-to-bottom button based on scroll position
-        const { distanceFromBottom } = message.data;
+        const {distanceFromBottom} = message.data;
         setShowScrollToBottom(distanceFromBottom > 20);
       }
     } catch (error) {
-      console.error("Error handling WebView message:", error);
+      console.error('Error handling WebView message:', error);
     }
   };
 
   useEffect(() => {
     if (!terminalReady && connectionStatus) {
-      sendToTerminal("output", connectionStatus + "\r\n");
+      sendToTerminal('output', connectionStatus + '\r\n');
     }
   }, [connectionStatus, terminalReady]);
 
@@ -1486,18 +1358,16 @@ export default function TerminalScreen({
 
   // Keyboard visibility listener - terminal keeps fixed size, wrapper becomes scrollable
   useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+    const showSubscription = Keyboard.addListener(showEvent, e => {
       const kbHeight = e.endCoordinates.height;
       setKeyboardVisible(true);
       setKeyboardHeight(kbHeight);
       // Scroll by keyboard height so content appears to stay in place
       setTimeout(() => {
-        terminalWrapperRef.current?.scrollTo({ y: kbHeight, animated: false });
+        terminalWrapperRef.current?.scrollTo({y: kbHeight, animated: false});
       }, 50);
     });
 
@@ -1505,7 +1375,7 @@ export default function TerminalScreen({
       setKeyboardVisible(false);
       setKeyboardHeight(0);
       // Scroll back to top when keyboard hides
-      terminalWrapperRef.current?.scrollTo({ y: 0, animated: true });
+      terminalWrapperRef.current?.scrollTo({y: 0, animated: true});
     });
 
     return () => {
@@ -1519,11 +1389,11 @@ export default function TerminalScreen({
   const handleTerminalWrapperLayout = useCallback(
     (event: LayoutChangeEvent) => {
       if (fixedTerminalHeight === null && !keyboardVisible) {
-        const { height } = event.nativeEvent.layout;
+        const {height} = event.nativeEvent.layout;
         setFixedTerminalHeight(height);
       }
     },
-    [fixedTerminalHeight, keyboardVisible]
+    [fixedTerminalHeight, keyboardVisible],
   );
 
   // Use the fixed height, or flex until it's measured
@@ -2003,31 +1873,27 @@ export default function TerminalScreen({
         key={process.uuid}
         style={[styles.tab, isActive && styles.tabActive]}
         onPress={() => {
-          sendToTerminal("blur", {});
+          sendToTerminal('blur', {});
           Keyboard.dismiss();
           switchProcess(process.uuid);
         }}
         onLongPress={() => {
-          sendToTerminal("blur", {});
+          sendToTerminal('blur', {});
           Keyboard.dismiss();
           handleRenameTab(process.uuid, process.label);
         }}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-          {process.label}
-        </Text>
+        activeOpacity={0.7}>
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{process.label}</Text>
         {/* Close button - ghost style, inside tab */}
         <TouchableOpacity
           style={styles.tabCloseButton}
-          onPress={(e) => {
+          onPress={e => {
             e.stopPropagation(); // Prevent tab switch when clicking close
-            sendToTerminal("blur", {});
+            sendToTerminal('blur', {});
             Keyboard.dismiss();
             terminateProcess(process.uuid);
           }}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-        >
+          hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
           <Text style={styles.tabCloseText}>×</Text>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -2050,7 +1916,7 @@ export default function TerminalScreen({
           </AppText>
           <AppButton
             title="Go to Connections"
-            onPress={() => navigation.navigate("Connections")}
+            onPress={() => navigation.navigate('Connections')}
             style={notConnectedStyles.button}
           />
         </View>
@@ -2061,40 +1927,28 @@ export default function TerminalScreen({
   return (
     <View style={isExpandedMode ? styles.containerExpanded : styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
-      <SafeAreaView
-        edges={["top"]}
-        style={{ backgroundColor: "#0a0a0f", flex: 1 }}
-      >
+      <SafeAreaView edges={['top']} style={{backgroundColor: '#0a0a0f', flex: 1}}>
         {/* Header Row - Hidden in expanded mode */}
         {!isExpandedMode && (
           <View style={styles.statusBar}>
             <View style={styles.statusContainer}>
               {/* Status indicator with glow */}
               <View style={styles.indicatorContainer}>
-                {paired && webrtcConnected && (
-                  <View style={styles.indicatorGlow} />
-                )}
+                {paired && webrtcConnected && <View style={styles.indicatorGlow} />}
                 <View
-                  style={[
-                    styles.indicator,
-                    paired && webrtcConnected && styles.indicatorConnected,
-                  ]}
+                  style={[styles.indicator, paired && webrtcConnected && styles.indicatorConnected]}
                 />
               </View>
-              <Text
-                style={styles.statusText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
+              <Text style={styles.statusText} numberOfLines={1} ellipsizeMode="tail">
                 {copyFeedback
-                  ? "✓ Copied!"
+                  ? '✓ Copied!'
                   : paired && webrtcConnected
-                  ? targetDeviceName || "Connected"
-                  : paired
-                  ? "Connecting..."
-                  : connected
-                  ? "Relay"
-                  : "Offline"}
+                    ? targetDeviceName || 'Connected'
+                    : paired
+                      ? 'Connecting...'
+                      : connected
+                        ? 'Relay'
+                        : 'Offline'}
               </Text>
             </View>
 
@@ -2103,39 +1957,30 @@ export default function TerminalScreen({
                 <TouchableOpacity
                   style={styles.dismissKeyboardButton}
                   onPress={() => {
-                    sendToTerminal("blur", {});
+                    sendToTerminal('blur', {});
                     Keyboard.dismiss();
-                  }}
-                >
+                  }}>
                   <Text style={styles.dismissKeyboardText}>⌄</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[
-                  styles.codeButton,
-                  !paired && styles.buttonDisabled,
-                ]}
+                style={[styles.codeButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   handleOpenInCode();
                 }}
-                disabled={!paired}
-              >
-                <Text style={styles.codeButtonText}>{"{ }"}</Text>
+                disabled={!paired}>
+                <Text style={styles.codeButtonText}>{'{ }'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.aiButton,
-                  (!paired || aiProcessing) && styles.buttonDisabled,
-                ]}
+                style={[styles.aiButton, (!paired || aiProcessing) && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setAiModalVisible(true);
                 }}
-                disabled={!paired || aiProcessing}
-              >
+                disabled={!paired || aiProcessing}>
                 {aiProcessing ? (
                   <ActivityIndicator size="small" color="#6200EE" />
                 ) : (
@@ -2143,46 +1988,37 @@ export default function TerminalScreen({
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.keyComboButton,
-                  !paired && styles.buttonDisabled,
-                ]}
+                style={[styles.keyComboButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setKeyCombModalVisible(true);
                 }}
-                disabled={!paired}
-              >
+                disabled={!paired}>
                 <Text style={styles.keyComboButtonText}>⌘</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.fitButton}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
-                  sendToTerminal("copy", {});
-                }}
-              >
+                  sendToTerminal('copy', {});
+                }}>
                 <Text style={styles.fitButtonText}>❐</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.expandButton}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setIsExpandedMode(!isExpandedMode);
-                }}
-              >
+                }}>
                 <Text
                   style={[
                     styles.expandButtonText,
-                    isExpandedMode
-                      ? { fontSize: 14, marginTop: 2 }
-                      : { fontSize: 20, marginTop: 4 },
-                  ]}
-                >
-                  {isExpandedMode ? "✕" : "⤢"}
+                    isExpandedMode ? {fontSize: 14, marginTop: 2} : {fontSize: 20, marginTop: 4},
+                  ]}>
+                  {isExpandedMode ? '✕' : '⤢'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2195,20 +2031,18 @@ export default function TerminalScreen({
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tabsScrollContent}
-            >
+              contentContainerStyle={styles.tabsScrollContent}>
               {processes.map((process, index) => renderTab(process, index))}
 
               {/* Add tab button */}
               <TouchableOpacity
                 style={[styles.addTabButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   createProcess();
                 }}
-                disabled={!paired}
-              >
+                disabled={!paired}>
                 <Text style={styles.addTabText}>+</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -2222,20 +2056,18 @@ export default function TerminalScreen({
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.tabsScrollContent}
-              style={styles.expandedTabsScroll}
-            >
+              style={styles.expandedTabsScroll}>
               {processes.map((process, index) => renderTab(process, index))}
 
               {/* Add tab button */}
               <TouchableOpacity
                 style={[styles.addTabButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   createProcess();
                 }}
-                disabled={!paired}
-              >
+                disabled={!paired}>
                 <Text style={styles.addTabText}>+</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -2245,39 +2077,30 @@ export default function TerminalScreen({
                 <TouchableOpacity
                   style={styles.dismissKeyboardButton}
                   onPress={() => {
-                    sendToTerminal("blur", {});
+                    sendToTerminal('blur', {});
                     Keyboard.dismiss();
-                  }}
-                >
+                  }}>
                   <Text style={styles.dismissKeyboardText}>⌄</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[
-                  styles.codeButton,
-                  !paired && styles.buttonDisabled,
-                ]}
+                style={[styles.codeButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   handleOpenInCode();
                 }}
-                disabled={!paired}
-              >
-                <Text style={styles.codeButtonText}>{"{ }"}</Text>
+                disabled={!paired}>
+                <Text style={styles.codeButtonText}>{'{ }'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.aiButton,
-                  (!paired || aiProcessing) && styles.buttonDisabled,
-                ]}
+                style={[styles.aiButton, (!paired || aiProcessing) && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setAiModalVisible(true);
                 }}
-                disabled={!paired || aiProcessing}
-              >
+                disabled={!paired || aiProcessing}>
                 {aiProcessing ? (
                   <ActivityIndicator size="small" color="#6200EE" />
                 ) : (
@@ -2285,46 +2108,37 @@ export default function TerminalScreen({
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.keyComboButton,
-                  !paired && styles.buttonDisabled,
-                ]}
+                style={[styles.keyComboButton, !paired && styles.buttonDisabled]}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setKeyCombModalVisible(true);
                 }}
-                disabled={!paired}
-              >
+                disabled={!paired}>
                 <Text style={styles.keyComboButtonText}>⌘</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.fitButton}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
-                  sendToTerminal("copy", {});
-                }}
-              >
+                  sendToTerminal('copy', {});
+                }}>
                 <Text style={styles.fitButtonText}>❐</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.expandButton}
                 onPress={() => {
-                  sendToTerminal("blur", {});
+                  sendToTerminal('blur', {});
                   Keyboard.dismiss();
                   setIsExpandedMode(!isExpandedMode);
-                }}
-              >
+                }}>
                 <Text
                   style={[
                     styles.expandButtonText,
-                    isExpandedMode
-                      ? { fontSize: 14, marginTop: 2 }
-                      : { fontSize: 20, marginTop: 4 },
-                  ]}
-                >
-                  {isExpandedMode ? "✕" : "⤢"}
+                    isExpandedMode ? {fontSize: 14, marginTop: 2} : {fontSize: 20, marginTop: 4},
+                  ]}>
+                  {isExpandedMode ? '✕' : '⤢'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2337,7 +2151,7 @@ export default function TerminalScreen({
             <View style={styles.terminalContainer}>
               <WebView
                 ref={webViewRef}
-                source={{ html: terminalHtml }}
+                source={{html: terminalHtml}}
                 style={styles.webview}
                 onMessage={handleWebViewMessage}
                 javaScriptEnabled={true}
@@ -2346,17 +2160,17 @@ export default function TerminalScreen({
                 showsVerticalScrollIndicator={true}
                 showsHorizontalScrollIndicator={false}
                 keyboardDisplayRequiresUserAction={false}
-                originWhitelist={["*"]}
+                originWhitelist={['*']}
                 mixedContentMode="always"
                 allowsInlineMediaPlayback={true}
                 mediaPlaybackRequiresUserAction={false}
-                onError={(syntheticEvent) => {
-                  const { nativeEvent } = syntheticEvent;
-                  console.error("WebView error:", nativeEvent);
+                onError={syntheticEvent => {
+                  const {nativeEvent} = syntheticEvent;
+                  console.error('WebView error:', nativeEvent);
                 }}
-                onHttpError={(syntheticEvent) => {
-                  const { nativeEvent } = syntheticEvent;
-                  console.error("WebView HTTP error:", nativeEvent);
+                onHttpError={syntheticEvent => {
+                  const {nativeEvent} = syntheticEvent;
+                  console.error('WebView HTTP error:', nativeEvent);
                 }}
                 hideKeyboardAccessoryView={true}
               />
@@ -2365,9 +2179,7 @@ export default function TerminalScreen({
                 <View style={styles.terminalLoadingOverlay}>
                   <View style={styles.loadingGlow} />
                   <ActivityIndicator size="small" color="#6200EE" />
-                  <Text style={styles.terminalLoadingText}>
-                    Starting terminal...
-                  </Text>
+                  <Text style={styles.terminalLoadingText}>Starting terminal...</Text>
                 </View>
               )}
               {/* Loading overlay during terminal initialization after sync */}
@@ -2375,9 +2187,7 @@ export default function TerminalScreen({
                 <View style={styles.terminalLoadingOverlay}>
                   <View style={styles.loadingGlow} />
                   <ActivityIndicator size="small" color="#6200EE" />
-                  <Text style={styles.terminalLoadingText}>
-                    Restoring terminal...
-                  </Text>
+                  <Text style={styles.terminalLoadingText}>Restoring terminal...</Text>
                 </View>
               )}
               {/* Welcome guide - show for newly created tabs until tapped */}
@@ -2389,14 +2199,13 @@ export default function TerminalScreen({
                     activeOpacity={1}
                     onPress={() => {
                       if (activeProcessUuid) {
-                        setNewlyCreatedTabs((prev) => {
+                        setNewlyCreatedTabs(prev => {
                           const next = new Set(prev);
                           next.delete(activeProcessUuid);
                           return next;
                         });
                       }
-                    }}
-                  >
+                    }}>
                     {/* Close button visual indicator */}
                     <View style={styles.welcomeCloseButton}>
                       <Text style={styles.welcomeCloseText}>✕</Text>
@@ -2404,21 +2213,16 @@ export default function TerminalScreen({
 
                     <ScrollView
                       style={styles.welcomeGuideScroll}
-                      contentContainerStyle={styles.welcomeGuideContent}
-                    >
-                      <Text style={styles.welcomeTitle}>
-                        Welcome to MobiFai
-                      </Text>
+                      contentContainerStyle={styles.welcomeGuideContent}>
+                      <Text style={styles.welcomeTitle}>Welcome to MobiFai</Text>
                       <Text style={styles.welcomeSubtitle}>
                         Start typing to begin. Here's a quick guide:
                       </Text>
 
                       <View style={styles.welcomeSection}>
-                        <Text style={styles.welcomeSectionTitle}>
-                          Top Bar Buttons:
-                        </Text>
+                        <Text style={styles.welcomeSectionTitle}>Top Bar Buttons:</Text>
                         <View style={styles.welcomeItem}>
-                          <Text style={[styles.welcomeIcon, { color: "#03DAC6" }]}>{"{ }"}</Text>
+                          <Text style={[styles.welcomeIcon, {color: '#03DAC6'}]}>{'{ }'}</Text>
                           <Text style={styles.welcomeText}>
                             Open current directory in Code Editor
                           </Text>
@@ -2437,48 +2241,33 @@ export default function TerminalScreen({
                         </View>
                         <View style={styles.welcomeItem}>
                           <Text style={styles.welcomeIcon}>❐</Text>
-                          <Text style={styles.welcomeText}>
-                            Copy all terminal content
-                          </Text>
+                          <Text style={styles.welcomeText}>Copy all terminal content</Text>
                         </View>
                         <View style={styles.welcomeItem}>
                           <Text style={styles.welcomeIcon}>⤢</Text>
-                          <Text style={styles.welcomeText}>
-                            Expand to full screen mode
-                          </Text>
+                          <Text style={styles.welcomeText}>Expand to full screen mode</Text>
                         </View>
                         <View style={styles.welcomeItem}>
-                          <Text style={[styles.welcomeIcon, { marginTop: -4 }]}>
-                            ⌄
-                          </Text>
-                          <Text style={styles.welcomeText}>
-                            Dismiss keyboard (when visible)
-                          </Text>
+                          <Text style={[styles.welcomeIcon, {marginTop: -4}]}>⌄</Text>
+                          <Text style={styles.welcomeText}>Dismiss keyboard (when visible)</Text>
                         </View>
                       </View>
 
                       <View style={styles.welcomeSection}>
-                        <Text style={styles.welcomeSectionTitle}>
-                          Quick Commands:
-                        </Text>
+                        <Text style={styles.welcomeSectionTitle}>Quick Commands:</Text>
                         <View style={styles.welcomeItem}>
                           <Text style={styles.welcomeIcon}>⚡</Text>
                           <Text style={styles.welcomeText}>
-                            Command combo bar - save & execute frequently used
-                            commands
+                            Command combo bar - save & execute frequently used commands
                           </Text>
                         </View>
                         <View style={styles.welcomeItem}>
                           <Text style={styles.welcomeIcon}>+</Text>
-                          <Text style={styles.welcomeText}>
-                            Long-press a tab to rename it
-                          </Text>
+                          <Text style={styles.welcomeText}>Long-press a tab to rename it</Text>
                         </View>
                       </View>
 
-                      <Text style={styles.welcomeFooter}>
-                        Tap anywhere to dismiss this guide
-                      </Text>
+                      <Text style={styles.welcomeFooter}>Tap anywhere to dismiss this guide</Text>
                     </ScrollView>
                   </TouchableOpacity>
                 )}
@@ -2490,9 +2279,7 @@ export default function TerminalScreen({
             <View style={styles.loadingGlow} />
             <ActivityIndicator size="large" color="#6200EE" />
             <Text style={styles.syncingTitle}>Connecting to Mac...</Text>
-            <Text style={styles.syncingSubtitle}>
-              Establishing secure connection
-            </Text>
+            <Text style={styles.syncingSubtitle}>Establishing secure connection</Text>
           </View>
         ) : syncingTabs ? (
           // Show loading state while waiting for tabs to sync from Mac
@@ -2500,20 +2287,13 @@ export default function TerminalScreen({
             <View style={styles.loadingGlow} />
             <ActivityIndicator size="large" color="#6200EE" />
             <Text style={styles.syncingTitle}>Syncing Tabs...</Text>
-            <Text style={styles.syncingSubtitle}>
-              Loading your terminals from Mac
-            </Text>
+            <Text style={styles.syncingSubtitle}>Loading your terminals from Mac</Text>
           </View>
         ) : (
           <View style={styles.emptyStateContainer}>
             <View style={notConnectedStyles.iconContainer}>
               <View style={notConnectedStyles.commandContainer}>
-                <Text
-                  style={[
-                    notConnectedStyles.emptyStateCommand,
-                    notConnectedStyles.dollarSign,
-                  ]}
-                >
+                <Text style={[notConnectedStyles.emptyStateCommand, notConnectedStyles.dollarSign]}>
                   $
                 </Text>
                 <Text style={notConnectedStyles.emptyStateCommand}>ls</Text>
@@ -2524,13 +2304,9 @@ export default function TerminalScreen({
               Tap the + button above to open a new terminal tab
             </Text>
             <TouchableOpacity
-              style={[
-                styles.emptyStateButton,
-                !paired && styles.buttonDisabled,
-              ]}
+              style={[styles.emptyStateButton, !paired && styles.buttonDisabled]}
               onPress={createProcess}
-              disabled={!paired}
-            >
+              disabled={!paired}>
               <Text style={styles.emptyStateButtonText}>+ New Terminal</Text>
             </TouchableOpacity>
           </View>
@@ -2552,13 +2328,11 @@ export default function TerminalScreen({
                 !keyboardVisible && {
                   bottom: 40,
                 },
-              Platform.OS === "ios" &&
+              Platform.OS === 'ios' &&
                 keyboardVisible && {
-                  bottom:
-                    keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
+                  bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT,
                 },
-            ]}
-          >
+            ]}>
             <CommandComboBar
               combinations={savedCombinations}
               onExecute={handleExecuteSavedCombination}
@@ -2575,16 +2349,11 @@ export default function TerminalScreen({
                 !keyboardVisible && {
                   bottom: 90,
                 },
-              Platform.OS === "ios" &&
+              Platform.OS === 'ios' &&
                 keyboardVisible && {
-                  bottom:
-                    keyboardHeight -
-                    insets.bottom -
-                    IOS_QUICKTYPE_BAR_HEIGHT +
-                    50,
+                  bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 50,
                 },
-            ]}
-          >
+            ]}>
             <ArrowButtons onArrowPress={handleArrowPress} disabled={!paired} />
           </View>
         )}
@@ -2600,21 +2369,15 @@ export default function TerminalScreen({
               !keyboardVisible && {
                 bottom: 162,
               },
-            Platform.OS === "ios" &&
+            Platform.OS === 'ios' &&
               keyboardVisible && {
-                bottom:
-                  keyboardHeight -
-                  insets.bottom -
-                  IOS_QUICKTYPE_BAR_HEIGHT +
-                  122,
+                bottom: keyboardHeight - insets.bottom - IOS_QUICKTYPE_BAR_HEIGHT + 122,
               },
           ]}
-          pointerEvents={showScrollToBottom ? "auto" : "none"}
-        >
+          pointerEvents={showScrollToBottom ? 'auto' : 'none'}>
           <TouchableOpacity
             style={styles.scrollToBottomTouchable}
-            onPress={() => sendToTerminal("scrollToBottom", {})}
-          >
+            onPress={() => sendToTerminal('scrollToBottom', {})}>
             <Text style={styles.scrollToBottomText}>↓</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -2625,14 +2388,11 @@ export default function TerminalScreen({
         visible={aiModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setAiModalVisible(false)}
-      >
+        onRequestClose={() => setAiModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>AI Assistant</Text>
-            <Text style={styles.modalSubtitle}>
-              Describe what you want to do in the terminal
-            </Text>
+            <Text style={styles.modalSubtitle}>Describe what you want to do in the terminal</Text>
 
             <TextInput
               style={styles.modalInput}
@@ -2651,20 +2411,15 @@ export default function TerminalScreen({
                 style={styles.modalCancelButton}
                 onPress={() => {
                   setAiModalVisible(false);
-                  setAiPrompt("");
-                }}
-              >
+                  setAiPrompt('');
+                }}>
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.modalSubmitButton,
-                  !aiPrompt.trim() && styles.buttonDisabled,
-                ]}
+                style={[styles.modalSubmitButton, !aiPrompt.trim() && styles.buttonDisabled]}
                 onPress={handleAiPromptSubmit}
-                disabled={!aiPrompt.trim()}
-              >
+                disabled={!aiPrompt.trim()}>
                 <Text style={styles.modalSubmitButtonText}>Send</Text>
               </TouchableOpacity>
             </View>
@@ -2687,15 +2442,12 @@ export default function TerminalScreen({
         onRequestClose={() => {
           setRenameModalVisible(false);
           setRenamingProcessUuid(null);
-          setNewTabName("");
-        }}
-      >
+          setNewTabName('');
+        }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Rename Tab</Text>
-            <Text style={styles.modalSubtitle}>
-              Choose a new name for this terminal tab
-            </Text>
+            <Text style={styles.modalSubtitle}>Choose a new name for this terminal tab</Text>
 
             <TextInput
               style={styles.renameInput}
@@ -2715,20 +2467,15 @@ export default function TerminalScreen({
                 onPress={() => {
                   setRenameModalVisible(false);
                   setRenamingProcessUuid(null);
-                  setNewTabName("");
-                }}
-              >
+                  setNewTabName('');
+                }}>
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.modalSubmitButton,
-                  !newTabName.trim() && styles.buttonDisabled,
-                ]}
+                style={[styles.modalSubmitButton, !newTabName.trim() && styles.buttonDisabled]}
                 onPress={handleRenameSubmit}
-                disabled={!newTabName.trim()}
-              >
+                disabled={!newTabName.trim()}>
                 <Text style={styles.modalSubmitButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -2742,12 +2489,12 @@ export default function TerminalScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0a0a0f",
+    backgroundColor: '#0a0a0f',
   },
   containerExpanded: {
     flex: 1,
-    backgroundColor: "#0a0a0f",
-    position: "absolute",
+    backgroundColor: '#0a0a0f',
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
@@ -2755,41 +2502,41 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   statusBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     height: 56,
-    backgroundColor: "#0a0a0f",
+    backgroundColor: '#0a0a0f',
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a3a",
+    borderBottomColor: '#2a2a3a',
   },
   statusContainer: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     marginRight: 12,
     minWidth: 0, // Allow flex item to shrink below content size
   },
   rightButtons: {
-    flexDirection: "row",
+    flexDirection: 'row',
     minWidth: 60,
-    justifyContent: "flex-end",
-    alignItems: "center",
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 8,
   },
   indicatorContainer: {
-    position: "relative",
+    position: 'relative',
     marginRight: 8,
   },
   indicatorGlow: {
-    position: "absolute",
+    position: 'absolute',
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: "rgba(98, 0, 238, 0.4)",
+    backgroundColor: 'rgba(98, 0, 238, 0.4)',
     top: -5,
     left: -5,
   },
@@ -2797,115 +2544,115 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#555566",
+    backgroundColor: '#555566',
   },
   indicatorConnected: {
-    backgroundColor: "#6200EE",
+    backgroundColor: '#6200EE',
   },
   statusText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     flex: 1,
   },
   fitButton: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   fitButtonText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
+    fontWeight: '600',
+    textAlign: 'center',
     includeFontPadding: false,
   },
   expandButton: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   expandButtonText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 18,
-    textAlign: "center",
+    textAlign: 'center',
     includeFontPadding: false,
   },
   dismissKeyboardButton: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   dismissKeyboardText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 18,
-    textAlign: "center",
+    textAlign: 'center',
     includeFontPadding: false,
     lineHeight: 18,
     marginTop: -8,
   },
   codeButton: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   codeButtonText: {
-    color: "#03DAC6",
+    color: '#03DAC6',
     fontSize: 11,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: '700',
+    textAlign: 'center',
     includeFontPadding: false,
   },
   aiButton: {
-    backgroundColor: "#6200EE",
+    backgroundColor: '#6200EE',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   aiButtonText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: '700',
+    textAlign: 'center',
     includeFontPadding: false,
     letterSpacing: 0.5,
   },
   keyComboButton: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   keyComboButtonText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 18,
-    textAlign: "center",
+    textAlign: 'center',
     includeFontPadding: false,
   },
   buttonDisabled: {
@@ -2913,86 +2660,86 @@ const styles = StyleSheet.create({
   },
   // Tabs row styles
   tabsRow: {
-    backgroundColor: "#12121a",
+    backgroundColor: '#12121a',
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a3a",
+    borderBottomColor: '#2a2a3a',
   },
   expandedTabsRow: {
-    flexDirection: "row",
-    backgroundColor: "#12121a",
+    flexDirection: 'row',
+    backgroundColor: '#12121a',
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a3a",
+    borderBottomColor: '#2a2a3a',
     paddingHorizontal: 12,
     paddingVertical: 4,
-    alignItems: "center",
+    alignItems: 'center',
   },
   expandedTabsScroll: {
     flex: 1,
   },
   expandedRightButtons: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
     marginLeft: 12,
   },
   tabsScrollContent: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     gap: 6,
     paddingVertical: 4,
   },
   tab: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingLeft: 12,
     paddingRight: 8,
     paddingVertical: 4,
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     borderRadius: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
     minHeight: 26,
   },
   tabActive: {
-    backgroundColor: "rgba(98, 0, 238, 0.15)",
+    backgroundColor: 'rgba(98, 0, 238, 0.15)',
     borderWidth: 1.5,
-    borderColor: "#6200EE",
-    shadowColor: "#6200EE",
-    shadowOffset: { width: 0, height: 0 },
+    borderColor: '#6200EE',
+    shadowColor: '#6200EE',
+    shadowOffset: {width: 0, height: 0},
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 4,
   },
   tabText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   tabTextActive: {
-    color: "#BB86FC",
-    fontWeight: "600",
+    color: '#BB86FC',
+    fontWeight: '600',
   },
   tabCloseButton: {
     width: 16,
     height: 16,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   tabCloseText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 14,
-    fontWeight: "300",
+    fontWeight: '300',
     lineHeight: 14,
   },
   // Empty state styles
   emptyStateContainer: {
     flex: 1,
-    backgroundColor: "#0a0a0f",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#0a0a0f',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 40,
   },
   emptyStateIcon: {
@@ -3000,60 +2747,60 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyStateTitle: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 12,
-    textAlign: "center",
+    textAlign: 'center',
   },
   emptyStateSubtitle: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 15,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 32,
     lineHeight: 22,
   },
   emptyStateButton: {
-    backgroundColor: "#6200EE",
+    backgroundColor: '#6200EE',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 32,
     minWidth: 200,
-    alignItems: "center",
+    alignItems: 'center',
   },
   emptyStateButtonText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   syncingTitle: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: '600',
     marginTop: 20,
     marginBottom: 8,
-    textAlign: "center",
+    textAlign: 'center',
   },
   syncingSubtitle: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 14,
-    textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   addTabButton: {
     width: 26,
     height: 26,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#6200EE",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#6200EE',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#BB86FC",
+    borderColor: '#BB86FC',
   },
   addTabText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     lineHeight: 16,
   },
   terminalWrapper: {
@@ -3061,10 +2808,10 @@ const styles = StyleSheet.create({
   },
   terminalContainer: {
     flex: 1,
-    position: "relative",
+    position: 'relative',
   },
   comboBarContainer: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
@@ -3072,66 +2819,66 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: '#000',
   },
   terminalLoadingOverlay: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#0a0a0f",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#0a0a0f',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   terminalLoadingText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: '500',
     marginTop: 16,
   },
   loadingGlow: {
-    position: "absolute",
+    position: 'absolute',
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: "rgba(98, 0, 238, 0.3)",
+    backgroundColor: 'rgba(98, 0, 238, 0.3)',
     opacity: 0.5,
   },
   // AI Toast Notification
   aiToast: {
-    position: "absolute",
+    position: 'absolute',
     top: 100,
     left: 20,
     right: 20,
-    backgroundColor: "rgba(0, 200, 200, 0.95)",
+    backgroundColor: 'rgba(0, 200, 200, 0.95)',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     zIndex: 1000,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
   aiToastText: {
-    color: "#000",
+    color: '#000',
     fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: '600',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   // Arrow Navigation Buttons
   arrowButtonsContainer: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 50,
     right: 12,
     zIndex: 1000,
   },
   // Scroll to Bottom Button
   scrollToBottomButton: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 122, // Above arrow buttons: 50 + 32 + 4 + 32 + 4 = 122
     right: 12,
     zIndex: 1000,
@@ -3140,42 +2887,42 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(98, 0, 238, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#6200EE",
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: 'rgba(98, 0, 238, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#6200EE',
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 1,
-    borderColor: "#BB86FC",
+    borderColor: '#BB86FC',
   },
   scrollToBottomText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 1,
   },
   // AI Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(10, 10, 15, 0.95)",
-    justifyContent: "flex-start",
-    alignItems: "center",
+    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     padding: 20,
     paddingTop: 80,
   },
   modalContent: {
-    backgroundColor: "#12121a",
+    backgroundColor: '#12121a',
     borderRadius: 20,
     padding: 24,
-    width: "100%",
+    width: '100%',
     maxWidth: 400,
     borderWidth: 1.5,
-    borderColor: "#6200EE",
-    shadowColor: "#6200EE",
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: '#6200EE',
+    shadowColor: '#6200EE',
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 10,
@@ -3184,13 +2931,13 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#6200EE",
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "center",
+    backgroundColor: '#6200EE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
     marginBottom: 16,
-    shadowColor: "#6200EE",
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#6200EE',
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 6,
@@ -3199,100 +2946,100 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   modalTitle: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: '700',
+    textAlign: 'center',
     marginBottom: 8,
   },
   modalSubtitle: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 14,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 20,
     lineHeight: 20,
   },
   modalInput: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
     borderRadius: 12,
     padding: 16,
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 15,
     minHeight: 120,
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   renameInput: {
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 15,
     height: 44,
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 20,
     gap: 12,
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: "#1a1a25",
+    backgroundColor: '#1a1a25',
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   modalCancelButtonText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   modalSubmitButton: {
     flex: 1,
-    backgroundColor: "#6200EE",
+    backgroundColor: '#6200EE',
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
   modalSubmitButtonText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   // Welcome guide styles
   welcomeGuideOverlay: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(10, 10, 15, 0.85)",
+    backgroundColor: 'rgba(10, 10, 15, 0.85)',
     zIndex: 10,
   },
   welcomeCloseButton: {
-    position: "absolute",
+    position: 'absolute',
     top: 12,
     right: 8,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 20,
   },
   welcomeCloseText: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 18,
-    fontWeight: "300",
+    fontWeight: '300',
   },
   welcomeGuideScroll: {
     flex: 1,
@@ -3302,52 +3049,52 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   welcomeTitle: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 8,
-    textAlign: "center",
+    textAlign: 'center',
   },
   welcomeSubtitle: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 14,
     marginBottom: 32,
-    textAlign: "center",
+    textAlign: 'center',
   },
   welcomeSection: {
     marginBottom: 24,
   },
   welcomeSectionTitle: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 12,
   },
   welcomeItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
     paddingLeft: 8,
   },
   welcomeIcon: {
-    color: "#6200EE",
+    color: '#6200EE',
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     width: 40,
-    textAlign: "center",
+    textAlign: 'center',
   },
   welcomeText: {
-    color: "#666677",
+    color: '#666677',
     fontSize: 13,
     flex: 1,
     lineHeight: 18,
   },
   welcomeFooter: {
-    color: "#555566",
+    color: '#555566',
     fontSize: 12,
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: 16,
-    fontStyle: "italic",
+    fontStyle: 'italic',
   },
 });
 
@@ -3355,52 +3102,52 @@ const styles = StyleSheet.create({
 const notConnectedStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0a0a0f",
+    backgroundColor: '#0a0a0f',
   },
   content: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: spacing.xl,
   },
   iconContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#1a1a25",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#1a1a25',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
   },
   icon: {
     fontSize: 48,
-    color: "#8888aa",
+    color: '#8888aa',
   },
   commandContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   emptyStateCommand: {
     fontSize: 32,
-    fontWeight: "700",
-    color: "#BB86FC",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: '700',
+    color: '#BB86FC',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   dollarSign: {
     marginRight: 10,
   },
   title: {
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: spacing.s,
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   subtitle: {
-    textAlign: "center",
-    color: "#8888aa",
+    textAlign: 'center',
+    color: '#8888aa',
     marginBottom: spacing.xl,
     lineHeight: 22,
     fontSize: 14,

@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { codeService } from '../services/CodeService';
-import { CodeProject, FileNode } from '../types/code';
+import {useQuery, useMutation, useQueryClient, QueryClient} from '@tanstack/react-query';
+import {codeService} from '../services/CodeService';
+import {CodeProject, FileNode} from '../types/code';
 
 /**
  * Hook to fetch projects history
@@ -20,7 +20,9 @@ export function useFolderChildren(folderPath: string | null) {
   return useQuery<FileNode[], Error>({
     queryKey: ['folder', folderPath],
     queryFn: () => {
-      if (!folderPath) throw new Error('Folder path is required');
+      if (!folderPath) {
+        throw new Error('Folder path is required');
+      }
       return codeService.getFolderChildren(folderPath);
     },
     enabled: !!folderPath,
@@ -36,7 +38,9 @@ export function useFileContent(filePath: string | null, projectPath?: string) {
   return useQuery<string, Error>({
     queryKey: ['file', filePath],
     queryFn: () => {
-      if (!filePath) throw new Error('File path is required');
+      if (!filePath) {
+        throw new Error('File path is required');
+      }
       return codeService.getFile(filePath, projectPath);
     },
     enabled: !!filePath,
@@ -56,13 +60,13 @@ export function useSaveFile() {
   return useMutation<
     boolean,
     Error,
-    { filePath: string; content: string },
-    { previousContent: string | undefined; filePath: string }
+    {filePath: string; content: string},
+    {previousContent: string | undefined; filePath: string}
   >({
-    mutationFn: ({ filePath, content }) => codeService.saveFile(filePath, content),
-    onMutate: async ({ filePath, content }) => {
+    mutationFn: ({filePath, content}) => codeService.saveFile(filePath, content),
+    onMutate: async ({filePath, content}) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['file', filePath] });
+      await queryClient.cancelQueries({queryKey: ['file', filePath]});
 
       // Snapshot the previous value
       const previousContent = queryClient.getQueryData<string>(['file', filePath]);
@@ -71,7 +75,7 @@ export function useSaveFile() {
       queryClient.setQueryData(['file', filePath], content);
 
       // Return context with snapshot
-      return { previousContent, filePath };
+      return {previousContent, filePath};
     },
     onError: (err, variables, context) => {
       // Rollback on error
@@ -81,7 +85,7 @@ export function useSaveFile() {
     },
     onSuccess: (data, variables) => {
       // Invalidate and refetch on success (optional)
-      queryClient.invalidateQueries({ queryKey: ['file', variables.filePath] });
+      queryClient.invalidateQueries({queryKey: ['file', variables.filePath]});
     },
   });
 }
@@ -92,9 +96,9 @@ export function useSaveFile() {
 export function useInitProject() {
   const queryClient = useQueryClient();
 
-  return useMutation<{ rootPath: string; children: FileNode[] }, Error, string>({
+  return useMutation<{rootPath: string; children: FileNode[]}, Error, string>({
     mutationFn: (projectPath: string) => codeService.initProject(projectPath),
-    onSuccess: (data) => {
+    onSuccess: data => {
       // Cache the root folder children
       queryClient.setQueryData(['folder', data.rootPath], data.children);
     },
@@ -122,22 +126,22 @@ export function useInvalidateCodeQueries() {
 
   return {
     invalidateAll: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['folder'] });
-      queryClient.invalidateQueries({ queryKey: ['file'] });
+      queryClient.invalidateQueries({queryKey: ['projects']});
+      queryClient.invalidateQueries({queryKey: ['folder']});
+      queryClient.invalidateQueries({queryKey: ['file']});
     },
     invalidateProject: (projectPath: string) => {
       // Invalidate all folders and files under this project
       queryClient.invalidateQueries({
         queryKey: ['folder'],
-        predicate: (query) => {
+        predicate: query => {
           const path = query.queryKey[1] as string;
           return path?.startsWith(projectPath);
         },
       });
       queryClient.invalidateQueries({
         queryKey: ['file'],
-        predicate: (query) => {
+        predicate: query => {
           const path = query.queryKey[1] as string;
           return path?.startsWith(projectPath);
         },
@@ -145,4 +149,3 @@ export function useInvalidateCodeQueries() {
     },
   };
 }
-

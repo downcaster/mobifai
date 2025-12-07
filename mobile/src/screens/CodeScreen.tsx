@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,48 +13,48 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { CodeEditor } from "../components/code/CodeEditor";
-import { FileTree, SelectedItem } from "../components/code/FileTree";
-import { EditorTabs, OpenFile } from "../components/code/EditorTabs";
-import { CodeProject, FileNode, FileChange } from "../types/code";
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CodeEditor } from '../components/code/CodeEditor';
+import { FileTree, SelectedItem } from '../components/code/FileTree';
+import { EditorTabs, OpenFile } from '../components/code/EditorTabs';
+import { CodeProject, FileNode, FileChange } from '../types/code';
 import {
   useInitProject,
   useFileContent,
   useSaveFile,
   useProjectsHistory,
-} from "../hooks/useCodeQueries";
-import { codeService, FileDiff } from "../services/CodeService";
-import { DiffMode } from "../components/code/CodeEditor";
-import { useQueryClient } from "@tanstack/react-query";
-import { useIsConnected } from "../services/ConnectionContext";
-import { MainTabParamList } from "../navigation/MainTabNavigator";
-import { AppView, AppText, AppButton } from "../components/ui";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { RELAY_SERVER_URL } from "../config";
-import { getThemeById, TerminalTheme } from "../theme/terminalThemes";
+} from '../hooks/useCodeQueries';
+import { codeService, FileDiff } from '../services/CodeService';
+import { DiffMode } from '../components/code/CodeEditor';
+import { useQueryClient } from '@tanstack/react-query';
+import { useIsConnected } from '../services/ConnectionContext';
+import { MainTabParamList } from '../navigation/MainTabNavigator';
+import { AppView, AppText, AppButton } from '../components/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RELAY_SERVER_URL } from '../config';
+import { getThemeById, TerminalTheme } from '../theme/terminalThemes';
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = 280;
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
-  background: "#0a0a0f",
-  surface: "#12121a",
-  surfaceElevated: "#1a1a25",
-  border: "#2a2a3a",
-  primary: "#6200EE",
-  primaryLight: "#BB86FC",
-  secondary: "#03DAC6",
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
   text: {
-    primary: "#ffffff",
-    secondary: "#8888aa",
-    disabled: "#555566",
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
   },
-  error: "#CF6679",
+  error: '#CF6679',
 };
 
 interface ProjectState {
@@ -63,8 +63,8 @@ interface ProjectState {
   rootChildren: FileNode[];
 }
 
-type ViewMode = "history" | "editor";
-type CreateMode = "file" | "folder" | null;
+type ViewMode = 'history' | 'editor';
+type CreateMode = 'file' | 'folder' | null;
 
 export default function CodeScreen(): React.ReactElement {
   const queryClient = useQueryClient();
@@ -72,18 +72,18 @@ export default function CodeScreen(): React.ReactElement {
   const isConnected = useIsConnected();
 
   // View state
-  const [viewMode, setViewMode] = useState<ViewMode>("history");
+  const [viewMode, setViewMode] = useState<ViewMode>('history');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarAnim = useRef(new Animated.Value(0)).current;
 
   // Create modal state
   const [createMode, setCreateMode] = useState<CreateMode>(null);
-  const [createName, setCreateName] = useState("");
+  const [createName, setCreateName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   // Project state - MUST be declared before any conditional returns
   const [currentProject, setCurrentProject] = useState<ProjectState | null>(
-    null
+    null,
   );
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function CodeScreen(): React.ReactElement {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
   // Diff state (loaded from settings)
-  const [diffMode, setDiffMode] = useState<DiffMode>("off");
+  const [diffMode, setDiffMode] = useState<DiffMode>('off');
   const [diffData, setDiffData] = useState<FileDiff | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
@@ -104,12 +104,12 @@ export default function CodeScreen(): React.ReactElement {
 
   // Context menu state (for long press)
   const [contextMenuItem, setContextMenuItem] = useState<SelectedItem | null>(
-    null
+    null,
   );
 
   // Rename modal state
   const [renameItem, setRenameItem] = useState<SelectedItem | null>(null);
-  const [renameName, setRenameName] = useState("");
+  const [renameName, setRenameName] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
   // Delete confirmation state
@@ -117,7 +117,7 @@ export default function CodeScreen(): React.ReactElement {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Sidebar tabs state
-  const [sidebarTab, setSidebarTab] = useState<"files" | "changes">("files");
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>('files');
   const [projectChanges, setProjectChanges] = useState<{
     staged: Array<{ path: string; type: string }>;
     unstaged: Array<{ path: string; type: string }>;
@@ -129,8 +129,10 @@ export default function CodeScreen(): React.ReactElement {
   const saveFileMutation = useSaveFile();
 
   // Fetch active file content
-  const { data: activeFileContent, isLoading: isLoadingFile } =
-    useFileContent(activeFile, currentProject?.path);
+  const { data: activeFileContent, isLoading: isLoadingFile } = useFileContent(
+    activeFile,
+    currentProject?.path,
+  );
 
   // Show "No Active Connection" screen when not connected
   if (!isConnected) {
@@ -148,7 +150,7 @@ export default function CodeScreen(): React.ReactElement {
           </AppText>
           <AppButton
             title="Connect to Mac"
-            onPress={() => navigation.navigate("Connections")}
+            onPress={() => navigation.navigate('Connections')}
             style={notConnectedStyles.button}
           />
         </View>
@@ -161,14 +163,14 @@ export default function CodeScreen(): React.ReactElement {
     useCallback(() => {
       const fetchEditorSettings = async () => {
         try {
-          const token = await AsyncStorage.getItem("mobifai_auth_token");
-          if (!token) return;
+          const token = await AsyncStorage.getItem('mobifai_auth_token');
+          if (!token) {return;}
 
           const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
-            method: "GET",
+            method: 'GET',
             headers: {
               Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
+              'Content-Type': 'application/json',
             },
           });
 
@@ -185,12 +187,12 @@ export default function CodeScreen(): React.ReactElement {
             }
           }
         } catch (error) {
-          console.error("Error fetching editor settings:", error);
+          console.error('Error fetching editor settings:', error);
         }
       };
 
       fetchEditorSettings();
-    }, [])
+    }, []),
   );
 
   // Update file content when loaded
@@ -198,8 +200,9 @@ export default function CodeScreen(): React.ReactElement {
     // Always update content when it changes
     // This ensures we get fresh content every time, even when reopening files
     if (activeFile && activeFileContent !== undefined) {
-      console.log(`📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`);
-      
+      console.log(
+        `📄 Received content for: ${activeFile.split("/").pop()} (${activeFileContent.length} bytes)`,
+
       setFileContents((prev) => ({
         ...prev,
         [activeFile]: activeFileContent,
@@ -235,35 +238,35 @@ export default function CodeScreen(): React.ReactElement {
   // Listen for openProject events from Terminal
   useEffect(() => {
     const handleOpenProject = codeService.onMessage(
-      "code:projectInitialized",
+      'code:projectInitialized',
       (_action, payload) => {
         if (payload.rootPath) {
-          const projectName = payload.rootPath.split("/").pop() || "Project";
+          const projectName = payload.rootPath.split('/').pop() || 'Project';
           setCurrentProject({
             path: payload.rootPath,
             name: projectName,
             rootChildren: payload.children || [],
           });
-          setViewMode("editor");
+          setViewMode('editor');
           // Select root folder by default
           setSelectedItem({
             path: payload.rootPath,
-            type: "folder",
+            type: 'folder',
             name: projectName,
           });
 
-          queryClient.setQueryData<CodeProject[]>(["projects"], (old) => {
+          queryClient.setQueryData<CodeProject[]>(['projects'], (old) => {
             const newProject: CodeProject = {
               path: payload.rootPath,
               name: projectName,
               lastOpened: Date.now(),
             };
-            if (!old) return [newProject];
+            if (!old) {return [newProject];}
             const filtered = old.filter((p) => p.path !== payload.rootPath);
             return [newProject, ...filtered];
           });
         }
-      }
+      },
     );
 
     return () => {
@@ -281,36 +284,43 @@ export default function CodeScreen(): React.ReactElement {
           name: project.name,
           rootChildren: result.children,
         });
-        setViewMode("editor");
+        setViewMode('editor');
         // Select root folder by default
         setSelectedItem({
           path: result.rootPath,
-          type: "folder",
+          type: 'folder',
           name: project.name,
         });
-        
+
         // Sync open files from Mac client for this project
         try {
           const syncedState = await codeService.syncOpenFiles(project.path);
           if (syncedState.files && syncedState.files.length > 0) {
             // Restore open file tabs
-            const restoredFiles: OpenFile[] = syncedState.files.map((file: { path: string; content: string; isActive: boolean }) => ({
-              path: file.path,
-              name: file.path.split("/").pop() || file.path,
-              isDirty: false,
-            }));
+            const restoredFiles: OpenFile[] = syncedState.files.map(
+              (file: { path: string; content: string; isActive: boolean }) => ({
+                path: file.path,
+                name: file.path.split('/').pop() || file.path,
+                isDirty: false,
+              }),
+            );
             setOpenFiles(restoredFiles);
-            
+
             // Restore active file and its content
-            const activeFileData = syncedState.files.find((f: { path: string; content: string; isActive: boolean }) => f.isActive);
+            const activeFileData = syncedState.files.find(
+              (f: { path: string; content: string; isActive: boolean }) =>
+                f.isActive,
+            );
             if (activeFileData) {
               setActiveFile(activeFileData.path);
-              setFileContents({ [activeFileData.path]: activeFileData.content });
+              setFileContents({
+                [activeFileData.path]: activeFileData.content,
+              });
               // Notify Mac client
               try {
                 await codeService.setActiveFile(activeFileData.path);
               } catch (error) {
-                console.error("Failed to set active file on Mac:", error);
+                console.error('Failed to set active file on Mac:', error);
               }
             } else if (restoredFiles.length > 0) {
               // No active file saved, auto-open the first tab
@@ -322,47 +332,47 @@ export default function CodeScreen(): React.ReactElement {
               try {
                 await codeService.setActiveFile(firstFile.path);
               } catch (error) {
-                console.error("Failed to set active file on Mac:", error);
+                console.error('Failed to set active file on Mac:', error);
               }
               console.log(`📂 Auto-opened first file: ${firstFile.name}`);
             }
             console.log(`✅ Restored ${syncedState.files.length} open file(s)`);
           }
         } catch (syncError) {
-          console.error("Failed to sync open files:", syncError);
+          console.error('Failed to sync open files:', syncError);
           // Non-critical error, continue
         }
       } catch (error: unknown) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        Alert.alert("Error", `Failed to open project: ${errorMessage}`);
+          error instanceof Error ? error.message : 'Unknown error';
+        Alert.alert('Error', `Failed to open project: ${errorMessage}`);
       }
     },
-    [initProjectMutation]
+    [initProjectMutation],
   );
 
   // Handle file selection from tree
   const handleFileSelect = useCallback(
     async (filePath: string) => {
       console.log(`📂 Opening file: ${filePath}`);
-      const fileName = filePath.split("/").pop() || filePath;
+      const fileName = filePath.split('/').pop() || filePath;
 
       const existingFile = openFiles.find((f) => f.path === filePath);
       if (existingFile) {
-        console.log(`   File already open, switching to it`);
+        console.log('   File already open, switching to it');
         setActiveFile(filePath);
         // Notify Mac client about active file change
         try {
           await codeService.setActiveFile(filePath);
-          console.log(`   ✅ Notified Mac about active file`);
+          console.log('   ✅ Notified Mac about active file');
         } catch (error) {
-          console.error("Failed to set active file on Mac:", error);
+          console.error('Failed to set active file on Mac:', error);
         }
         closeSidebar();
         return;
       }
 
-      console.log(`   Opening new file`);
+      console.log('   Opening new file');
       const newFile: OpenFile = {
         path: filePath,
         name: fileName,
@@ -373,13 +383,13 @@ export default function CodeScreen(): React.ReactElement {
       // Notify Mac client about active file change
       try {
         await codeService.setActiveFile(filePath);
-        console.log(`   ✅ Notified Mac about active file`);
+        console.log('   ✅ Notified Mac about active file');
       } catch (error) {
-        console.error("Failed to set active file on Mac:", error);
+        console.error('Failed to set active file on Mac:', error);
       }
       closeSidebar();
     },
-    [openFiles, closeSidebar]
+    [openFiles, closeSidebar],
   );
 
   // Handle item selection (for file/folder creation context)
@@ -399,29 +409,29 @@ export default function CodeScreen(): React.ReactElement {
 
       if (isDirty) {
         Alert.alert(
-          "Unsaved Changes",
-          "Do you want to save changes before closing?",
+          'Unsaved Changes',
+          'Do you want to save changes before closing?',
           [
-            { text: "Cancel", style: "cancel" },
+            { text: 'Cancel', style: 'cancel' },
             {
               text: "Don't Save",
-              style: "destructive",
+              style: 'destructive',
               onPress: () => performCloseFile(filePath),
             },
             {
-              text: "Save",
+              text: 'Save',
               onPress: async () => {
                 await handleSaveFile(filePath);
                 performCloseFile(filePath);
               },
             },
-          ]
+          ],
         );
       } else {
         performCloseFile(filePath);
       }
     },
-    [dirtyFiles]
+    [dirtyFiles],
   );
 
   const performCloseFile = async (filePath: string) => {
@@ -440,14 +450,15 @@ export default function CodeScreen(): React.ReactElement {
 
     if (activeFile === filePath) {
       const remainingFiles = openFiles.filter((f) => f.path !== filePath);
-      const newActiveFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
+      const newActiveFile =
+        remainingFiles.length > 0 ? remainingFiles[0].path : null;
       setActiveFile(newActiveFile);
-      
+
       // Notify Mac about the new active file
       try {
         await codeService.setActiveFile(newActiveFile);
       } catch (error) {
-        console.error("Failed to set active file on Mac:", error);
+        console.error('Failed to set active file on Mac:', error);
       }
     }
 
@@ -456,21 +467,21 @@ export default function CodeScreen(): React.ReactElement {
       await codeService.closeFile(filePath);
       console.log(`✅ Closed file on Mac: ${filePath}`);
     } catch (error) {
-      console.error("Failed to close file on Mac:", error);
+      console.error('Failed to close file on Mac:', error);
     }
   };
 
   // Handle content change
   const handleContentChange = useCallback(
     (content: string) => {
-      if (!activeFile) return;
+      if (!activeFile) {return;}
 
       setFileContents((prev) => ({
         ...prev,
         [activeFile]: content,
       }));
 
-      const originalContent = activeFileContent || "";
+      const originalContent = activeFileContent || '';
       const isDirty = content !== originalContent;
 
       setDirtyFiles((prev) => {
@@ -484,20 +495,20 @@ export default function CodeScreen(): React.ReactElement {
       });
 
       setOpenFiles((prev) =>
-        prev.map((f) => (f.path === activeFile ? { ...f, isDirty } : f))
+        prev.map((f) => (f.path === activeFile ? { ...f, isDirty } : f)),
       );
     },
-    [activeFile, activeFileContent]
+    [activeFile, activeFileContent],
   );
 
   // Handle save
   const handleSaveFile = useCallback(
     async (filePath?: string) => {
       const pathToSave = filePath || activeFile;
-      if (!pathToSave) return;
+      if (!pathToSave) {return;}
 
       const content = fileContents[pathToSave];
-      if (content === undefined) return;
+      if (content === undefined) {return;}
 
       try {
         await saveFileMutation.mutateAsync({
@@ -513,62 +524,62 @@ export default function CodeScreen(): React.ReactElement {
 
         setOpenFiles((prev) =>
           prev.map((f) =>
-            f.path === pathToSave ? { ...f, isDirty: false } : f
+            f.path === pathToSave ? { ...f, isDirty: false } : f,
           )
         );
       } catch (error: unknown) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        Alert.alert("Error", `Failed to save file: ${errorMessage}`);
+          error instanceof Error ? error.message : 'Unknown error';
+        Alert.alert('Error', `Failed to save file: ${errorMessage}`);
       }
     },
-    [activeFile, fileContents, saveFileMutation]
+    [activeFile, fileContents, saveFileMutation],
   );
 
   // Get target folder for creation
   const getTargetFolder = (): string | null => {
-    if (!currentProject) return null;
+    if (!currentProject) {return null;}
 
     if (!selectedItem) {
       return currentProject.path; // Default to root
     }
 
-    if (selectedItem.type === "folder") {
+    if (selectedItem.type === 'folder') {
       return selectedItem.path;
     }
 
     // If file is selected, get parent folder
-    const pathParts = selectedItem.path.split("/");
+    const pathParts = selectedItem.path.split('/');
     pathParts.pop(); // Remove file name
-    return pathParts.join("/");
+    return pathParts.join('/');
   };
 
   // Handle create file
   const handleCreateFile = useCallback(() => {
-    setCreateMode("file");
-    setCreateName("");
+    setCreateMode('file');
+    setCreateName('');
   }, []);
 
   // Handle create folder
   const handleCreateFolder = useCallback(() => {
-    setCreateMode("folder");
-    setCreateName("");
+    setCreateMode('folder');
+    setCreateName('');
   }, []);
 
   // Handle create submit
   const handleCreateSubmit = useCallback(async () => {
-    if (!createName.trim() || !currentProject) return;
+    if (!createName.trim() || !currentProject) {return;}
 
     const targetFolder = getTargetFolder();
-    if (!targetFolder) return;
+    if (!targetFolder) {return;}
 
     setIsCreating(true);
 
     try {
-      if (createMode === "file") {
+      if (createMode === 'file') {
         const result = await codeService.createFile(
           targetFolder,
-          createName.trim()
+          createName.trim(),
         );
 
         // Update the project's children if we created in root
@@ -579,21 +590,21 @@ export default function CodeScreen(): React.ReactElement {
                   ...prev,
                   rootChildren: result.children,
                 }
-              : null
+              : null,
           );
         }
 
         // Invalidate folder queries to refresh the tree
         queryClient.invalidateQueries({
-          queryKey: ["folderChildren", targetFolder],
+          queryKey: ['folderChildren', targetFolder],
         });
 
         // Optionally open the new file
         handleFileSelect(result.filePath);
-      } else if (createMode === "folder") {
+      } else if (createMode === 'folder') {
         const result = await codeService.createFolder(
           targetFolder,
-          createName.trim()
+          createName.trim(),
         );
 
         // Update the project's children if we created in root
@@ -604,22 +615,22 @@ export default function CodeScreen(): React.ReactElement {
                   ...prev,
                   rootChildren: result.children,
                 }
-              : null
+              : null,
           );
         }
 
         // Invalidate folder queries to refresh the tree
         queryClient.invalidateQueries({
-          queryKey: ["folderChildren", targetFolder],
+          queryKey: ['folderChildren', targetFolder],
         });
       }
 
       setCreateMode(null);
-      setCreateName("");
+      setCreateName('');
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      Alert.alert("Error", `Failed to create ${createMode}: ${errorMessage}`);
+        error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to create ${createMode}: ${errorMessage}`);
     } finally {
       setIsCreating(false);
     }
@@ -636,14 +647,14 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle rename submit
   const handleRenameSubmit = useCallback(async () => {
-    if (!renameName.trim() || !renameItem || !currentProject) return;
+    if (!renameName.trim() || !renameItem || !currentProject) {return;}
 
     setIsRenaming(true);
 
     try {
       const result = await codeService.renameItem(
         renameItem.path,
-        renameName.trim()
+        renameName.trim(),
       );
 
       const parentFolder = result.parentFolder;
@@ -656,24 +667,24 @@ export default function CodeScreen(): React.ReactElement {
                 ...prev,
                 rootChildren: result.children,
               }
-            : null
+            : null,
         );
       }
 
       // Invalidate folder queries to refresh the tree
       queryClient.invalidateQueries({
-        queryKey: ["folderChildren", parentFolder],
+        queryKey: ['folderChildren', parentFolder],
       });
 
       // Update open files if the renamed item was open
-      if (renameItem.type === "file") {
+      if (renameItem.type === 'file') {
         setOpenFiles((prev) =>
           prev.map((f) => {
             if (f.path === renameItem.path) {
               return { ...f, path: result.newPath, name: renameName.trim() };
             }
             return f;
-          })
+          }),
         );
 
         // Update active file if it was the renamed file
@@ -712,11 +723,11 @@ export default function CodeScreen(): React.ReactElement {
       }
 
       setRenameItem(null);
-      setRenameName("");
+      setRenameName('');
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      Alert.alert("Error", `Failed to rename: ${errorMessage}`);
+        error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to rename: ${errorMessage}`);
     } finally {
       setIsRenaming(false);
     }
@@ -741,7 +752,7 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle delete confirm
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteItem || !currentProject) return;
+    if (!deleteItem || !currentProject) {return;}
 
     setIsDeleting(true);
 
@@ -758,26 +769,26 @@ export default function CodeScreen(): React.ReactElement {
                 ...prev,
                 rootChildren: result.children,
               }
-            : null
+            : null,
         );
       }
 
       // Invalidate folder queries to refresh the tree
       queryClient.invalidateQueries({
-        queryKey: ["folderChildren", parentFolder],
+        queryKey: ['folderChildren', parentFolder],
       });
 
       // Close the file if it was open
       if (
-        deleteItem.type === "file" &&
+        deleteItem.type === 'file' &&
         openFiles.some((f) => f.path === deleteItem.path)
       ) {
         performCloseFile(deleteItem.path);
       }
 
       // If a folder was deleted, close all files inside it
-      if (deleteItem.type === "folder") {
-        const deletedPath = deleteItem.path + "/";
+      if (deleteItem.type === 'folder') {
+        const deletedPath = deleteItem.path + '/';
         openFiles.forEach((f) => {
           if (f.path.startsWith(deletedPath)) {
             performCloseFile(f.path);
@@ -788,8 +799,8 @@ export default function CodeScreen(): React.ReactElement {
       // Clear selected item if it was deleted
       if (
         selectedItem?.path === deleteItem.path ||
-        (deleteItem.type === "folder" &&
-          selectedItem?.path.startsWith(deleteItem.path + "/"))
+        (deleteItem.type === 'folder' &&
+          selectedItem?.path.startsWith(deleteItem.path + '/'))
       ) {
         setSelectedItem(null);
       }
@@ -797,8 +808,8 @@ export default function CodeScreen(): React.ReactElement {
       setDeleteItem(null);
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      Alert.alert("Error", `Failed to delete: ${errorMessage}`);
+        error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to delete: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
     }
@@ -816,7 +827,7 @@ export default function CodeScreen(): React.ReactElement {
       const diff = await codeService.getFileDiff(filePath);
       setDiffData(diff);
     } catch (error) {
-      console.error("Failed to fetch diff:", error);
+      console.error('Failed to fetch diff:', error);
       setDiffData(null);
     } finally {
       setIsLoadingDiff(false);
@@ -825,7 +836,7 @@ export default function CodeScreen(): React.ReactElement {
 
   // Fetch diff when active file changes or diff mode is enabled
   useEffect(() => {
-    if (activeFile && diffMode !== "off") {
+    if (activeFile && diffMode !== 'off') {
       fetchDiffData(activeFile);
     } else {
       setDiffData(null);
@@ -834,11 +845,11 @@ export default function CodeScreen(): React.ReactElement {
 
   // Fetch project changes when project changes or tab switches to changes
   useEffect(() => {
-    if (currentProject?.path && sidebarTab === "changes") {
+    if (currentProject?.path && sidebarTab === 'changes') {
       codeService
         .getProjectChanges(currentProject.path)
         .then((changes) => setProjectChanges(changes))
-        .catch((err) => console.error("Failed to fetch project changes:", err));
+        .catch((err) => console.error('Failed to fetch project changes:', err));
     }
   }, [currentProject?.path, sidebarTab]);
 
@@ -846,17 +857,17 @@ export default function CodeScreen(): React.ReactElement {
   // Listen for file updates from Mac
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
-      "code:fileUpdated",
+      'code:fileUpdated',
       (_action, payload: { filePath: string; content: string }) => {
         // Only update if this is the active file
         if (payload.filePath === activeFile) {
-          console.log("📝 File updated from Mac:", payload.filePath);
+          console.log('📝 File updated from Mac:', payload.filePath);
           setFileContents((prev) => ({
             ...prev,
             [payload.filePath]: payload.content,
           }));
         }
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -865,15 +876,17 @@ export default function CodeScreen(): React.ReactElement {
   // Listen for diff updates from Mac (sent automatically after file changes)
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
-      "code:fileDiff",
+      'code:fileDiff',
       (_action, payload: FileDiff) => {
         // Only update if this is the active file and diff mode is enabled
-        if (payload.filePath === activeFile && diffMode !== "off") {
-          console.log("📊 Received live diff update from Mac:", payload.filePath);
-          console.log(`   Added: ${payload.addedLines.length}, Deleted: ${payload.deletedLines.length}, Modified: ${payload.modifiedLines.length}`);
+        if (payload.filePath === activeFile && diffMode !== 'off') {
+          console.log('📊 Received live diff update from Mac:', payload.filePath);
+          console.log(
+            `   Added: ${payload.addedLines.length}, Deleted: ${payload.deletedLines.length}, Modified: ${payload.modifiedLines.length}`,
+          );
           setDiffData(payload);
         }
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -882,18 +895,27 @@ export default function CodeScreen(): React.ReactElement {
   // Listen for project changes from Git watcher
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
-      "code:projectChanges",
-      (_action, payload: { projectPath: string; staged: FileChange[]; unstaged: FileChange[] }) => {
+      'code:projectChanges',
+      (
+        _action,
+        payload: {
+          projectPath: string;
+          staged: FileChange[];
+          unstaged: FileChange[];
+        },
+      ) => {
         // Only update if this is the current project
         if (payload.projectPath === currentProject?.path) {
-          console.log("🔄 Received project changes from Mac:");
-          console.log(`   Staged: ${payload.staged.length}, Unstaged: ${payload.unstaged.length}`);
+          console.log('🔄 Received project changes from Mac:');
+          console.log(
+            `   Staged: ${payload.staged.length}, Unstaged: ${payload.unstaged.length}`,
+          );
           setProjectChanges({
             staged: payload.staged,
             unstaged: payload.unstaged,
           });
         }
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -901,24 +923,24 @@ export default function CodeScreen(): React.ReactElement {
 
   // Get language from file path
   const getLanguage = (filePath: string): string => {
-    const ext = filePath.split(".").pop()?.toLowerCase();
+    const ext = filePath.split('.').pop()?.toLowerCase();
     const langMap: Record<string, string> = {
-      js: "javascript",
-      jsx: "javascript",
-      ts: "typescript",
-      tsx: "typescript",
-      py: "python",
-      json: "json",
-      html: "html",
-      css: "css",
-      md: "markdown",
+      js: 'javascript',
+      jsx: 'javascript',
+      ts: 'typescript',
+      tsx: 'typescript',
+      py: 'python',
+      json: 'json',
+      html: 'html',
+      css: 'css',
+      md: 'markdown',
     };
-    return langMap[ext || ""] || "javascript";
+    return langMap[ext || ''] || 'javascript';
   };
 
   // Go back to history
   const handleBackToHistory = () => {
-    setViewMode("history");
+    setViewMode('history');
     setCurrentProject(null);
     setOpenFiles([]);
     setActiveFile(null);
@@ -936,10 +958,10 @@ export default function CodeScreen(): React.ReactElement {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return "Just now";
+    if (days > 0) {return `${days}d ago`;}
+    if (hours > 0) {return `${hours}h ago`;}
+    if (minutes > 0) {return `${minutes}m ago`;}
+    return 'Just now';
   };
 
   // Handle removing a project from history
@@ -951,13 +973,13 @@ export default function CodeScreen(): React.ReactElement {
       try {
         await codeService.removeFromHistory(projectPath);
         // Invalidate projects query to refresh the list
-        queryClient.invalidateQueries({ queryKey: ["projects"] });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
       } catch (error) {
-        console.error("Failed to remove project:", error);
-        Alert.alert("Error", "Failed to remove project from history");
+        console.error('Failed to remove project:', error);
+        Alert.alert('Error', 'Failed to remove project from history');
       }
     },
-    [queryClient]
+    [queryClient],
   );
 
   // Sidebar slide animation
@@ -973,20 +995,20 @@ export default function CodeScreen(): React.ReactElement {
 
   // Get selected folder name for display
   const getSelectedFolderName = (): string => {
-    if (!selectedItem) return currentProject?.name || "root";
-    if (selectedItem.type === "folder") {
-      return selectedItem.path.split("/").pop() || "root";
+    if (!selectedItem) {return currentProject?.name || "root";}
+    if (selectedItem.type === 'folder') {
+      return selectedItem.path.split('/').pop() || 'root';
     }
     // If file, show parent folder
-    const pathParts = selectedItem.path.split("/");
+    const pathParts = selectedItem.path.split('/');
     pathParts.pop();
-    return pathParts.pop() || "root";
+    return pathParts.pop() || 'root';
   };
 
   // History View
-  if (viewMode === "history") {
+  if (viewMode === 'history') {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Code Editor</Text>
@@ -1060,7 +1082,7 @@ export default function CodeScreen(): React.ReactElement {
           {/* Help Text */}
           <View style={styles.helpContainer}>
             <Text style={styles.helpText}>
-              To open a new project, tap the {"{ }"} button in the Terminal
+              To open a new project, tap the {'{ }'} button in the Terminal
               while navigated to your project directory.
             </Text>
           </View>
@@ -1071,7 +1093,7 @@ export default function CodeScreen(): React.ReactElement {
 
   // Editor View
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -1109,7 +1131,7 @@ export default function CodeScreen(): React.ReactElement {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {currentProject?.name || "Editor"}
+          {currentProject?.name || 'Editor'}
         </Text>
 
         {activeFile && dirtyFiles.has(activeFile) && (
@@ -1132,7 +1154,7 @@ export default function CodeScreen(): React.ReactElement {
           try {
             await codeService.setActiveFile(filePath);
           } catch (error) {
-            console.error("Failed to set active file on Mac:", error);
+            console.error('Failed to set active file on Mac:', error);
           }
         }}
         onCloseFile={handleCloseFile}
@@ -1144,7 +1166,7 @@ export default function CodeScreen(): React.ReactElement {
         {/* Editor Area */}
         {activeFile ? (
           <CodeEditor
-            content={fileContents[activeFile] || ""}
+            content={fileContents[activeFile] || ''}
             language={getLanguage(activeFile)}
             onContentChange={handleContentChange}
             onSave={() => handleSaveFile()}
@@ -1193,14 +1215,14 @@ export default function CodeScreen(): React.ReactElement {
               <TouchableOpacity
                 style={[
                   styles.sidebarTab,
-                  sidebarTab === "files" && styles.sidebarTabActive,
+                  sidebarTab === 'files' && styles.sidebarTabActive,
                 ]}
-                onPress={() => setSidebarTab("files")}
+                onPress={() => setSidebarTab('files')}
               >
                 <Text
                   style={[
                     styles.sidebarTabText,
-                    sidebarTab === "files" && styles.sidebarTabTextActive,
+                    sidebarTab === 'files' && styles.sidebarTabTextActive,
                   ]}
                 >
                   Files
@@ -1209,14 +1231,14 @@ export default function CodeScreen(): React.ReactElement {
               <TouchableOpacity
                 style={[
                   styles.sidebarTab,
-                  sidebarTab === "changes" && styles.sidebarTabActive,
+                  sidebarTab === 'changes' && styles.sidebarTabActive,
                 ]}
-                onPress={() => setSidebarTab("changes")}
+                onPress={() => setSidebarTab('changes')}
               >
                 <Text
                   style={[
                     styles.sidebarTabText,
-                    sidebarTab === "changes" && styles.sidebarTabTextActive,
+                    sidebarTab === 'changes' && styles.sidebarTabTextActive,
                   ]}
                 >
                   Changes
@@ -1233,7 +1255,7 @@ export default function CodeScreen(): React.ReactElement {
               </TouchableOpacity>
             </View>
             <View style={styles.sidebarActions}>
-              {sidebarTab === "files" && (
+              {sidebarTab === 'files' && (
                 <>
                   <TouchableOpacity
                     onPress={handleCreateFile}
@@ -1261,13 +1283,13 @@ export default function CodeScreen(): React.ReactElement {
           </View>
 
           {/* Files Tab Content */}
-          {sidebarTab === "files" && (
+          {sidebarTab === 'files' && (
             <>
               {/* Selected folder indicator */}
               {selectedItem && (
                 <View style={styles.selectedIndicator}>
                   <Text style={styles.selectedIndicatorText}>
-                    Selected: {selectedItem.type === "folder" ? "📁" : "📄"}{" "}
+                    Selected: {selectedItem.type === 'folder' ? '📁' : '📄'}{' '}
                     {selectedItem.name}
                   </Text>
                 </View>
@@ -1288,7 +1310,7 @@ export default function CodeScreen(): React.ReactElement {
           )}
 
           {/* Changes Tab Content */}
-          {sidebarTab === "changes" && (
+          {sidebarTab === 'changes' && (
             <ScrollView style={styles.changesContainer}>
               {/* Staged Changes */}
               {projectChanges.staged.length > 0 && (
@@ -1308,7 +1330,7 @@ export default function CodeScreen(): React.ReactElement {
                       />
                       <Text style={styles.changeTypeBadge}>{change.type}</Text>
                       <Text style={styles.changeFileName} numberOfLines={1}>
-                        {change.path.split("/").pop()}
+                        {change.path.split('/').pop()}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1328,18 +1350,18 @@ export default function CodeScreen(): React.ReactElement {
                       <View
                         style={[
                           styles.changeTypeIndicator,
-                          change.type === "A"
+                          change.type === 'A'
                             ? styles.changeTypeAdded
-                            : change.type === "M"
-                            ? styles.changeTypeModified
-                            : change.type === "D"
-                            ? styles.changeTypeDeleted
-                            : styles.changeTypeModified,
+                            : change.type === 'M'
+                              ? styles.changeTypeModified
+                              : change.type === 'D'
+                                ? styles.changeTypeDeleted
+                                : styles.changeTypeModified,
                         ]}
                       />
                       <Text style={styles.changeTypeBadge}>{change.type}</Text>
                       <Text style={styles.changeFileName} numberOfLines={1}>
-                        {change.path.split("/").pop()}
+                        {change.path.split('/').pop()}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1376,7 +1398,7 @@ export default function CodeScreen(): React.ReactElement {
         >
           <View style={styles.contextMenu}>
             <Text style={styles.contextMenuTitle} numberOfLines={1}>
-              {contextMenuItem?.type === "folder" ? "📁" : "📄"}{" "}
+              {contextMenuItem?.type === 'folder' ? '📁' : '📄'}{' '}
               {contextMenuItem?.name}
             </Text>
             <TouchableOpacity
@@ -1409,7 +1431,7 @@ export default function CodeScreen(): React.ReactElement {
         onRequestClose={() => setCreateMode(null)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
           <TouchableOpacity
@@ -1419,7 +1441,7 @@ export default function CodeScreen(): React.ReactElement {
           />
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              Create New {createMode === "file" ? "File" : "Folder"}
+              Create New {createMode === 'file' ? 'File' : 'Folder'}
             </Text>
             <Text style={styles.modalSubtitle}>
               in {getSelectedFolderName()}
@@ -1427,7 +1449,7 @@ export default function CodeScreen(): React.ReactElement {
             <TextInput
               style={styles.modalInput}
               placeholder={
-                createMode === "file" ? "filename.txt" : "folder-name"
+                createMode === 'file' ? 'filename.txt' : 'folder-name'
               }
               placeholderTextColor={darkTheme.text.disabled}
               value={createName}
@@ -1471,7 +1493,7 @@ export default function CodeScreen(): React.ReactElement {
         onRequestClose={() => setRenameItem(null)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
           <TouchableOpacity
@@ -1481,10 +1503,10 @@ export default function CodeScreen(): React.ReactElement {
           />
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              Rename {renameItem?.type === "folder" ? "Folder" : "File"}
+              Rename {renameItem?.type === 'folder' ? 'Folder' : 'File'}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {renameItem?.type === "folder" ? "📁" : "📄"} {renameItem?.name}
+              {renameItem?.type === 'folder' ? '📁' : '📄'} {renameItem?.name}
             </Text>
             <TextInput
               style={styles.modalInput}
@@ -1545,16 +1567,16 @@ export default function CodeScreen(): React.ReactElement {
           />
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              Delete {deleteItem?.type === "folder" ? "Folder" : "File"}?
+              Delete {deleteItem?.type === 'folder' ? 'Folder' : 'File'}?
             </Text>
             <Text style={styles.deleteWarning}>
-              {deleteItem?.type === "folder"
-                ? "This will delete the folder and all its contents. This action cannot be undone."
-                : "This action cannot be undone."}
+              {deleteItem?.type === 'folder'
+                ? 'This will delete the folder and all its contents. This action cannot be undone.'
+                : 'This action cannot be undone.'}
             </Text>
             <View style={styles.deleteItemPreview}>
               <Text style={styles.deleteItemIcon}>
-                {deleteItem?.type === "folder" ? "📁" : "📄"}
+                {deleteItem?.type === 'folder' ? '📁' : '📄'}
               </Text>
               <Text style={styles.deleteItemName} numberOfLines={1}>
                 {deleteItem?.name}
@@ -1597,8 +1619,8 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     height: 56,
@@ -1607,7 +1629,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
   },
   backButton: {
@@ -1617,8 +1639,8 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.surfaceElevated,
     borderWidth: 1,
     borderColor: darkTheme.border,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   backButtonText: {
@@ -1632,14 +1654,14 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.surfaceElevated,
     borderWidth: 1,
     borderColor: darkTheme.border,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   hamburger: {
     width: 18,
     height: 14,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
   },
   hamburgerLine: {
     width: 18,
@@ -1655,17 +1677,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 32,
     borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   saveButtonText: {
     fontSize: 13,
     color: darkTheme.text.primary,
-    fontWeight: "600",
+    fontWeight: '600',
     lineHeight: 15,
     includeFontPadding: false,
-    textAlignVertical: "center",
+    textAlignVertical: 'center',
   },
 
   // History View
@@ -1680,7 +1702,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.secondary,
     letterSpacing: 1,
   },
@@ -1688,12 +1710,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   projectCardWrapper: {
-    position: "relative",
+    position: 'relative',
     marginBottom: 8,
   },
   projectCard: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     paddingRight: 48, // Make room for remove button
     backgroundColor: darkTheme.surfaceElevated,
@@ -1702,32 +1724,32 @@ const styles = StyleSheet.create({
     borderColor: darkTheme.border,
   },
   removeButton: {
-    position: "absolute",
+    position: 'absolute',
     right: 8,
-    top: "50%",
+    top: '50%',
     transform: [{ translateY: -16 }],
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: darkTheme.background,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: darkTheme.border,
   },
   removeButtonText: {
     fontSize: 20,
     color: darkTheme.text.secondary,
-    fontWeight: "500",
+    fontWeight: '500',
     lineHeight: 20,
   },
   projectIconWrapper: {
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: darkTheme.primary + "25",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: darkTheme.primary + '25',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
   projectIcon: {
@@ -1738,7 +1760,7 @@ const styles = StyleSheet.create({
   },
   projectName: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
     marginBottom: 4,
   },
@@ -1753,7 +1775,7 @@ const styles = StyleSheet.create({
 
   // Empty State
   emptyState: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 64,
   },
   emptyIcon: {
@@ -1763,14 +1785,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
     color: darkTheme.text.secondary,
-    textAlign: "center",
+    textAlign: 'center',
   },
 
   // Help Container
@@ -1785,13 +1807,13 @@ const styles = StyleSheet.create({
   helpText: {
     fontSize: 13,
     color: darkTheme.text.secondary,
-    textAlign: "center",
+    textAlign: 'center',
     lineHeight: 20,
   },
 
   // Loading
   loadingContainer: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 32,
   },
   loadingText: {
@@ -1803,19 +1825,19 @@ const styles = StyleSheet.create({
   // Editor View
   editorContent: {
     flex: 1,
-    position: "relative",
+    position: 'relative',
   },
 
   // Overlay
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000",
+    backgroundColor: '#000',
     zIndex: 10,
   },
 
   // Sidebar
   sidebar: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     bottom: 0,
@@ -1824,37 +1846,37 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: darkTheme.border,
     zIndex: 20,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 10,
   },
   sidebarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
   },
   sidebarTabs: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 4,
   },
   sidebarTab: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sidebarTabActive: {
-    backgroundColor: darkTheme.primary + "25",
+    backgroundColor: darkTheme.primary + '25',
   },
   sidebarTabText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.secondary,
   },
   sidebarTabTextActive: {
@@ -1867,22 +1889,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     minWidth: 18,
-    alignItems: "center",
+    alignItems: 'center',
   },
   changesBadgeText: {
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
   },
   sidebarTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.secondary,
     letterSpacing: 1,
   },
   sidebarActions: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   createButton: {
@@ -1890,8 +1912,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
     backgroundColor: darkTheme.surfaceElevated,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   createButtonText: {
     fontSize: 12,
@@ -1901,8 +1923,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: darkTheme.surfaceElevated,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 4,
   },
   closeSidebarText: {
@@ -1912,7 +1934,7 @@ const styles = StyleSheet.create({
   selectedIndicator: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: darkTheme.primary + "15",
+    backgroundColor: darkTheme.primary + '15',
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
   },
@@ -1930,15 +1952,15 @@ const styles = StyleSheet.create({
   },
   changesSectionTitle: {
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.secondary,
     letterSpacing: 1,
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
   changeItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
@@ -1949,20 +1971,20 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   changeTypeStaged: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: '#4CAF50',
   },
   changeTypeAdded: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: '#4CAF50',
   },
   changeTypeModified: {
-    backgroundColor: "#2196F3",
+    backgroundColor: '#2196F3',
   },
   changeTypeDeleted: {
-    backgroundColor: "#F44336",
+    backgroundColor: '#F44336',
   },
   changeTypeBadge: {
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.secondary,
     backgroundColor: darkTheme.surfaceElevated,
     paddingHorizontal: 6,
@@ -1970,7 +1992,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 8,
     minWidth: 18,
-    textAlign: "center",
+    textAlign: 'center',
   },
   changeFileName: {
     flex: 1,
@@ -1978,17 +2000,17 @@ const styles = StyleSheet.create({
     color: darkTheme.text.primary,
   },
   changesEmpty: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 48,
   },
   changesEmptyIcon: {
     fontSize: 32,
-    color: "#4CAF50",
+    color: '#4CAF50',
     marginBottom: 12,
   },
   changesEmptyText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
     marginBottom: 4,
   },
@@ -2000,8 +2022,8 @@ const styles = StyleSheet.create({
   // No file selected
   noFileSelected: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: darkTheme.background,
     padding: 32,
   },
@@ -2013,7 +2035,7 @@ const styles = StyleSheet.create({
   noFileText: {
     fontSize: 14,
     color: darkTheme.text.secondary,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 24,
   },
   openFilesButton: {
@@ -2027,15 +2049,15 @@ const styles = StyleSheet.create({
   openFilesButtonText: {
     fontSize: 14,
     color: darkTheme.primaryLight,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   // Context Menu
   contextMenuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contextMenu: {
     width: 200,
@@ -2043,21 +2065,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: darkTheme.border,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   contextMenuTitle: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
     backgroundColor: darkTheme.surfaceElevated,
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
   },
   contextMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -2080,12 +2102,12 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
     width: SCREEN_WIDTH - 48,
@@ -2097,7 +2119,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     color: darkTheme.text.primary,
     marginBottom: 4,
   },
@@ -2117,7 +2139,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalButtons: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
   },
   modalCancelButton: {
@@ -2125,24 +2147,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: darkTheme.surfaceElevated,
-    alignItems: "center",
+    alignItems: 'center',
   },
   modalCancelText: {
     fontSize: 15,
     color: darkTheme.text.secondary,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   modalCreateButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: darkTheme.primary,
-    alignItems: "center",
+    alignItems: 'center',
   },
   modalCreateText: {
     fontSize: 15,
-    color: "#fff",
-    fontWeight: "600",
+    color: '#fff',
+    fontWeight: '600',
   },
   modalButtonDisabled: {
     opacity: 0.5,
@@ -2152,12 +2174,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: darkTheme.error,
-    alignItems: "center",
+    alignItems: 'center',
   },
   modalDeleteText: {
     fontSize: 15,
-    color: "#fff",
-    fontWeight: "600",
+    color: '#fff',
+    fontWeight: '600',
   },
   deleteWarning: {
     fontSize: 14,
@@ -2166,8 +2188,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   deleteItemPreview: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     backgroundColor: darkTheme.background,
     borderRadius: 8,
@@ -2181,7 +2203,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: darkTheme.text.primary,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 });
 
@@ -2193,8 +2215,8 @@ const notConnectedStyles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 32,
   },
   iconContainer: {
@@ -2202,8 +2224,8 @@ const notConnectedStyles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     backgroundColor: darkTheme.surfaceElevated,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
     borderColor: darkTheme.border,
@@ -2214,15 +2236,15 @@ const notConnectedStyles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: '700',
     color: darkTheme.text.primary,
     marginBottom: 12,
-    textAlign: "center",
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 15,
     color: darkTheme.text.secondary,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 32,
     lineHeight: 22,
   },

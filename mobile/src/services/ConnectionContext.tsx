@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { WebRTCService } from './WebRTCService';
-import { Socket } from 'socket.io-client';
+import React, {createContext, useContext, useState, ReactNode} from 'react';
+import {WebRTCService} from './WebRTCService';
+import {Socket} from 'socket.io-client';
 
 export interface ConnectionInfo {
   relayServerUrl: string;
@@ -39,31 +39,31 @@ const initialState: ConnectionState = {
 
 const ConnectionContext = createContext<ConnectionContextType | null>(null);
 
-export function ConnectionProvider({ children }: { children: ReactNode }): React.ReactElement {
+export function ConnectionProvider({children}: {children: ReactNode}): React.ReactElement {
   const [state, setState] = useState<ConnectionState>(initialState);
 
   const setConnected = (connected: boolean) => {
-    setState((prev) => ({ ...prev, isConnected: connected }));
+    setState(prev => ({...prev, isConnected: connected}));
   };
 
   const setPaired = (paired: boolean) => {
-    setState((prev) => ({ ...prev, isPaired: paired }));
+    setState(prev => ({...prev, isPaired: paired}));
   };
 
   const setWebRTCConnected = (connected: boolean) => {
-    setState((prev) => ({ ...prev, isWebRTCConnected: connected }));
+    setState(prev => ({...prev, isWebRTCConnected: connected}));
   };
 
   const setConnectionInfo = (info: ConnectionInfo | null) => {
-    setState((prev) => ({ ...prev, connectionInfo: info }));
+    setState(prev => ({...prev, connectionInfo: info}));
   };
 
   const setWebRTCService = (service: WebRTCService | null) => {
-    setState((prev) => ({ ...prev, webrtcService: service }));
+    setState(prev => ({...prev, webrtcService: service}));
   };
 
   const setSocket = (socket: Socket | null) => {
-    setState((prev) => ({ ...prev, socket: socket }));
+    setState(prev => ({...prev, socket: socket}));
   };
 
   const reset = () => {
@@ -81,8 +81,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }): React
         setWebRTCService,
         setSocket,
         reset,
-      }}
-    >
+      }}>
       {children}
     </ConnectionContext.Provider>
   );
@@ -98,7 +97,6 @@ export function useConnection(): ConnectionContextType {
 
 // Helper hook to check if we have an active connection
 export function useIsConnected(): boolean {
-  const { state } = useConnection();
+  const {state} = useConnection();
   return state.isPaired && (state.isWebRTCConnected || state.isConnected);
 }
-

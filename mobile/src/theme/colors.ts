@@ -2,12 +2,12 @@ export const colors = {
   primary: '#6200EE',
   primaryVariant: '#3700B3',
   secondary: '#03DAC6',
-  
+
   background: '#F5F5F5', // Slightly off-white for app background
-  surface: '#FFFFFF',    // Cards/Inputs
-  
+  surface: '#FFFFFF', // Cards/Inputs
+
   error: '#B00020',
-  
+
   text: {
     primary: '#000000DE', // 87% opacity
     secondary: '#00000099', // 60% opacity
@@ -15,10 +15,10 @@ export const colors = {
     inverse: '#FFFFFF',
     link: '#6200EE',
   },
-  
+
   border: '#E0E0E0',
   divider: '#0000001F',
-  
+
   terminal: {
     background: '#FFFFFF',
     foreground: '#212121',
@@ -40,6 +40,5 @@ export const colors = {
     brightMagenta: '#8E24AA',
     brightCyan: '#00ACC1',
     brightWhite: '#FAFAFA',
-  }
+  },
 };
-

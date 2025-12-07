@@ -1,14 +1,21 @@
-import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment, StateField, StateEffect } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { json } from '@codemirror/lang-json';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { markdown } from '@codemirror/lang-markdown';
-import { keymap, Decoration, DecorationSet, WidgetType, gutter, GutterMarker } from '@codemirror/view';
-import { defaultKeymap, indentWithTab } from '@codemirror/commands';
+import {EditorView, basicSetup} from 'codemirror';
+import {EditorState, Compartment, StateField, StateEffect} from '@codemirror/state';
+import {oneDark} from '@codemirror/theme-one-dark';
+import {javascript} from '@codemirror/lang-javascript';
+import {python} from '@codemirror/lang-python';
+import {json} from '@codemirror/lang-json';
+import {html} from '@codemirror/lang-html';
+import {css} from '@codemirror/lang-css';
+import {markdown} from '@codemirror/lang-markdown';
+import {
+  keymap,
+  Decoration,
+  DecorationSet,
+  WidgetType,
+  gutter,
+  GutterMarker,
+} from '@codemirror/view';
+import {defaultKeymap, indentWithTab} from '@codemirror/commands';
 
 // Declare window interface for React Native WebView
 declare global {
@@ -82,7 +89,7 @@ function createDiffGutter(diffData: DiffData | null) {
     class: 'cm-diff-gutter',
     lineMarker: (view, line) => {
       const lineNumber = view.state.doc.lineAt(line.from).number;
-      
+
       if (diffData.modifiedLines.includes(lineNumber)) {
         return modifiedMarker;
       }
@@ -90,9 +97,7 @@ function createDiffGutter(diffData: DiffData | null) {
         return addedMarker;
       }
       // Check if there are deleted lines after the previous line
-      const hasDeletedBefore = diffData.deletedLines.some(
-        d => d.afterLine === lineNumber - 1
-      );
+      const hasDeletedBefore = diffData.deletedLines.some(d => d.afterLine === lineNumber - 1);
       if (hasDeletedBefore) {
         return deletedMarker;
       }
@@ -113,14 +118,14 @@ class DeletedLinesWidget extends WidgetType {
   toDOM() {
     const wrapper = document.createElement('div');
     wrapper.className = 'diff-deleted-lines';
-    
+
     for (const line of this.lines) {
       const lineEl = document.createElement('div');
       lineEl.className = 'diff-deleted-line';
       lineEl.textContent = line || ' '; // Show space for empty lines
       wrapper.appendChild(lineEl);
     }
-    
+
     return wrapper;
   }
 
@@ -149,8 +154,8 @@ const diffDecorationsField = StateField.define<DecorationSet>({
 });
 
 // Line decoration for added lines (inline mode)
-const addedLineDecoration = Decoration.line({ class: 'diff-line-added' });
-const modifiedLineDecoration = Decoration.line({ class: 'diff-line-modified' });
+const addedLineDecoration = Decoration.line({class: 'diff-line-added'});
+const modifiedLineDecoration = Decoration.line({class: 'diff-line-modified'});
 
 // Function to create diff decorations
 function createDiffDecorations(state: EditorState, diffData: DiffData | null): DecorationSet {
@@ -180,7 +185,7 @@ function createDiffDecorations(state: EditorState, diffData: DiffData | null): D
   for (const deleted of diffData.deletedLines) {
     const afterLine = deleted.afterLine;
     let pos: number;
-    
+
     if (afterLine === 0) {
       // Deleted at the very beginning
       pos = 0;
@@ -220,26 +225,26 @@ function updateDiffDecorations(view: EditorView, diffData: DiffData | null) {
  */
 function getLanguageExtension(language: string) {
   const lang = language.toLowerCase();
-  
+
   // Map file extensions to languages
   const extensionMap: Record<string, any> = {
-    'js': javascript({ jsx: false, typescript: false }),
-    'jsx': javascript({ jsx: true, typescript: false }),
-    'ts': javascript({ jsx: false, typescript: true }),
-    'tsx': javascript({ jsx: true, typescript: true }),
-    'javascript': javascript({ jsx: false, typescript: false }),
-    'typescript': javascript({ jsx: false, typescript: true }),
-    'py': python(),
-    'python': python(),
-    'json': json(),
-    'html': html(),
-    'htm': html(),
-    'css': css(),
-    'md': markdown(),
-    'markdown': markdown(),
+    js: javascript({jsx: false, typescript: false}),
+    jsx: javascript({jsx: true, typescript: false}),
+    ts: javascript({jsx: false, typescript: true}),
+    tsx: javascript({jsx: true, typescript: true}),
+    javascript: javascript({jsx: false, typescript: false}),
+    typescript: javascript({jsx: false, typescript: true}),
+    py: python(),
+    python: python(),
+    json: json(),
+    html: html(),
+    htm: html(),
+    css: css(),
+    md: markdown(),
+    markdown: markdown(),
   };
-  
-  return extensionMap[lang] || javascript({ jsx: false, typescript: false });
+
+  return extensionMap[lang] || javascript({jsx: false, typescript: false});
 }
 
 /**
@@ -247,7 +252,7 @@ function getLanguageExtension(language: string) {
  */
 function postMessage(type: string, data?: any) {
   if (window.ReactNativeWebView) {
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type, data }));
+    window.ReactNativeWebView.postMessage(JSON.stringify({type, data}));
   } else {
     console.log('[Editor]', type, data);
   }
@@ -376,7 +381,7 @@ function addDiffStyles() {
 function initEditor() {
   // Add loading spinner first
   addLoadingSpinner();
-  
+
   const container = document.getElementById('editor');
   if (!container) {
     console.error('Editor container not found');
@@ -391,7 +396,7 @@ function initEditor() {
     {
       key: 'Mod-s',
       run: () => {
-        postMessage('save', { content: editorView?.state.doc.toString() });
+        postMessage('save', {content: editorView?.state.doc.toString()});
         return true;
       },
     },
@@ -408,7 +413,7 @@ function initEditor() {
       diffDecorationsField,
       keymap.of([...defaultKeymap, indentWithTab]),
       saveKeymap,
-      EditorView.updateListener.of((update) => {
+      EditorView.updateListener.of(update => {
         if (update.docChanged) {
           postMessage('contentChanged', {
             content: update.state.doc.toString(),
@@ -436,7 +441,7 @@ function initEditor() {
 function handleMessage(event: MessageEvent) {
   try {
     const message = JSON.parse(event.data);
-    
+
     switch (message.type) {
       case 'setContent':
         if (editorView && message.data?.content !== undefined) {
@@ -448,10 +453,10 @@ function handleMessage(event: MessageEvent) {
             },
           });
           editorView.dispatch(transaction);
-          
+
           // Hide loading spinner when content is set
           hideLoadingSpinner();
-          
+
           // Re-apply diff decorations after content change
           if (currentDiffData && currentDiffData.mode === 'inline') {
             setTimeout(() => {
@@ -462,13 +467,13 @@ function handleMessage(event: MessageEvent) {
           }
         }
         break;
-        
+
       case 'getContent':
         if (editorView) {
-          postMessage('content', { content: editorView.state.doc.toString() });
+          postMessage('content', {content: editorView.state.doc.toString()});
         }
         break;
-        
+
       case 'setLanguage':
         if (editorView && message.data?.language) {
           currentLanguage = message.data.language;
@@ -477,51 +482,49 @@ function handleMessage(event: MessageEvent) {
           });
         }
         break;
-        
+
       case 'setReadOnly':
         if (editorView && message.data?.readOnly !== undefined) {
           editorView.dispatch({
-            effects: readOnlyConf.reconfigure(
-              EditorState.readOnly.of(message.data.readOnly)
-            ),
+            effects: readOnlyConf.reconfigure(EditorState.readOnly.of(message.data.readOnly)),
           });
         }
         break;
-        
+
       case 'focus':
         if (editorView) {
           editorView.focus();
         }
         break;
-        
+
       case 'setDiffData':
         if (editorView && message.data) {
           currentDiffData = message.data as DiffData;
-          
+
           // Update gutter
           editorView.dispatch({
             effects: diffGutterConf.reconfigure(createDiffGutter(currentDiffData)),
           });
-          
+
           // Update inline decorations
           updateDiffDecorations(editorView, currentDiffData);
         }
         break;
-        
+
       case 'clearDiff':
         if (editorView) {
           currentDiffData = null;
-          
+
           // Clear gutter
           editorView.dispatch({
             effects: diffGutterConf.reconfigure([]),
           });
-          
+
           // Clear inline decorations
           updateDiffDecorations(editorView, null);
         }
         break;
-        
+
       case 'setFontSize':
         if (message.data?.fontSize) {
           const fontSize = message.data.fontSize as number;
@@ -538,18 +541,22 @@ function handleMessage(event: MessageEvent) {
           }
         }
         break;
-        
+
       case 'setTheme':
         if (message.data) {
-          const { background, foreground, cursor } = message.data as { background: string; foreground: string; cursor: string };
+          const {background, foreground, cursor} = message.data as {
+            background: string;
+            foreground: string;
+            cursor: string;
+          };
           // Apply theme colors to the editor
           document.documentElement.style.setProperty('--editor-bg', background);
           document.documentElement.style.setProperty('--editor-fg', foreground);
           document.documentElement.style.setProperty('--editor-cursor', cursor);
-          
+
           // Update body background
           document.body.style.backgroundColor = background;
-          
+
           // Update CodeMirror theme dynamically via CSS custom properties
           const style = document.createElement('style');
           style.id = 'dynamic-theme';
@@ -597,7 +604,7 @@ function handleMessage(event: MessageEvent) {
           document.head.appendChild(style);
         }
         break;
-        
+
       default:
         console.warn('Unknown message type:', message.type);
     }

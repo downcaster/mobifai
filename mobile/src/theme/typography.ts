@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import {Platform} from 'react-native';
 
 export const typography = {
   fontFamily: {
@@ -17,6 +17,5 @@ export const typography = {
     regular: '400' as '400',
     medium: '500' as '500',
     bold: '700' as '700',
-  }
+  },
 };
-

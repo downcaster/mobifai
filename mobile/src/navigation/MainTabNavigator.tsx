@@ -1,14 +1,20 @@
-import React from "react";
-import { StyleSheet, View, Text, Platform } from "react-native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import DeviceListScreen from "../screens/DeviceListScreen";
-import TerminalScreen from "../screens/TerminalScreen";
-import CodeScreen from "../screens/CodeScreen";
-import ProfileStackNavigator from "./ProfileStackNavigator";
+import React from 'react';
+import {StyleSheet, View, Text, Platform} from 'react-native';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import DeviceListScreen from '../screens/DeviceListScreen';
+import TerminalScreen from '../screens/TerminalScreen';
+import CodeScreen from '../screens/CodeScreen';
+import ProfileStackNavigator from './ProfileStackNavigator';
 
 export type MainTabParamList = {
   Connections: undefined;
-  Terminal: { relayServerUrl?: string; targetDeviceId?: string; targetDeviceName?: string } | undefined;
+  Terminal:
+    | {
+        relayServerUrl?: string;
+        targetDeviceId?: string;
+        targetDeviceName?: string;
+      }
+    | undefined;
   Code: undefined;
   Profile: undefined;
 };
@@ -21,15 +27,11 @@ interface TabIconProps {
   icon: string;
 }
 
-function TabIcon({ focused, label, icon }: TabIconProps): React.ReactElement {
+function TabIcon({focused, label, icon}: TabIconProps): React.ReactElement {
   return (
     <View style={styles.tabIconContainer}>
-      <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>
-        {icon}
-      </Text>
-      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
-        {label}
-      </Text>
+      <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>{icon}</Text>
+      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{label}</Text>
     </View>
   );
 }
@@ -41,17 +43,14 @@ export default function MainTabNavigator(): React.ReactElement {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: "#6200EE",
-        tabBarInactiveTintColor: "#888",
-      }}
-    >
+        tabBarActiveTintColor: '#6200EE',
+        tabBarInactiveTintColor: '#888',
+      }}>
       <Tab.Screen
         name="Connections"
         component={DeviceListScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Connect" icon="◉" />
-          ),
+          tabBarIcon: ({focused}) => <TabIcon focused={focused} label="Connect" icon="◉" />,
         }}
       />
       <Tab.Screen
@@ -59,27 +58,21 @@ export default function MainTabNavigator(): React.ReactElement {
         component={TerminalScreen}
         initialParams={undefined}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Terminal" icon="▣" />
-          ),
+          tabBarIcon: ({focused}) => <TabIcon focused={focused} label="Terminal" icon="▣" />,
         }}
       />
       <Tab.Screen
         name="Code"
         component={CodeScreen}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Code" icon="{ }" />
-          ),
+          tabBarIcon: ({focused}) => <TabIcon focused={focused} label="Code" icon="{ }" />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Profile" icon="●" />
-          ),
+          tabBarIcon: ({focused}) => <TabIcon focused={focused} label="Profile" icon="●" />,
         }}
       />
     </Tab.Navigator>
@@ -88,33 +81,32 @@ export default function MainTabNavigator(): React.ReactElement {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: '#1a1a1a',
     borderTopWidth: 1,
-    borderTopColor: "#333",
-    height: Platform.OS === "ios" ? 88 : 64,
+    borderTopColor: '#333',
+    height: Platform.OS === 'ios' ? 88 : 64,
     paddingTop: 8,
-    paddingBottom: Platform.OS === "ios" ? 28 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 8,
   },
   tabIconContainer: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabIcon: {
     fontSize: 20,
-    color: "#666",
+    color: '#666',
     marginBottom: 4,
   },
   tabIconActive: {
-    color: "#6200EE",
+    color: '#6200EE',
   },
   tabLabel: {
     fontSize: 10,
-    color: "#666",
-    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "sans-serif",
-    fontWeight: "500",
+    color: '#666',
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'sans-serif',
+    fontWeight: '500',
   },
   tabLabelActive: {
-    color: "#6200EE",
+    color: '#6200EE',
   },
 });
-

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
+import React, {useEffect, useState, useCallback, useMemo, memo} from 'react';
 import {
   View,
   ScrollView,
@@ -8,17 +8,17 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
-} from "react-native";
-import { AppText, Slider } from "../components/ui";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { RELAY_SERVER_URL } from "../config";
-import { useNavigation, CommonActions } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { terminalThemes, TerminalTheme } from "../theme/terminalThemes";
-import { SavedCombination, SAVED_COMBINATIONS_KEY } from "../types/savedCombinations";
-import { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
+} from 'react-native';
+import {AppText, Slider} from '../components/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {RELAY_SERVER_URL} from '../config';
+import {useNavigation, CommonActions} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {terminalThemes, TerminalTheme} from '../theme/terminalThemes';
+import {SavedCombination, SAVED_COMBINATIONS_KEY} from '../types/savedCombinations';
+import {ProfileStackParamList} from '../navigation/ProfileStackNavigator';
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 // Memoized theme preview component to prevent re-renders during scroll
 interface ThemePreviewProps {
@@ -40,38 +40,27 @@ const ThemePreviewItem = memo(function ThemePreviewItem({
 
   return (
     <TouchableOpacity
-      style={[
-        styles.themePreview,
-        isSelected && styles.themePreviewSelected,
-      ]}
-      onPress={handlePress}
-    >
+      style={[styles.themePreview, isSelected && styles.themePreviewSelected]}
+      onPress={handlePress}>
       {isSelected && <View style={styles.themePreviewGlow} />}
       <View
         style={[
           styles.themePreviewInner,
-          { backgroundColor: terminalTheme.background },
-          isSelected && { borderColor: themeColors.accent.primary, borderWidth: 2.5 },
-        ]}
-      >
-        <AppText
-          style={[
-            styles.themePreviewText,
-            { color: terminalTheme.foreground },
-          ]}
-        >
-          $ ls
-        </AppText>
+          {backgroundColor: terminalTheme.background},
+          isSelected && {
+            borderColor: themeColors.accent.primary,
+            borderWidth: 2.5,
+          },
+        ]}>
+        <AppText style={[styles.themePreviewText, {color: terminalTheme.foreground}]}>$ ls</AppText>
       </View>
-      <AppText style={styles.themePreviewName}>
-        {terminalTheme.name}
-      </AppText>
+      <AppText style={styles.themePreviewName}>{terminalTheme.name}</AppText>
     </TouchableOpacity>
   );
 });
 
-const TOKEN_KEY = "mobifai_auth_token";
-const USER_INFO_KEY = "mobifai_user_info";
+const TOKEN_KEY = 'mobifai_auth_token';
+const USER_INFO_KEY = 'mobifai_user_info';
 
 interface UserInfo {
   email: string;
@@ -86,31 +75,31 @@ interface AppSettings {
   fontFamily: string;
   terminalTheme?: string;
   codeTheme?: string;
-  codeDiffMode?: "off" | "gutter" | "inline";
+  codeDiffMode?: 'off' | 'gutter' | 'inline';
   showTerminalGuide?: boolean;
 }
 
 // Design tokens for the futuristic theme
 const themeColors = {
   bg: {
-    primary: "#0a0a0f",
-    secondary: "#12121a",
-    tertiary: "#1a1a25",
-    card: "#15151f",
+    primary: '#0a0a0f',
+    secondary: '#12121a',
+    tertiary: '#1a1a25',
+    card: '#15151f',
   },
   accent: {
-    primary: "#6200EE",
-    secondary: "#BB86FC",
-    glow: "rgba(98, 0, 238, 0.3)",
+    primary: '#6200EE',
+    secondary: '#BB86FC',
+    glow: 'rgba(98, 0, 238, 0.3)',
   },
   text: {
-    primary: "#ffffff",
-    secondary: "#8888aa",
-    muted: "#555566",
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    muted: '#555566',
   },
   border: {
-    subtle: "#2a2a3a",
-    accent: "#6200EE40",
+    subtle: '#2a2a3a',
+    accent: '#6200EE40',
   },
 };
 
@@ -118,13 +107,13 @@ export default function ProfileScreen(): React.ReactElement {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
-    theme: "dark",
+    theme: 'dark',
     fontSize: 14,
-    cursorStyle: "block",
-    fontFamily: "monospace",
-    terminalTheme: "default",
-    codeTheme: "default",
-    codeDiffMode: "off",
+    cursorStyle: 'block',
+    fontFamily: 'monospace',
+    terminalTheme: 'default',
+    codeTheme: 'default',
+    codeDiffMode: 'off',
     showTerminalGuide: true,
   });
   const [loading, setLoading] = useState(true);
@@ -143,7 +132,9 @@ export default function ProfileScreen(): React.ReactElement {
       await fetchSettings();
       await loadCombinations();
     } catch (error) {
-      if (__DEV__) console.error("Error loading profile data:", error);
+      if (__DEV__) {
+        console.error('Error loading profile data:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -156,88 +147,100 @@ export default function ProfileScreen(): React.ReactElement {
         setSavedCombinations(JSON.parse(saved));
       }
     } catch (error) {
-      if (__DEV__) console.error("Error loading combinations:", error);
+      if (__DEV__) {
+        console.error('Error loading combinations:', error);
+      }
     }
   };
 
   const fetchSettings = async (): Promise<void> => {
     try {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token) return;
+      if (!token) {
+        return;
+      }
 
       const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
-        method: "GET",
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setSettings((prev) => ({ ...prev, ...data }));
+        setSettings(prev => ({...prev, ...data}));
       }
     } catch (error) {
-      if (__DEV__) console.error("Error fetching settings:", error);
+      if (__DEV__) {
+        console.error('Error fetching settings:', error);
+      }
     }
   };
 
-  const updateSetting = useCallback(async (
-    key: string,
-    value: string | number | boolean
-  ): Promise<void> => {
-    // Optimistic update
-    setSettings((prev) => {
-      const newSettings = { ...prev, [key]: value };
-      
-      // Fire API call asynchronously
-      (async () => {
-        try {
-          const token = await AsyncStorage.getItem(TOKEN_KEY);
-          if (!token) return;
+  const updateSetting = useCallback(
+    async (key: string, value: string | number | boolean): Promise<void> => {
+      // Optimistic update
+      setSettings(prev => {
+        const newSettings = {...prev, [key]: value};
 
-          const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ [key]: value }),
-          });
+        // Fire API call asynchronously
+        (async () => {
+          try {
+            const token = await AsyncStorage.getItem(TOKEN_KEY);
+            if (!token) {
+              return;
+            }
 
-          if (!response.ok) {
-            throw new Error("Failed to update settings");
-            // Note: In production, you'd revert settings here
+            const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({[key]: value}),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to update settings');
+              // Note: In production, you'd revert settings here
+            }
+          } catch (error) {
+            if (__DEV__) {
+              console.error('Error updating settings:', error);
+            }
           }
-        } catch (error) {
-          if (__DEV__) console.error("Error updating settings:", error);
-        }
-      })();
-      
-      return newSettings;
-    });
-  }, []);
+        })();
+
+        return newSettings;
+      });
+    },
+    [],
+  );
 
   const handleLogout = useCallback((): void => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      {text: 'Cancel', style: 'cancel'},
       {
-        text: "Sign Out",
-        style: "destructive",
+        text: 'Sign Out',
+        style: 'destructive',
         onPress: async () => {
           try {
             await AsyncStorage.removeItem(TOKEN_KEY);
             await AsyncStorage.removeItem(USER_INFO_KEY);
-            await AsyncStorage.removeItem("mobifai_device_id");
+            await AsyncStorage.removeItem('mobifai_device_id');
 
             navigation.dispatch(
               CommonActions.reset({
                 index: 0,
-                routes: [{ name: "Auth" as never }],
-              })
+                routes: [{name: 'Auth' as never}],
+              }),
             );
           } catch (e) {
-            if (__DEV__) console.error("Logout error:", e);
+            if (__DEV__) {
+              console.error('Logout error:', e);
+            }
           }
         },
       },
@@ -258,28 +261,23 @@ export default function ProfileScreen(): React.ReactElement {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={true}
-        scrollEventThrottle={16}
-      >
+        scrollEventThrottle={16}>
         {/* Profile Header with Gradient */}
         <View style={styles.headerSection}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatarGlow} />
             {userInfo?.picture ? (
-              <Image source={{ uri: userInfo.picture }} style={styles.avatar} />
+              <Image source={{uri: userInfo.picture}} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <AppText style={styles.avatarText}>
-                  {userInfo?.name?.charAt(0) ||
-                    userInfo?.email?.charAt(0) ||
-                    "?"}
+                  {userInfo?.name?.charAt(0) || userInfo?.email?.charAt(0) || '?'}
                 </AppText>
               </View>
             )}
           </View>
-          <AppText style={styles.userName}>{userInfo?.name || "User"}</AppText>
-          <AppText style={styles.userEmail}>
-            {userInfo?.email || "Not signed in"}
-          </AppText>
+          <AppText style={styles.userName}>{userInfo?.name || 'User'}</AppText>
+          <AppText style={styles.userEmail}>{userInfo?.email || 'Not signed in'}</AppText>
         </View>
 
         {/* Settings Sections */}
@@ -303,7 +301,7 @@ export default function ProfileScreen(): React.ReactElement {
                     min={8}
                     max={22}
                     step={1}
-                    onValueChange={(val) => updateSetting("fontSize", val)}
+                    onValueChange={val => updateSetting('fontSize', val)}
                     minLabel="Small"
                     maxLabel="Large"
                     trackColor={themeColors.bg.tertiary}
@@ -318,7 +316,7 @@ export default function ProfileScreen(): React.ReactElement {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionIcon}>
-                <AppText style={styles.sectionIconText}>{ }</AppText>
+                <AppText style={styles.sectionIconText}>{}</AppText>
               </View>
               <AppText style={styles.sectionTitle}>Code Editor</AppText>
             </View>
@@ -331,14 +329,13 @@ export default function ProfileScreen(): React.ReactElement {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.themesContainer}
-                  removeClippedSubviews={true}
-                >
-                  {terminalThemes.map((terminalTheme) => (
+                  removeClippedSubviews={true}>
+                  {terminalThemes.map(terminalTheme => (
                     <ThemePreviewItem
                       key={terminalTheme.id}
                       terminalTheme={terminalTheme}
                       isSelected={settings.codeTheme === terminalTheme.id}
-                      onSelect={(id) => updateSetting("codeTheme", id)}
+                      onSelect={id => updateSetting('codeTheme', id)}
                       theme={themeColors}
                     />
                   ))}
@@ -351,26 +348,22 @@ export default function ProfileScreen(): React.ReactElement {
               <View style={styles.settingItem}>
                 <AppText style={styles.settingLabel}>Git Diff Display</AppText>
                 <View style={styles.diffModeGroup}>
-                  {(["off", "gutter", "inline"] as const).map((mode) => (
+                  {(['off', 'gutter', 'inline'] as const).map(mode => (
                     <TouchableOpacity
                       key={mode}
                       style={[
                         styles.diffModeOption,
-                        settings.codeDiffMode === mode &&
-                          styles.diffModeOptionActive,
+                        settings.codeDiffMode === mode && styles.diffModeOptionActive,
                       ]}
-                      onPress={() => updateSetting("codeDiffMode", mode)}
-                    >
+                      onPress={() => updateSetting('codeDiffMode', mode)}>
                       <View style={styles.diffModePreview}>
-                        {mode === "off" && (
-                          <AppText style={styles.diffModeIcon}>○</AppText>
-                        )}
-                        {mode === "gutter" && (
+                        {mode === 'off' && <AppText style={styles.diffModeIcon}>○</AppText>}
+                        {mode === 'gutter' && (
                           <View style={styles.gutterPreview}>
                             <View style={styles.gutterLine} />
                           </View>
                         )}
-                        {mode === "inline" && (
+                        {mode === 'inline' && (
                           <View style={styles.inlinePreview}>
                             <View style={styles.inlineLineAdded} />
                             <View style={styles.inlineLineDeleted} />
@@ -380,11 +373,9 @@ export default function ProfileScreen(): React.ReactElement {
                       <AppText
                         style={[
                           styles.diffModeLabel,
-                          settings.codeDiffMode === mode &&
-                            styles.diffModeLabelActive,
-                        ]}
-                      >
-                        {mode === "off" ? "Off" : mode === "gutter" ? "Gutter" : "Inline"}
+                          settings.codeDiffMode === mode && styles.diffModeLabelActive,
+                        ]}>
+                        {mode === 'off' ? 'Off' : mode === 'gutter' ? 'Gutter' : 'Inline'}
                       </AppText>
                     </TouchableOpacity>
                   ))}
@@ -410,14 +401,13 @@ export default function ProfileScreen(): React.ReactElement {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.themesContainer}
-                  removeClippedSubviews={true}
-                >
-                  {terminalThemes.map((terminalTheme) => (
+                  removeClippedSubviews={true}>
+                  {terminalThemes.map(terminalTheme => (
                     <ThemePreviewItem
                       key={terminalTheme.id}
                       terminalTheme={terminalTheme}
                       isSelected={settings.terminalTheme === terminalTheme.id}
-                      onSelect={(id) => updateSetting("terminalTheme", id)}
+                      onSelect={id => updateSetting('terminalTheme', id)}
                       theme={themeColors}
                     />
                   ))}
@@ -430,32 +420,24 @@ export default function ProfileScreen(): React.ReactElement {
               <View style={styles.settingItem}>
                 <AppText style={styles.settingLabel}>Cursor Style</AppText>
                 <View style={styles.cursorGroup}>
-                  {(["block", "underline", "bar"] as const).map((style) => (
+                  {(['block', 'underline', 'bar'] as const).map(style => (
                     <TouchableOpacity
                       key={style}
                       style={[
                         styles.cursorOption,
-                        settings.cursorStyle === style &&
-                          styles.cursorOptionActive,
+                        settings.cursorStyle === style && styles.cursorOptionActive,
                       ]}
-                      onPress={() => updateSetting("cursorStyle", style)}
-                    >
+                      onPress={() => updateSetting('cursorStyle', style)}>
                       <View style={styles.cursorPreview}>
-                        {style === "block" && (
-                          <View style={styles.cursorBlock} />
-                        )}
-                        {style === "underline" && (
-                          <View style={styles.cursorUnderline} />
-                        )}
-                        {style === "bar" && <View style={styles.cursorBar} />}
+                        {style === 'block' && <View style={styles.cursorBlock} />}
+                        {style === 'underline' && <View style={styles.cursorUnderline} />}
+                        {style === 'bar' && <View style={styles.cursorBar} />}
                       </View>
                       <AppText
                         style={[
                           styles.cursorLabel,
-                          settings.cursorStyle === style &&
-                            styles.cursorLabelActive,
-                        ]}
-                      >
+                          settings.cursorStyle === style && styles.cursorLabelActive,
+                        ]}>
                         {style.charAt(0).toUpperCase() + style.slice(1)}
                       </AppText>
                     </TouchableOpacity>
@@ -466,8 +448,8 @@ export default function ProfileScreen(): React.ReactElement {
               <View style={styles.divider} />
 
               {/* Show Terminal Guide Toggle */}
-              <View style={[styles.settingItem, { flexDirection: "row", alignItems: "center" }]}>
-                <View style={{ flex: 1, marginRight: 12 }}>
+              <View style={[styles.settingItem, {flexDirection: 'row', alignItems: 'center'}]}>
+                <View style={{flex: 1, marginRight: 12}}>
                   <AppText style={styles.settingLabel} numberOfLines={1}>
                     Show Welcome Guide
                   </AppText>
@@ -476,12 +458,8 @@ export default function ProfileScreen(): React.ReactElement {
                   </AppText>
                 </View>
                 <TouchableOpacity
-                  style={[
-                    styles.toggle,
-                    settings.showTerminalGuide && styles.toggleActive,
-                  ]}
-                  onPress={() => updateSetting("showTerminalGuide", !settings.showTerminalGuide)}
-                >
+                  style={[styles.toggle, settings.showTerminalGuide && styles.toggleActive]}
+                  onPress={() => updateSetting('showTerminalGuide', !settings.showTerminalGuide)}>
                   <View
                     style={[
                       styles.toggleThumb,
@@ -496,14 +474,13 @@ export default function ProfileScreen(): React.ReactElement {
               {/* Command Combinations - Navigate to list */}
               <TouchableOpacity
                 style={styles.navRow}
-                onPress={() => navigation.navigate("CommandCombinations")}
-              >
+                onPress={() => navigation.navigate('CommandCombinations')}>
                 <View style={styles.navRowContent}>
                   <AppText style={styles.settingLabel}>Command Combinations</AppText>
                   <AppText style={styles.settingDescription}>
                     {savedCombinations.length === 0
-                      ? "No saved combinations"
-                      : `${savedCombinations.length} combination${savedCombinations.length !== 1 ? "s" : ""}`}
+                      ? 'No saved combinations'
+                      : `${savedCombinations.length} combination${savedCombinations.length !== 1 ? 's' : ''}`}
                   </AppText>
                 </View>
                 <AppText style={styles.navRowArrow}>→</AppText>
@@ -543,27 +520,27 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: themeColors.bg.primary,
   },
   content: {
     paddingBottom: 120,
   },
-  
+
   // Header
   headerSection: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: 24,
   },
   avatarContainer: {
-    position: "relative",
+    position: 'relative',
     marginBottom: 16,
   },
   avatarGlow: {
-    position: "absolute",
+    position: 'absolute',
     width: 100,
     height: 100,
     borderRadius: 50,
@@ -585,17 +562,17 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.bg.tertiary,
     borderWidth: 2,
     borderColor: themeColors.accent.primary,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarText: {
     fontSize: 36,
     color: themeColors.accent.secondary,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   userName: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: '700',
     color: themeColors.text.primary,
     marginBottom: 4,
   },
@@ -612,8 +589,8 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
     paddingHorizontal: 4,
   },
@@ -622,8 +599,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 8,
     backgroundColor: themeColors.accent.glow,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
   },
   sectionIconText: {
@@ -632,9 +609,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.secondary,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 1,
   },
 
@@ -644,14 +621,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: themeColors.border.subtle,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   settingItem: {
     padding: 20,
   },
   settingLabel: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.primary,
     marginBottom: 16,
   },
@@ -668,7 +645,7 @@ const styles = StyleSheet.create({
 
   // Toggle Group
   toggleGroup: {
-    flexDirection: "row",
+    flexDirection: 'row',
     backgroundColor: themeColors.bg.tertiary,
     borderRadius: 10,
     padding: 4,
@@ -677,14 +654,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    alignItems: "center",
+    alignItems: 'center',
   },
   toggleButtonActive: {
     backgroundColor: themeColors.accent.primary,
   },
   toggleText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.muted,
   },
   toggleTextActive: {
@@ -697,14 +674,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   themePreview: {
-    position: "relative",
-    alignItems: "center",
+    position: 'relative',
+    alignItems: 'center',
   },
   themePreviewSelected: {
     // Selected state handled by glow
   },
   themePreviewGlow: {
-    position: "absolute",
+    position: 'absolute',
     width: 88,
     height: 88,
     borderRadius: 16,
@@ -716,26 +693,26 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: 'transparent',
   },
   themePreviewText: {
     fontSize: 13,
-    fontFamily: "monospace",
-    fontWeight: "600",
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   themePreviewName: {
     fontSize: 11,
     color: themeColors.text.secondary,
     marginTop: 6,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 
   // Cursor Options
   cursorGroup: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
   },
   cursorOption: {
@@ -743,9 +720,9 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.bg.tertiary,
     borderRadius: 12,
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: 'transparent',
   },
   cursorOptionActive: {
     borderColor: themeColors.accent.primary,
@@ -754,8 +731,8 @@ const styles = StyleSheet.create({
   cursorPreview: {
     width: 40,
     height: 32,
-    justifyContent: "flex-end",
-    alignItems: "center",
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     marginBottom: 8,
   },
   cursorBlock: {
@@ -778,7 +755,7 @@ const styles = StyleSheet.create({
   },
   cursorLabel: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: '500',
     color: themeColors.text.muted,
   },
   cursorLabelActive: {
@@ -787,7 +764,7 @@ const styles = StyleSheet.create({
 
   // Diff Mode Options
   diffModeGroup: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
   },
   diffModeOption: {
@@ -795,9 +772,9 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.bg.tertiary,
     borderRadius: 12,
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: 'transparent',
   },
   diffModeOptionActive: {
     borderColor: themeColors.accent.primary,
@@ -806,8 +783,8 @@ const styles = StyleSheet.create({
   diffModePreview: {
     width: 40,
     height: 32,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
   diffModeIcon: {
@@ -819,12 +796,12 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: themeColors.bg.secondary,
     borderRadius: 2,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   gutterLine: {
     width: 4,
-    height: "100%",
-    backgroundColor: "#4CAF50",
+    height: '100%',
+    backgroundColor: '#4CAF50',
   },
   inlinePreview: {
     width: 32,
@@ -833,17 +810,17 @@ const styles = StyleSheet.create({
   },
   inlineLineAdded: {
     flex: 1,
-    backgroundColor: "rgba(76, 175, 80, 0.3)",
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
     borderRadius: 2,
   },
   inlineLineDeleted: {
     flex: 1,
-    backgroundColor: "rgba(244, 67, 54, 0.3)",
+    backgroundColor: 'rgba(244, 67, 54, 0.3)',
     borderRadius: 2,
   },
   diffModeLabel: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: '500',
     color: themeColors.text.muted,
   },
   diffModeLabelActive: {
@@ -852,8 +829,8 @@ const styles = StyleSheet.create({
 
   // Navigation Row (for clickable settings that navigate)
   navRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
   },
   navRowContent: {
@@ -867,28 +844,28 @@ const styles = StyleSheet.create({
 
   // Sign Out
   signOutButton: {
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#ff4444",
+    borderColor: '#ff4444',
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
   },
   signOutText: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#ff4444",
+    fontWeight: '600',
+    color: '#ff4444',
   },
 
   // Footer
   footer: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingTop: 40,
     paddingBottom: 20,
   },
   footerText: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     color: themeColors.text.muted,
     marginBottom: 4,
   },
@@ -911,7 +888,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: themeColors.border.subtle,
     padding: 2,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
   toggleActive: {
     backgroundColor: themeColors.accent.primary,
@@ -924,7 +901,7 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.text.muted,
   },
   toggleThumbActive: {
-    backgroundColor: "#ffffff",
-    alignSelf: "flex-end",
+    backgroundColor: '#ffffff',
+    alignSelf: 'flex-end',
   },
 });

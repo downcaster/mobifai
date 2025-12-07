@@ -1,4 +1,4 @@
-import { TerminalAction } from '../components/KeyCombinationModal';
+import {TerminalAction} from '../components/KeyCombinationModal';
 
 export interface SavedCombination {
   id: string;
@@ -7,4 +7,3 @@ export interface SavedCombination {
 }
 
 export const SAVED_COMBINATIONS_KEY = '@mobifai_saved_combinations';
-

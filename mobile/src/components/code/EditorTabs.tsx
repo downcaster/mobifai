@@ -1,25 +1,19 @@
-import React from "react";
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Text,
-} from "react-native";
+import React from 'react';
+import {View, TouchableOpacity, StyleSheet, ScrollView, Text} from 'react-native';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
-  background: "#0a0a0f",
-  surface: "#12121a",
-  surfaceElevated: "#1a1a25",
-  border: "#2a2a3a",
-  primary: "#6200EE",
-  primaryLight: "#BB86FC",
-  secondary: "#03DAC6",
+  background: '#0a0a0f',
+  surface: '#12121a',
+  surfaceElevated: '#1a1a25',
+  border: '#2a2a3a',
+  primary: '#6200EE',
+  primaryLight: '#BB86FC',
+  secondary: '#03DAC6',
   text: {
-    primary: "#ffffff",
-    secondary: "#8888aa",
-    disabled: "#555566",
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    disabled: '#555566',
   },
 };
 
@@ -58,8 +52,7 @@ export function EditorTabs({
         horizontal
         style={styles.container}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
-      >
+        contentContainerStyle={styles.contentContainer}>
         {files.map((file, index) => {
           const isActive = activeFile === file.path;
           const isFirst = index === 0;
@@ -71,22 +64,19 @@ export function EditorTabs({
                 styles.tab,
                 isActive ? styles.tabActive : styles.tabInactive,
                 isFirst && styles.tabFirst,
-              ]}
-            >
+              ]}>
               <TouchableOpacity
                 style={styles.tabButton}
                 onPress={() => onSelectFile(file.path)}
-                activeOpacity={0.7}
-              >
+                activeOpacity={0.7}>
                 {file.isDirty && <View style={styles.dirtyIndicator} />}
                 <Text
                   style={[
                     styles.tabName,
                     isActive && styles.tabNameActive,
-                    { fontSize: fontSize }, // Apply dynamic font size
+                    {fontSize: fontSize}, // Apply dynamic font size
                   ]}
-                  numberOfLines={1}
-                >
+                  numberOfLines={1}>
                   {file.name}
                 </Text>
               </TouchableOpacity>
@@ -95,13 +85,8 @@ export function EditorTabs({
                 style={styles.closeButton}
                 onPress={() => onCloseFile(file.path)}
                 activeOpacity={0.7}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Text
-                  style={[styles.closeIcon, isActive && styles.closeIconActive]}
-                >
-                  ×
-                </Text>
+                hitSlop={{top: 8, right: 8, bottom: 8, left: 8}}>
+                <Text style={[styles.closeIcon, isActive && styles.closeIconActive]}>×</Text>
               </TouchableOpacity>
             </View>
           );
@@ -117,7 +102,7 @@ const TAB_HEIGHT = 36;
 
 const styles = StyleSheet.create({
   wrapper: {
-    flexDirection: "row",
+    flexDirection: 'row',
     backgroundColor: darkTheme.background,
   },
   container: {
@@ -126,15 +111,15 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   contentContainer: {
-    alignItems: "flex-end", // Align tabs to bottom
+    alignItems: 'flex-end', // Align tabs to bottom
   },
   emptyContainer: {
     backgroundColor: darkTheme.background,
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
     height: TAB_HEIGHT,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyText: {
     fontSize: 12,
@@ -147,8 +132,8 @@ const styles = StyleSheet.create({
     borderBottomColor: darkTheme.border,
   },
   tab: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     height: TAB_HEIGHT,
     paddingLeft: 12,
     paddingRight: 4,
@@ -168,26 +153,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0, // No bottom border - connected to content
   },
   tabInactive: {
-    backgroundColor: "#06060a", // Even darker than background for inactive tabs
+    backgroundColor: '#06060a', // Even darker than background for inactive tabs
     borderBottomWidth: 1,
     borderBottomColor: darkTheme.border,
   },
   tabButton: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
   },
   tabName: {
     fontSize: 13,
     color: darkTheme.text.secondary,
-    fontWeight: "500",
+    fontWeight: '500',
     flex: 1,
     minWidth: 40,
   },
   tabNameActive: {
     color: darkTheme.text.primary, // White text for active
-    fontWeight: "600",
+    fontWeight: '600',
   },
   dirtyIndicator: {
     width: 6,
@@ -199,14 +184,14 @@ const styles = StyleSheet.create({
   closeButton: {
     width: 22,
     height: 22,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 4,
   },
   closeIcon: {
     fontSize: 16,
     color: darkTheme.text.disabled,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   closeIconActive: {
     color: darkTheme.text.secondary,

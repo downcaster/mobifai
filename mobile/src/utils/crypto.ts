@@ -1,8 +1,8 @@
-import crypto from "react-native-quick-crypto";
-import { ec as EC } from "elliptic";
-import { Buffer } from "buffer";
+import crypto from 'react-native-quick-crypto';
+import {ec as EC} from 'elliptic';
+import {Buffer} from 'buffer';
 
-const ec = new EC("secp256k1");
+const ec = new EC('secp256k1');
 
 export interface KeyPair {
   publicKey: string;
@@ -19,11 +19,11 @@ export function generateKeyPair(): KeyPair {
     const key = ec.keyFromPrivate(privateKeyBytes);
 
     return {
-      publicKey: key.getPublic("hex"),
-      privateKey: key.getPrivate("hex"),
+      publicKey: key.getPublic('hex'),
+      privateKey: key.getPrivate('hex'),
     };
   } catch (error) {
-    console.error("❌ Error generating key pair:", error);
+    console.error('❌ Error generating key pair:', error);
     throw error;
   }
 }
@@ -31,12 +31,9 @@ export function generateKeyPair(): KeyPair {
 /**
  * Derive shared secret from peer's public key
  */
-export function deriveSharedSecret(
-  privateKey: string,
-  peerPublicKey: string
-): Buffer {
-  const key = ec.keyFromPrivate(privateKey, "hex");
-  const shared = key.derive(ec.keyFromPublic(peerPublicKey, "hex").getPublic());
+export function deriveSharedSecret(privateKey: string, peerPublicKey: string): Buffer {
+  const key = ec.keyFromPrivate(privateKey, 'hex');
+  const shared = key.derive(ec.keyFromPublic(peerPublicKey, 'hex').getPublic());
   // @ts-ignore - BN type definition might be missing toArrayLike in some versions, but it exists
   return Buffer.from(shared.toArray());
 }
@@ -45,9 +42,9 @@ export function deriveSharedSecret(
  * Sign a challenge with shared secret
  */
 export function signChallenge(challenge: string, sharedSecret: Buffer): string {
-  const hmac = crypto.createHmac("sha256", sharedSecret);
+  const hmac = crypto.createHmac('sha256', sharedSecret);
   hmac.update(challenge);
-  return hmac.digest("hex") as string;
+  return hmac.digest('hex') as string;
 }
 
 /**
@@ -56,13 +53,13 @@ export function signChallenge(challenge: string, sharedSecret: Buffer): string {
 export function verifyChallenge(
   challenge: string,
   signature: string,
-  sharedSecret: Buffer
+  sharedSecret: Buffer,
 ): boolean {
   const expectedSignature = signChallenge(challenge, sharedSecret);
   // @ts-ignore
   return crypto.timingSafeEqual(
-    Buffer.from(signature, "hex"),
-    Buffer.from(expectedSignature, "hex")
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex'),
   );
 }
 
@@ -70,5 +67,5 @@ export function verifyChallenge(
  * Generate random challenge for handshake
  */
 export function generateChallenge(): string {
-  return crypto.randomBytes(32).toString("hex") as string;
+  return crypto.randomBytes(32).toString('hex') as string;
 }

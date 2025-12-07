@@ -118,7 +118,7 @@ let healthCheckInterval: NodeJS.Timeout | null = null;
  */
 function sendToClient(type: string, payload: unknown): void {
   const message = JSON.stringify({ type, payload });
-  
+
   if (isWebRTCConnected && dataChannel?.readyState === "open") {
     try {
       dataChannel.send(message);
@@ -135,17 +135,25 @@ function sendToClient(type: string, payload: unknown): void {
  */
 function performHealthCheck(): void {
   const stats = processManager.getMemoryStats();
-  
+
   console.log(chalk.gray("\n💓 Health Check"));
-  console.log(chalk.gray(`   Memory: ${stats.heapUsedMB}MB / ${stats.heapTotalMB}MB`));
+  console.log(
+    chalk.gray(`   Memory: ${stats.heapUsedMB}MB / ${stats.heapTotalMB}MB`)
+  );
   console.log(chalk.gray(`   Processes: ${stats.processCount}`));
-  console.log(chalk.gray(`   Buffer Size: ${Math.round(stats.totalBufferSize / 1024)}KB`));
-  console.log(chalk.gray(`   WebRTC: ${isWebRTCConnected ? "Connected" : "Disconnected"}`));
-  
+  console.log(
+    chalk.gray(`   Buffer Size: ${Math.round(stats.totalBufferSize / 1024)}KB`)
+  );
+  console.log(
+    chalk.gray(`   WebRTC: ${isWebRTCConnected ? "Connected" : "Disconnected"}`)
+  );
+
   // Warn if memory usage is high
   if (stats.heapUsedMB > 512) {
-    console.log(chalk.yellow(`⚠️  High memory usage detected: ${stats.heapUsedMB}MB`));
-    
+    console.log(
+      chalk.yellow(`⚠️  High memory usage detected: ${stats.heapUsedMB}MB`)
+    );
+
     // Force garbage collection if available
     if (global.gc) {
       console.log(chalk.gray("   Running garbage collection..."));
@@ -162,7 +170,7 @@ function startHealthMonitoring(): void {
   healthCheckInterval = setInterval(() => {
     performHealthCheck();
   }, 10 * 60 * 1000);
-  
+
   console.log(chalk.gray("✅ Health monitoring started"));
 }
 
@@ -177,19 +185,25 @@ function setupProcessManagerCallbacks(): void {
     if (activeProcess && activeProcess.uuid === uuid) {
       getAIService().updateScreenBuffer(data);
     }
-    
+
     // Debug: log output being sent
     if (config.DEBUG) {
-      console.log(chalk.gray(`→ Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`));
+      console.log(
+        chalk.gray(
+          `→ Sending output from ${uuid.substring(0, 8)} (${data.length} chars)`
+        )
+      );
     }
-    
+
     // Send output to iOS with uuid
     sendToClient("terminal:output", { uuid, data });
   });
 
   // Handle process exit
   processManager.onExit((uuid) => {
-    console.log(chalk.gray(`Process ${uuid.substring(0, 8)} exited, notifying iOS`));
+    console.log(
+      chalk.gray(`Process ${uuid.substring(0, 8)} exited, notifying iOS`)
+    );
     sendToClient("process:exited", { uuid });
   });
 }
@@ -199,93 +213,124 @@ function setupProcessManagerCallbacks(): void {
  */
 function setupOpenFilesManagerCallbacks(): void {
   console.log(chalk.cyan(`🔧 Setting up OpenFilesManager callbacks...`));
-  
+
   // Track last sent content per file to avoid duplicate sends
   const lastSentContent = new Map<string, string>();
-  
+
   // Handle file updates from file watcher
   openFilesManager.onFileUpdate(async (filePath, content) => {
-    console.log(chalk.bold.cyan(`📝 File updated from watcher: ${path.basename(filePath)}`));
-    
+    console.log(
+      chalk.bold.cyan(
+        `📝 File updated from watcher: ${path.basename(filePath)}`
+      )
+    );
+
     // Check if content actually changed from what we last sent
     const previousContent = lastSentContent.get(filePath);
     const contentChanged = content !== previousContent;
-    
+
     if (contentChanged) {
       console.log(chalk.gray(`   Content changed, sending to iOS...`));
       sendToClient("code:fileUpdated", { filePath, content });
       lastSentContent.set(filePath, content);
       console.log(chalk.green(`   ✅ Sent content to iOS`));
     } else {
-      console.log(chalk.yellow(`   ⚠️ Content unchanged from last send, skipping`));
+      console.log(
+        chalk.yellow(`   ⚠️ Content unchanged from last send, skipping`)
+      );
     }
-    
+
     // Always compute and send updated diff (even if content didn't change from our perspective,
     // the diff might have changed due to git operations)
     try {
       console.log(chalk.gray(`   Computing updated diff...`));
       const diff = await codeManager.getFileDiff(filePath);
-      
+
       // ALWAYS send the diff, even if there are no changes
       // iOS needs to know when to clear the diff highlights
       sendToClient("code:fileDiff", diff);
-      
+
       if (diff.hasChanges) {
-        console.log(chalk.green(`   ✅ Sent updated diff to iOS (added=${diff.addedLines.length}, deleted=${diff.deletedLines.length})`));
+        console.log(
+          chalk.green(
+            `   ✅ Sent updated diff to iOS (added=${diff.addedLines.length}, deleted=${diff.deletedLines.length})`
+          )
+        );
       } else {
-        console.log(chalk.gray(`   ✅ Sent empty diff to iOS (file back to original state)`));
+        console.log(
+          chalk.gray(
+            `   ✅ Sent empty diff to iOS (file back to original state)`
+          )
+        );
       }
     } catch (error: any) {
       console.error(chalk.red(`   ❌ Failed to compute diff:`, error.message));
     }
   });
-  
+
   console.log(chalk.green(`✅ OpenFilesManager callbacks set up`));
 }
 
 function setupGitWatcherCallbacks(): void {
   console.log(chalk.cyan(`🔧 Setting up GitWatcher callbacks...`));
-  
+
   // Handle git changes detected
   gitWatcher.onChanges((projectPath, changes) => {
-    console.log(chalk.bold.cyan(`📝 Git changes detected: ${path.basename(projectPath)}`));
-    console.log(chalk.gray(`   Staged: ${changes.staged.length}, Unstaged: ${changes.unstaged.length}`));
-    
+    console.log(
+      chalk.bold.cyan(`📝 Git changes detected: ${path.basename(projectPath)}`)
+    );
+    console.log(
+      chalk.gray(
+        `   Staged: ${changes.staged.length}, Unstaged: ${changes.unstaged.length}`
+      )
+    );
+
     // Send to iOS
     sendToClient("code:projectChanges", {
       projectPath,
       staged: changes.staged,
       unstaged: changes.unstaged,
     });
-    
+
     console.log(chalk.green(`   ✅ Sent project changes to iOS`));
   });
-  
+
   console.log(chalk.green(`✅ GitWatcher callbacks set up`));
 }
 
 /**
  * Handle process:create command from iOS
  */
-async function handleProcessCreate(payload: ProcessCreatePayload): Promise<void> {
+async function handleProcessCreate(
+  payload: ProcessCreatePayload
+): Promise<void> {
   const { uuid, name, cols = terminalCols, rows = terminalRows } = payload;
-  
-  console.log(chalk.cyan(`[iOS] Process creation: ${uuid.substring(0, 8)} "${name || 'unnamed'}"`));
-  
-  const processInfo = await processManager.createProcess(uuid, cols, rows, name);
-  
+
+  console.log(
+    chalk.cyan(
+      `[iOS] Process creation: ${uuid.substring(0, 8)} "${name || "unnamed"}"`
+    )
+  );
+
+  const processInfo = await processManager.createProcess(
+    uuid,
+    cols,
+    rows,
+    name
+  );
+
   if (processInfo) {
     // Set this process as the only active one
     await processManager.switchActiveProcesses([uuid]);
-    
+
     // Update AI service with the new terminal
     const aiService = getAIService();
     aiService.setTerminal(processInfo.pty);
     aiService.setDimensions(cols, rows);
-    
+
     // Notify iOS that process was created (include the name that was assigned)
     sendToClient("process:created", { uuid, name: processInfo.name });
-    
+
     // Send system ready message (for first process)
     if (processManager.getProcessCount() === 1) {
       socket.emit("system:message", { type: "terminal_ready" });
@@ -298,13 +343,17 @@ async function handleProcessCreate(payload: ProcessCreatePayload): Promise<void>
 /**
  * Handle process:rename command from iOS
  */
-async function handleProcessRename(payload: ProcessRenamePayload): Promise<void> {
+async function handleProcessRename(
+  payload: ProcessRenamePayload
+): Promise<void> {
   const { uuid, name } = payload;
-  
-  console.log(chalk.cyan(`[iOS] Process rename: ${uuid.substring(0, 8)} -> "${name}"`));
-  
+
+  console.log(
+    chalk.cyan(`[iOS] Process rename: ${uuid.substring(0, 8)} -> "${name}"`)
+  );
+
   const success = await processManager.renameProcess(uuid, name);
-  
+
   if (success) {
     sendToClient("process:renamed", { uuid, name });
   } else {
@@ -315,30 +364,43 @@ async function handleProcessRename(payload: ProcessRenamePayload): Promise<void>
 /**
  * Handle process:terminate command from iOS
  */
-async function handleProcessTerminate(payload: ProcessTerminatePayload): Promise<void> {
+async function handleProcessTerminate(
+  payload: ProcessTerminatePayload
+): Promise<void> {
   const { uuid } = payload;
-  
+
   console.log(chalk.cyan(`[iOS] Process termination: ${uuid.substring(0, 8)}`));
-  
+
   const success = await processManager.terminateProcess(uuid);
-  
+
   if (success) {
     sendToClient("process:terminated", { uuid });
   } else {
-    sendToClient("process:error", { uuid, error: "Failed to terminate process" });
+    sendToClient("process:error", {
+      uuid,
+      error: "Failed to terminate process",
+    });
   }
 }
 
 /**
  * Handle process:switch command from iOS
  */
-async function handleProcessSwitch(payload: ProcessSwitchPayload): Promise<void> {
+async function handleProcessSwitch(
+  payload: ProcessSwitchPayload
+): Promise<void> {
   const { activeUuids } = payload;
-  
-  console.log(chalk.cyan(`[iOS] Process switch: ${activeUuids.map(u => u.substring(0, 8)).join(", ")}`));
-  
+
+  console.log(
+    chalk.cyan(
+      `[iOS] Process switch: ${activeUuids
+        .map((u) => u.substring(0, 8))
+        .join(", ")}`
+    )
+  );
+
   const snapshots = await processManager.switchActiveProcesses(activeUuids);
-  
+
   // Update AI service with the first active terminal
   const activeProcess = processManager.getFirstActiveProcess();
   if (activeProcess) {
@@ -346,7 +408,7 @@ async function handleProcessSwitch(payload: ProcessSwitchPayload): Promise<void>
     aiService.setTerminal(activeProcess.pty);
     aiService.setDimensions(activeProcess.cols, activeProcess.rows);
   }
-  
+
   // Send screen snapshots for all newly active processes
   for (const [uuid, screenData] of snapshots) {
     sendToClient("process:screen", { uuid, data: screenData });
@@ -386,13 +448,12 @@ interface TerminalActionsPayload {
 
 function handleTerminalActions(payload: TerminalActionsPayload): void {
   const { uuid, actions } = payload;
-  
+
   console.log(
     chalk.cyan(
-      `\n⌨️  Processing ${actions.length} action(s) for process ${uuid.substring(
-        0,
-        8
-      )}`
+      `\n⌨️  Processing ${
+        actions.length
+      } action(s) for process ${uuid.substring(0, 8)}`
     )
   );
 
@@ -415,10 +476,10 @@ function handleTerminalActions(payload: TerminalActionsPayload): void {
  */
 function handleTerminalResize(payload: TerminalResizePayload): void {
   const { uuid, cols, rows } = payload;
-  
+
   terminalCols = cols;
   terminalRows = rows;
-  
+
   if (uuid) {
     // Resize specific process
     processManager.resizeProcess(uuid, cols, rows);
@@ -426,7 +487,7 @@ function handleTerminalResize(payload: TerminalResizePayload): void {
     // Resize all processes (legacy behavior)
     processManager.resizeAll(cols, rows);
   }
-  
+
   // Update AI service dimensions
   getAIService().setDimensions(cols, rows);
 }
@@ -496,12 +557,16 @@ async function setupWebRTC() {
     channel.onopen = () => {
       console.log(chalk.green("✅ WebRTC data channel opened"));
       isWebRTCConnected = true;
-      
+
       // Small delay to ensure iOS data channel is fully ready to receive
       setTimeout(() => {
         // Always send processes:sync via WebRTC (even if empty) so iOS knows sync is complete
         const existingProcesses = processManager.getProcessSyncData();
-        console.log(chalk.cyan(`→ Sending processes:sync via WebRTC (${existingProcesses.length} processes)`));
+        console.log(
+          chalk.cyan(
+            `→ Sending processes:sync via WebRTC (${existingProcesses.length} processes)`
+          )
+        );
         const syncPayload = {
           processes: existingProcesses,
           activeUuids: processManager.getActiveProcessIds(),
@@ -561,24 +626,24 @@ async function setupWebRTC() {
 /**
  * Handle messages from WebRTC data channel
  */
-function handleWebRTCMessage(message: { 
-  type?: string; 
+function handleWebRTCMessage(message: {
+  type?: string;
   payload?: unknown;
   namespace?: string;
   action?: string;
 }): void {
   // Check for new namespace format first
   if (message.namespace && message.action) {
-    if (message.namespace === 'code') {
+    if (message.namespace === "code") {
       handleCodeMessage(message.action, message.payload);
       return;
-    } else if (message.namespace === 'terminal') {
+    } else if (message.namespace === "terminal") {
       // Route to terminal handlers using action
       handleTerminalMessage(message.action, message.payload);
       return;
     }
   }
-  
+
   // Fallback to legacy type-based routing for backward compatibility
   if (message.type) {
     switch (message.type) {
@@ -605,7 +670,11 @@ function handleWebRTCMessage(message: {
         break;
       case "ai:prompt":
         const aiPayload = message.payload as AIPromptPayload;
-        console.log(chalk.cyan(`\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`));
+        console.log(
+          chalk.cyan(
+            `\n🤖 AI Prompt received via WebRTC: "${aiPayload.prompt}"`
+          )
+        );
         handleAIPrompt(aiPayload.prompt, aiPayload.uuid);
         break;
       default:
@@ -655,7 +724,7 @@ function handleTerminalMessage(action: string, payload: unknown): void {
  */
 function handleCodeMessage(action: string, payload: unknown): void {
   console.log(chalk.cyan(`📝 Code action: ${action}`));
-  
+
   try {
     switch (action) {
       case "initProject":
@@ -683,10 +752,14 @@ function handleCodeMessage(action: string, payload: unknown): void {
         handleCodeOpenCurrentDir(payload as { uuid: string });
         break;
       case "createFile":
-        handleCodeCreateFile(payload as { folderPath: string; fileName: string });
+        handleCodeCreateFile(
+          payload as { folderPath: string; fileName: string }
+        );
         break;
       case "createFolder":
-        handleCodeCreateFolder(payload as { parentPath: string; folderName: string });
+        handleCodeCreateFolder(
+          payload as { parentPath: string; folderName: string }
+        );
         break;
       case "renameItem":
         handleCodeRenameItem(payload as { oldPath: string; newName: string });
@@ -701,7 +774,9 @@ function handleCodeMessage(action: string, payload: unknown): void {
         handleCodeGetProjectChanges(payload as { projectPath: string });
         break;
       case "openFile":
-        handleCodeOpenFile(payload as { projectPath: string; filePath: string });
+        handleCodeOpenFile(
+          payload as { projectPath: string; filePath: string }
+        );
         break;
       case "closeFile":
         handleCodeCloseFile(payload as { filePath: string });
@@ -718,10 +793,10 @@ function handleCodeMessage(action: string, payload: unknown): void {
     }
   } catch (error: any) {
     console.error(chalk.red(`❌ Code action failed: ${action}`), error);
-    sendToClient("code:error", { 
-      action, 
+    sendToClient("code:error", {
+      action,
       error: error.message || "Unknown error",
-      details: error.stack 
+      details: error.stack,
     });
   }
 }
@@ -729,10 +804,12 @@ function handleCodeMessage(action: string, payload: unknown): void {
 /**
  * Handle code.initProject
  */
-async function handleCodeInitProject(payload: { projectPath: string }): Promise<void> {
+async function handleCodeInitProject(payload: {
+  projectPath: string;
+}): Promise<void> {
   const result = await codeManager.initProject(payload.projectPath);
   sendToClient("code:projectInitialized", result);
-  
+
   // Start watching for git changes in this project
   gitWatcher.startWatching(payload.projectPath);
 }
@@ -748,13 +825,20 @@ function handleCodeGetFolderChildren(payload: { folderPath: string }): void {
 /**
  * Handle code.getFile
  */
-async function handleCodeGetFile(payload: { filePath: string; projectPath?: string }): Promise<void> {
-  console.log(chalk.cyan(`📄 Getting file: ${path.basename(payload.filePath)}`));
+async function handleCodeGetFile(payload: {
+  filePath: string;
+  projectPath?: string;
+}): Promise<void> {
+  console.log(
+    chalk.cyan(`📄 Getting file: ${path.basename(payload.filePath)}`)
+  );
   console.log(chalk.gray(`   Full path: ${payload.filePath}`));
-  console.log(chalk.gray(`   Project path: ${payload.projectPath || 'not provided'}`));
-  
+  console.log(
+    chalk.gray(`   Project path: ${payload.projectPath || "not provided"}`)
+  );
+
   const result = codeManager.getFile(payload.filePath);
-  
+
   // Also register the file with OpenFilesManager if projectPath is provided
   if (payload.projectPath && result.content) {
     try {
@@ -764,24 +848,33 @@ async function handleCodeGetFile(payload: { filePath: string; projectPath?: stri
       console.warn(chalk.yellow(`  ⚠️ Failed to register file:`, error));
     }
   } else if (!payload.projectPath) {
-    console.log(chalk.yellow(`  ⚠️ No projectPath provided - file won't be tracked or watched`));
+    console.log(
+      chalk.yellow(
+        `  ⚠️ No projectPath provided - file won't be tracked or watched`
+      )
+    );
   }
-  
+
   sendToClient("code:fileContent", result);
-  console.log(chalk.gray(`  📤 Sent content to iOS (${result.content.length} bytes)`));
+  console.log(
+    chalk.gray(`  📤 Sent content to iOS (${result.content.length} bytes)`)
+  );
 }
 
 /**
  * Handle code.saveFile
  */
-function handleCodeSaveFile(payload: { filePath: string; newContent: string }): void {
+function handleCodeSaveFile(payload: {
+  filePath: string;
+  newContent: string;
+}): void {
   try {
     const result = codeManager.saveFile(payload.filePath, payload.newContent);
     sendToClient("code:fileSaved", result);
   } catch (error: any) {
     sendToClient("code:fileSaveError", {
       filePath: payload.filePath,
-      error: error.message || "Save failed"
+      error: error.message || "Save failed",
     });
   }
 }
@@ -791,10 +884,10 @@ function handleCodeSaveFile(payload: { filePath: string; newContent: string }): 
  */
 function handleCodeCloseProject(payload: { projectPath: string }): void {
   codeManager.closeProject(payload.projectPath);
-  
+
   // Stop watching for git changes
   gitWatcher.stopWatching(payload.projectPath);
-  
+
   sendToClient("code:projectClosed", { projectPath: payload.projectPath });
 }
 
@@ -809,42 +902,67 @@ async function handleCodeGetProjectsHistory(): Promise<void> {
 /**
  * Handle code.removeFromHistory
  */
-async function handleCodeRemoveFromHistory(payload: { projectPath: string }): Promise<void> {
-  console.log(chalk.cyan(`🗑️  Removing from history: ${path.basename(payload.projectPath)}`));
+async function handleCodeRemoveFromHistory(payload: {
+  projectPath: string;
+}): Promise<void> {
+  console.log(
+    chalk.cyan(
+      `🗑️  Removing from history: ${path.basename(payload.projectPath)}`
+    )
+  );
   const success = await codeManager.removeFromHistory(payload.projectPath);
   if (success) {
-    sendToClient("code:projectRemovedFromHistory", { projectPath: payload.projectPath });
+    sendToClient("code:projectRemovedFromHistory", {
+      projectPath: payload.projectPath,
+    });
   } else {
-    sendToClient("code:error", { action: "removeFromHistory", error: "Failed to remove project" });
+    sendToClient("code:error", {
+      action: "removeFromHistory",
+      error: "Failed to remove project",
+    });
   }
 }
 
 /**
  * Handle code.openCurrentDir - get current directory from a process and init as project
  */
-async function handleCodeOpenCurrentDir(payload: { uuid: string }): Promise<void> {
+async function handleCodeOpenCurrentDir(payload: {
+  uuid: string;
+}): Promise<void> {
   const { uuid } = payload;
-  
-  console.log(chalk.cyan(`📂 Opening current directory for process ${uuid.substring(0, 8)}`));
-  
+
+  console.log(
+    chalk.cyan(
+      `📂 Opening current directory for process ${uuid.substring(0, 8)}`
+    )
+  );
+
   // Get the process's current working directory
   const processInfo = processManager.getProcess(uuid);
   if (!processInfo) {
     console.log(chalk.yellow(`⚠️ Process ${uuid.substring(0, 8)} not found`));
-    sendToClient("code:error", { action: "openCurrentDir", error: "Process not found" });
+    sendToClient("code:error", {
+      action: "openCurrentDir",
+      error: "Process not found",
+    });
     return;
   }
-  
+
   // Get the cwd from the process
   const cwd = processInfo.cwd;
   if (!cwd) {
-    console.log(chalk.yellow(`⚠️ No cwd available for process ${uuid.substring(0, 8)}`));
-    sendToClient("code:error", { action: "openCurrentDir", error: "Could not determine current directory" });
+    console.log(
+      chalk.yellow(`⚠️ No cwd available for process ${uuid.substring(0, 8)}`)
+    );
+    sendToClient("code:error", {
+      action: "openCurrentDir",
+      error: "Could not determine current directory",
+    });
     return;
   }
-  
+
   console.log(chalk.cyan(`  └─ Current directory: ${cwd}`));
-  
+
   // Initialize the project (this also adds to history) - now async!
   try {
     const result = await codeManager.initProject(cwd);
@@ -852,14 +970,20 @@ async function handleCodeOpenCurrentDir(payload: { uuid: string }): Promise<void
     sendToClient("code:currentDirOpened", { projectPath: cwd }); // Also send this for iOS navigation
   } catch (error: any) {
     console.error(chalk.red(`❌ Failed to init project: ${error.message}`));
-    sendToClient("code:error", { action: "openCurrentDir", error: error.message });
+    sendToClient("code:error", {
+      action: "openCurrentDir",
+      error: error.message,
+    });
   }
 }
 
 /**
  * Handle code.createFile
  */
-function handleCodeCreateFile(payload: { folderPath: string; fileName: string }): void {
+function handleCodeCreateFile(payload: {
+  folderPath: string;
+  fileName: string;
+}): void {
   try {
     const result = codeManager.createFile(payload.folderPath, payload.fileName);
     // Also return updated folder children so UI can refresh
@@ -872,7 +996,7 @@ function handleCodeCreateFile(payload: { folderPath: string; fileName: string })
     sendToClient("code:createFileError", {
       folderPath: payload.folderPath,
       fileName: payload.fileName,
-      error: error.message || "Create failed"
+      error: error.message || "Create failed",
     });
   }
 }
@@ -880,9 +1004,15 @@ function handleCodeCreateFile(payload: { folderPath: string; fileName: string })
 /**
  * Handle code.createFolder
  */
-function handleCodeCreateFolder(payload: { parentPath: string; folderName: string }): void {
+function handleCodeCreateFolder(payload: {
+  parentPath: string;
+  folderName: string;
+}): void {
   try {
-    const result = codeManager.createFolder(payload.parentPath, payload.folderName);
+    const result = codeManager.createFolder(
+      payload.parentPath,
+      payload.folderName
+    );
     // Also return updated parent folder children so UI can refresh
     const folderChildren = codeManager.getFolderChildren(payload.parentPath);
     sendToClient("code:folderCreated", {
@@ -893,7 +1023,7 @@ function handleCodeCreateFolder(payload: { parentPath: string; folderName: strin
     sendToClient("code:createFolderError", {
       parentPath: payload.parentPath,
       folderName: payload.folderName,
-      error: error.message || "Create failed"
+      error: error.message || "Create failed",
     });
   }
 }
@@ -901,7 +1031,10 @@ function handleCodeCreateFolder(payload: { parentPath: string; folderName: strin
 /**
  * Handle code.renameItem
  */
-function handleCodeRenameItem(payload: { oldPath: string; newName: string }): void {
+function handleCodeRenameItem(payload: {
+  oldPath: string;
+  newName: string;
+}): void {
   try {
     const result = codeManager.renameItem(payload.oldPath, payload.newName);
     // Also return updated parent folder children so UI can refresh
@@ -913,7 +1046,7 @@ function handleCodeRenameItem(payload: { oldPath: string; newName: string }): vo
   } catch (error: any) {
     sendToClient("code:renameError", {
       path: payload.oldPath,
-      error: error.message || "Rename failed"
+      error: error.message || "Rename failed",
     });
   }
 }
@@ -933,7 +1066,7 @@ function handleCodeDeleteItem(payload: { itemPath: string }): void {
   } catch (error: any) {
     sendToClient("code:deleteError", {
       path: payload.itemPath,
-      error: error.message || "Delete failed"
+      error: error.message || "Delete failed",
     });
   }
 }
@@ -941,17 +1074,23 @@ function handleCodeDeleteItem(payload: { itemPath: string }): void {
 /**
  * Handle code.getFileDiff
  */
-async function handleCodeGetFileDiff(payload: { filePath: string }): Promise<void> {
+async function handleCodeGetFileDiff(payload: {
+  filePath: string;
+}): Promise<void> {
   console.log(chalk.cyan(`📊 Getting diff for file: ${payload.filePath}`));
   try {
     const diff = await codeManager.getFileDiff(payload.filePath);
-    console.log(chalk.green(`✅ Diff computed: added=${diff.addedLines.length}, deleted=${diff.deletedLines.length}, modified=${diff.modifiedLines.length}`));
+    console.log(
+      chalk.green(
+        `✅ Diff computed: added=${diff.addedLines.length}, deleted=${diff.deletedLines.length}, modified=${diff.modifiedLines.length}`
+      )
+    );
     sendToClient("code:fileDiff", diff);
   } catch (error: any) {
     console.error(chalk.red(`❌ Diff error: ${error.message}`));
     sendToClient("code:fileDiffError", {
       filePath: payload.filePath,
-      error: error.message || "Failed to get diff"
+      error: error.message || "Failed to get diff",
     });
   }
 }
@@ -959,7 +1098,9 @@ async function handleCodeGetFileDiff(payload: { filePath: string }): Promise<voi
 /**
  * Handle code.getProjectChanges - get git status for a project
  */
-async function handleCodeGetProjectChanges(payload: { projectPath: string }): Promise<void> {
+async function handleCodeGetProjectChanges(payload: {
+  projectPath: string;
+}): Promise<void> {
   console.log(chalk.cyan(`🔄 Getting project changes: ${payload.projectPath}`));
   try {
     const changes = await codeManager.getProjectChanges(payload.projectPath);
@@ -971,7 +1112,7 @@ async function handleCodeGetProjectChanges(payload: { projectPath: string }): Pr
     console.error(chalk.red(`❌ Project changes error: ${error.message}`));
     sendToClient("code:projectChangesError", {
       projectPath: payload.projectPath,
-      error: error.message || "Failed to get project changes"
+      error: error.message || "Failed to get project changes",
     });
   }
 }
@@ -979,10 +1120,16 @@ async function handleCodeGetProjectChanges(payload: { projectPath: string }): Pr
 /**
  * Handle code.openFile - open a file for editing
  */
-async function handleCodeOpenFile(payload: { projectPath: string; filePath: string }): Promise<void> {
+async function handleCodeOpenFile(payload: {
+  projectPath: string;
+  filePath: string;
+}): Promise<void> {
   console.log(chalk.cyan(`📂 Opening file: ${payload.filePath}`));
   try {
-    const content = await openFilesManager.openFile(payload.projectPath, payload.filePath);
+    const content = await openFilesManager.openFile(
+      payload.projectPath,
+      payload.filePath
+    );
     if (content !== null) {
       sendToClient("code:fileOpened", {
         filePath: payload.filePath,
@@ -991,14 +1138,14 @@ async function handleCodeOpenFile(payload: { projectPath: string; filePath: stri
     } else {
       sendToClient("code:fileOpenError", {
         filePath: payload.filePath,
-        error: "File not found or cannot be read"
+        error: "File not found or cannot be read",
       });
     }
   } catch (error: any) {
     console.error(chalk.red(`❌ Open file error: ${error.message}`));
     sendToClient("code:fileOpenError", {
       filePath: payload.filePath,
-      error: error.message || "Failed to open file"
+      error: error.message || "Failed to open file",
     });
   }
 }
@@ -1006,7 +1153,9 @@ async function handleCodeOpenFile(payload: { projectPath: string; filePath: stri
 /**
  * Handle code.closeFile - close an open file
  */
-async function handleCodeCloseFile(payload: { filePath: string }): Promise<void> {
+async function handleCodeCloseFile(payload: {
+  filePath: string;
+}): Promise<void> {
   console.log(chalk.cyan(`📁 Closing file: ${payload.filePath}`));
   try {
     await openFilesManager.closeFile(payload.filePath);
@@ -1015,7 +1164,7 @@ async function handleCodeCloseFile(payload: { filePath: string }): Promise<void>
     console.error(chalk.red(`❌ Close file error: ${error.message}`));
     sendToClient("code:fileCloseError", {
       filePath: payload.filePath,
-      error: error.message || "Failed to close file"
+      error: error.message || "Failed to close file",
     });
   }
 }
@@ -1023,8 +1172,12 @@ async function handleCodeCloseFile(payload: { filePath: string }): Promise<void>
 /**
  * Handle code.setActiveFile - set the currently active file and start watching
  */
-async function handleCodeSetActiveFile(payload: { filePath: string | null }): Promise<void> {
-  console.log(chalk.cyan(`👁️ Setting active file: ${payload.filePath || 'none'}`));
+async function handleCodeSetActiveFile(payload: {
+  filePath: string | null;
+}): Promise<void> {
+  console.log(
+    chalk.cyan(`👁️ Setting active file: ${payload.filePath || "none"}`)
+  );
   try {
     const content = await openFilesManager.setActiveFile(payload.filePath);
     sendToClient("code:activeFileSet", {
@@ -1035,7 +1188,7 @@ async function handleCodeSetActiveFile(payload: { filePath: string | null }): Pr
     console.error(chalk.red(`❌ Set active file error: ${error.message}`));
     sendToClient("code:activeFileError", {
       filePath: payload.filePath,
-      error: error.message || "Failed to set active file"
+      error: error.message || "Failed to set active file",
     });
   }
 }
@@ -1043,8 +1196,12 @@ async function handleCodeSetActiveFile(payload: { filePath: string | null }): Pr
 /**
  * Handle code.syncOpenFiles - sync open files state for a project
  */
-async function handleCodeSyncOpenFiles(payload: { projectPath: string }): Promise<void> {
-  console.log(chalk.cyan(`🔄 Syncing open files for project: ${payload.projectPath}`));
+async function handleCodeSyncOpenFiles(payload: {
+  projectPath: string;
+}): Promise<void> {
+  console.log(
+    chalk.cyan(`🔄 Syncing open files for project: ${payload.projectPath}`)
+  );
   try {
     const state = await openFilesManager.syncProject(payload.projectPath);
     sendToClient("code:openFilesSync", state);
@@ -1052,7 +1209,7 @@ async function handleCodeSyncOpenFiles(payload: { projectPath: string }): Promis
     console.error(chalk.red(`❌ Sync open files error: ${error.message}`));
     sendToClient("code:openFilesSyncError", {
       projectPath: payload.projectPath,
-      error: error.message || "Failed to sync open files"
+      error: error.message || "Failed to sync open files",
     });
   }
 }
@@ -1095,22 +1252,31 @@ async function handleAIPrompt(prompt: string, uuid?: string): Promise<void> {
   if (uuid) {
     targetProcess = processManager.getProcess(uuid);
     if (!targetProcess) {
-      console.log(chalk.yellow(`⚠️  Process ${uuid.substring(0, 8)} not found, falling back to first active`));
+      console.log(
+        chalk.yellow(
+          `⚠️  Process ${uuid.substring(
+            0,
+            8
+          )} not found, falling back to first active`
+        )
+      );
       targetProcess = processManager.getFirstActiveProcess();
     }
   } else {
     targetProcess = processManager.getFirstActiveProcess();
   }
-  
+
   if (!targetProcess) {
     console.log(chalk.red("❌ Cannot process AI prompt - no active terminal"));
     return;
   }
-  
-  console.log(chalk.gray(`   Targeting process: ${targetProcess.uuid.substring(0, 8)}`));
+
+  console.log(
+    chalk.gray(`   Targeting process: ${targetProcess.uuid.substring(0, 8)}`)
+  );
 
   const aiService = getAIService();
-  
+
   // Ensure AI service has the terminal reference
   aiService.setTerminal(targetProcess.pty);
 
@@ -1155,9 +1321,11 @@ async function connectToRelay() {
 
   // Restore processes
   if (processesToRestore.length > 0) {
-    console.log(chalk.cyan(`🔄 Restoring ${processesToRestore.length} terminal tab(s)...`));
+    console.log(
+      chalk.cyan(`🔄 Restoring ${processesToRestore.length} terminal tab(s)...`)
+    );
     const restoredUuids: string[] = [];
-    
+
     for (const proc of processesToRestore) {
       const restored = await processManager.createProcess(
         proc.uuid,
@@ -1165,20 +1333,24 @@ async function connectToRelay() {
         24, // Default rows
         proc.name
       );
-      
+
       if (restored) {
         // Try to restore working directory
         if (proc.cwd && proc.cwd !== process.env.HOME) {
           try {
             restored.pty.write(`cd "${proc.cwd}"\nclear\n`);
-            console.log(chalk.green(`  ✅ Restored "${proc.name}" at ${proc.cwd}`));
+            console.log(
+              chalk.green(`  ✅ Restored "${proc.name}" at ${proc.cwd}`)
+            );
           } catch (error) {
-            console.warn(chalk.yellow(`  ⚠️ Could not restore cwd for "${proc.name}"`));
+            console.warn(
+              chalk.yellow(`  ⚠️ Could not restore cwd for "${proc.name}"`)
+            );
           }
         } else {
           console.log(chalk.green(`  ✅ Restored "${proc.name}"`));
         }
-        
+
         if (proc.isActive) {
           restoredUuids.unshift(proc.uuid); // Active process first
         } else {
@@ -1186,12 +1358,12 @@ async function connectToRelay() {
         }
       }
     }
-    
+
     // Set active processes
     if (restoredUuids.length > 0) {
       await processManager.switchActiveProcesses(restoredUuids);
     }
-    
+
     // After iOS connects, we'll send the restored processes
     // This is handled in the pairing success handler
   }
@@ -1218,12 +1390,12 @@ async function connectToRelay() {
 
   socket.on("connect", () => {
     console.log(chalk.green("✅ Connected to relay server"));
-    
+
     // Start health monitoring on first connection
     if (!healthCheckInterval) {
       startHealthMonitoring();
     }
-    
+
     // Register as Mac device with public key and tab count
     socket.emit("register", {
       type: "mac",
@@ -1425,16 +1597,20 @@ async function connectToRelay() {
 
       // Always send processes:sync (even if empty) so iOS knows sync is complete
       const existingProcesses = processManager.getProcessSyncData();
-      console.log(chalk.cyan(`→ Syncing ${existingProcesses.length} process(es) to iOS via socket...`));
-      
+      console.log(
+        chalk.cyan(
+          `→ Syncing ${existingProcesses.length} process(es) to iOS via socket...`
+        )
+      );
+
       const syncPayload = {
         processes: existingProcesses,
         activeUuids: processManager.getActiveProcessIds(),
       };
-      
+
       // Send via socket as fallback (WebRTC will also send when connected)
       socket.emit("processes:sync", syncPayload);
-      
+
       if (existingProcesses.length > 0) {
         // Send terminal ready since we already have processes
         socket.emit("system:message", { type: "terminal_ready" });
@@ -1447,17 +1623,21 @@ async function connectToRelay() {
 
   socket.on("paired_device_disconnected", ({ message }) => {
     console.log(chalk.yellow(`\n⚠️  ${message}`));
-    
+
     // Check if WebRTC P2P is still active
     if (isWebRTCConnected && dataChannel?.readyState === "open") {
       console.log(chalk.yellow("⚠️  Relay disconnected, but P2P active"));
       return;
     }
-    
+
     // Close WebRTC connection but DON'T cleanup processes
     // Processes will persist for reconnection
-    console.log(chalk.cyan(`→ Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`));
-    
+    console.log(
+      chalk.cyan(
+        `→ Keeping ${processManager.getProcessCount()} process(es) alive for reconnection...`
+      )
+    );
+
     // Close WebRTC and clean up event listeners
     if (dataChannel) {
       try {
@@ -1470,7 +1650,7 @@ async function connectToRelay() {
       }
       dataChannel = null;
     }
-    
+
     if (peerConnection) {
       try {
         peerConnection.onicecandidate = null;
@@ -1483,12 +1663,12 @@ async function connectToRelay() {
     }
     isWebRTCConnected = false;
     pendingIceCandidates = [];
-    
+
     // Force garbage collection to clean up closed connections
     if (global.gc) {
       global.gc();
     }
-    
+
     // Re-register to wait for reconnection
     const token = getToken();
     socket.emit("register", {
@@ -1499,23 +1679,29 @@ async function connectToRelay() {
       publicKey: keyPair.publicKey,
       tabCount: processManager.getProcessCount(),
     });
-    
+
     console.log(chalk.cyan("⏳ Waiting for iOS to reconnect..."));
   });
 
   // WebRTC handlers
   socket.on("webrtc:answer", async ({ answer }) => {
     console.log(chalk.cyan("← Received WebRTC answer"));
-    
+
     if (!peerConnection) {
-      console.log(chalk.yellow("⚠️  No peer connection available, ignoring answer"));
+      console.log(
+        chalk.yellow("⚠️  No peer connection available, ignoring answer")
+      );
       return;
     }
 
     // Check signaling state to prevent setting answer in wrong state
     const signalingState = peerConnection.signalingState;
     if (signalingState !== "have-local-offer") {
-      console.log(chalk.yellow(`⚠️  Cannot set answer in state: ${signalingState} (expected: have-local-offer)`));
+      console.log(
+        chalk.yellow(
+          `⚠️  Cannot set answer in state: ${signalingState} (expected: have-local-offer)`
+        )
+      );
       return;
     }
 
@@ -1524,7 +1710,11 @@ async function connectToRelay() {
 
       // Add pending candidates
       if (pendingIceCandidates.length > 0) {
-        console.log(chalk.gray(`→ Adding ${pendingIceCandidates.length} pending ICE candidate(s)`));
+        console.log(
+          chalk.gray(
+            `→ Adding ${pendingIceCandidates.length} pending ICE candidate(s)`
+          )
+        );
         for (const c of pendingIceCandidates) {
           await peerConnection.addIceCandidate(new RTCIceCandidate(c));
         }
@@ -1581,7 +1771,9 @@ async function connectToRelay() {
 
   // Handle AI prompt via Socket
   socket.on("ai:prompt", (data: AIPromptPayload) => {
-    console.log(chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`));
+    console.log(
+      chalk.cyan(`\n🤖 AI Prompt received via Socket: "${data.prompt}"`)
+    );
     handleAIPrompt(data.prompt, data.uuid);
   });
 

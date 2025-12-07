@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React, {ReactNode} from 'react';
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 
 // Configure QueryClient with sensible defaults for mobile
 const queryClient = new QueryClient({
@@ -27,13 +27,8 @@ interface QueryProviderProps {
   children: ReactNode;
 }
 
-export function QueryProvider({ children }: QueryProviderProps): React.ReactElement {
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+export function QueryProvider({children}: QueryProviderProps): React.ReactElement {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
-export { queryClient };
-
+export {queryClient};

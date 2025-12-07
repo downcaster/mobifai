@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import {View, TouchableOpacity, Text, StyleSheet} from 'react-native';
 
 interface ArrowButtonsProps {
   onArrowPress: (direction: 'up' | 'down' | 'left' | 'right') => void;
   disabled?: boolean;
 }
 
-export function ArrowButtons({ onArrowPress, disabled = false }: ArrowButtonsProps): React.ReactElement {
+export function ArrowButtons({
+  onArrowPress,
+  disabled = false,
+}: ArrowButtonsProps): React.ReactElement {
   return (
     <View style={styles.container}>
       {/* Top row - Up arrow centered */}
@@ -14,33 +17,29 @@ export function ArrowButtons({ onArrowPress, disabled = false }: ArrowButtonsPro
         <TouchableOpacity
           style={[styles.button, disabled && styles.buttonDisabled]}
           onPress={() => onArrowPress('up')}
-          disabled={disabled}
-        >
+          disabled={disabled}>
           <Text style={styles.buttonText}>↑</Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Bottom row - Left, Down, Right */}
       <View style={styles.bottomRow}>
         <TouchableOpacity
           style={[styles.button, disabled && styles.buttonDisabled]}
           onPress={() => onArrowPress('left')}
-          disabled={disabled}
-        >
+          disabled={disabled}>
           <Text style={styles.buttonText}>←</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, disabled && styles.buttonDisabled]}
           onPress={() => onArrowPress('down')}
-          disabled={disabled}
-        >
+          disabled={disabled}>
           <Text style={styles.buttonText}>↓</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, disabled && styles.buttonDisabled]}
           onPress={() => onArrowPress('right')}
-          disabled={disabled}
-        >
+          disabled={disabled}>
           <Text style={styles.buttonText}>→</Text>
         </TouchableOpacity>
       </View>
@@ -79,4 +78,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

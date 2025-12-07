@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   Text,
 } from 'react-native';
-import { CodeProject } from '../../types/code';
-import { useProjectsHistory } from '../../hooks/useCodeQueries';
+import {CodeProject} from '../../types/code';
+import {useProjectsHistory} from '../../hooks/useCodeQueries';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
@@ -36,7 +36,7 @@ export function ProjectsList({
   onProjectSelect,
   selectedProject,
 }: ProjectsListProps): React.ReactElement {
-  const { data: projects, isLoading, error, refetch } = useProjectsHistory();
+  const {data: projects, isLoading, error, refetch} = useProjectsHistory();
 
   if (isLoading) {
     return (
@@ -69,7 +69,7 @@ export function ProjectsList({
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={true}>
-      {projects.map((project) => {
+      {projects.map(project => {
         const isSelected = selectedProject === project.path;
         const lastOpenedDate = new Date(project.lastOpened);
         const timeAgo = getTimeAgo(lastOpenedDate);
@@ -79,19 +79,14 @@ export function ProjectsList({
             key={project.path}
             onPress={() => onProjectSelect(project)}
             activeOpacity={0.7}
-            style={[styles.projectCard, isSelected && styles.projectCardSelected]}
-          >
+            style={[styles.projectCard, isSelected && styles.projectCardSelected]}>
             <View style={styles.projectIconContainer}>
               <Text style={styles.projectIcon}>📂</Text>
             </View>
             <View style={styles.projectInfo}>
               <Text
-                style={[
-                  styles.projectName,
-                  isSelected && styles.projectNameSelected,
-                ]}
-                numberOfLines={1}
-              >
+                style={[styles.projectName, isSelected && styles.projectNameSelected]}
+                numberOfLines={1}>
                 {project.name}
               </Text>
               <Text style={styles.projectPath} numberOfLines={1}>
@@ -114,9 +109,15 @@ function getTimeAgo(date: Date): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days}d`;
-  if (hours > 0) return `${hours}h`;
-  if (minutes > 0) return `${minutes}m`;
+  if (days > 0) {
+    return `${days}d`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m`;
+  }
   return 'Now';
 }
 

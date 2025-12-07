@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
-import { FileDiff } from '../../services/CodeService';
-import { TerminalTheme } from '../../theme/terminalThemes';
+import React, {useRef, useEffect, useState, useCallback} from 'react';
+import {View, StyleSheet, ActivityIndicator, Platform, Text} from 'react-native';
+import {WebView, WebViewMessageEvent} from 'react-native-webview';
+import {FileDiff} from '../../services/CodeService';
+import {TerminalTheme} from '../../theme/terminalThemes';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
@@ -58,7 +58,7 @@ export function CodeEditor({
   const webviewRef = useRef<WebView>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Track content from editor to avoid feedback loop
   const lastEditorContentRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
@@ -66,80 +66,87 @@ export function CodeEditor({
 
   const getLanguage = (lang: string): string => {
     const langMap: Record<string, string> = {
-      'javascript': 'js',
-      'typescript': 'ts',
-      'python': 'py',
-      'json': 'json',
-      'html': 'html',
-      'css': 'css',
-      'markdown': 'md',
+      javascript: 'js',
+      typescript: 'ts',
+      python: 'py',
+      json: 'json',
+      html: 'html',
+      css: 'css',
+      markdown: 'md',
     };
     return langMap[lang.toLowerCase()] || lang;
   };
 
-  const sendMessage = useCallback((type: string, data?: Record<string, unknown>) => {
-    if (webviewRef.current && isReady) {
-      const message = JSON.stringify({ type, data });
-      webviewRef.current.postMessage(message);
-    }
-  }, [isReady]);
-
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const message: EditorMessage = JSON.parse(event.nativeEvent.data);
-
-      switch (message.type) {
-        case 'ready':
-          console.log('📝 Editor ready');
-          setIsReady(true);
-          setError(null);
-          break;
-
-        case 'contentChanged':
-          if (onContentChange && message.data?.content !== undefined) {
-            // Track content from editor to avoid sending it back
-            lastEditorContentRef.current = message.data.content;
-            onContentChange(message.data.content);
-          }
-          break;
-
-        case 'save':
-          console.log('💾 Save requested from editor');
-          if (onSave) {
-            onSave();
-          }
-          break;
-
-        default:
-          console.log('Unknown editor message:', message.type);
+  const sendMessage = useCallback(
+    (type: string, data?: Record<string, unknown>) => {
+      if (webviewRef.current && isReady) {
+        const message = JSON.stringify({type, data});
+        webviewRef.current.postMessage(message);
       }
-    } catch (err) {
-      console.error('Error parsing editor message:', err);
-    }
-  }, [onContentChange, onSave]);
+    },
+    [isReady],
+  );
+
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const message: EditorMessage = JSON.parse(event.nativeEvent.data);
+
+        switch (message.type) {
+          case 'ready':
+            console.log('📝 Editor ready');
+            setIsReady(true);
+            setError(null);
+            break;
+
+          case 'contentChanged':
+            if (onContentChange && message.data?.content !== undefined) {
+              // Track content from editor to avoid sending it back
+              lastEditorContentRef.current = message.data.content;
+              onContentChange(message.data.content);
+            }
+            break;
+
+          case 'save':
+            console.log('💾 Save requested from editor');
+            if (onSave) {
+              onSave();
+            }
+            break;
+
+          default:
+            console.log('Unknown editor message:', message.type);
+        }
+      } catch (err) {
+        console.error('Error parsing editor message:', err);
+      }
+    },
+    [onContentChange, onSave],
+  );
 
   // Set content only when it's from an external source (file switch, initial load)
   // NOT when it's the same content we just received from the editor
   useEffect(() => {
     if (isReady) {
       // Detect if this is a different file (content prop changed to something completely different)
-      const isDifferentFile = lastContentPropRef.current !== '' && 
-                              content !== lastContentPropRef.current &&
-                              content !== lastEditorContentRef.current;
-      
+      const isDifferentFile =
+        lastContentPropRef.current !== '' &&
+        content !== lastContentPropRef.current &&
+        content !== lastEditorContentRef.current;
+
       // Only send setContent if:
       // 1. We haven't initialized yet (first load)
       // 2. Content differs from what the editor last sent us (external change)
       // 3. This is a different file (file switch detected)
       const isExternalChange = content !== lastEditorContentRef.current;
       const isFirstLoad = !hasInitializedRef.current;
-      
+
       if (isFirstLoad || isExternalChange || isDifferentFile) {
         console.log(`📝 Updating editor content (${content.length} bytes)`);
         if (isDifferentFile) {
-          console.log(`   Detected file switch - forcing content update`);
+          console.log('   Detected file switch - forcing content update');
         }
-        sendMessage('setContent', { content });
+        sendMessage('setContent', {content});
         lastEditorContentRef.current = content;
         lastContentPropRef.current = content;
         hasInitializedRef.current = true;
@@ -149,13 +156,13 @@ export function CodeEditor({
 
   useEffect(() => {
     if (isReady) {
-      sendMessage('setLanguage', { language: getLanguage(language) });
+      sendMessage('setLanguage', {language: getLanguage(language)});
     }
   }, [language, isReady, sendMessage]);
 
   useEffect(() => {
     if (isReady) {
-      sendMessage('setReadOnly', { readOnly });
+      sendMessage('setReadOnly', {readOnly});
     }
   }, [readOnly, isReady, sendMessage]);
 
@@ -185,7 +192,7 @@ export function CodeEditor({
   // Send font size to the editor when it changes
   useEffect(() => {
     if (isReady) {
-      sendMessage('setFontSize', { fontSize });
+      sendMessage('setFontSize', {fontSize});
     }
   }, [fontSize, isReady, sendMessage]);
 
@@ -207,7 +214,7 @@ export function CodeEditor({
 
   const editorHTML = Platform.select({
     ios: require('../../assets/editor.html'),
-    android: { uri: 'file:///android_asset/editor.html' },
+    android: {uri: 'file:///android_asset/editor.html'},
   });
 
   if (error) {

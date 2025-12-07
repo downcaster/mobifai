@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   TouchableOpacity,
@@ -7,8 +7,8 @@ import {
   ScrollView,
   Text,
 } from 'react-native';
-import { FileNode } from '../../types/code';
-import { useFolderChildren } from '../../hooks/useCodeQueries';
+import {FileNode} from '../../types/code';
+import {useFolderChildren} from '../../hooks/useCodeQueries';
 
 // Dark theme colors (matching terminal)
 const darkTheme = {
@@ -81,7 +81,7 @@ function TreeNode({
   const handlePress = () => {
     // Always select the item when pressed
     if (onItemSelect) {
-      onItemSelect({ path: fullPath, type: node.type, name: node.name });
+      onItemSelect({path: fullPath, type: node.type, name: node.name});
     }
 
     if (node.type === 'folder') {
@@ -97,7 +97,7 @@ function TreeNode({
 
   const handleLongPress = () => {
     if (onItemLongPress) {
-      onItemLongPress({ path: fullPath, type: node.type, name: node.name });
+      onItemLongPress({path: fullPath, type: node.type, name: node.name});
     }
   };
 
@@ -106,19 +106,19 @@ function TreeNode({
     if (node.type === 'folder') {
       return isExpanded ? '📂' : '📁';
     }
-    
+
     const ext = node.name.split('.').pop()?.toLowerCase();
     const iconMap: Record<string, string> = {
-      'js': '📜',
-      'jsx': '⚛️',
-      'ts': '📘',
-      'tsx': '⚛️',
-      'json': '📋',
-      'md': '📝',
-      'py': '🐍',
-      'html': '🌐',
-      'css': '🎨',
-      'txt': '📄',
+      js: '📜',
+      jsx: '⚛️',
+      ts: '📘',
+      tsx: '⚛️',
+      json: '📋',
+      md: '📝',
+      py: '🐍',
+      html: '🌐',
+      css: '🎨',
+      txt: '📄',
     };
     return iconMap[ext || ''] || '📄';
   };
@@ -128,24 +128,18 @@ function TreeNode({
       <TouchableOpacity
         style={[
           styles.nodeContainer,
-          { paddingLeft: 12 + level * 16 },
+          {paddingLeft: 12 + level * 16},
           (isFileSelected || isItemSelected) && styles.nodeSelected,
         ]}
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={400}
-        activeOpacity={0.6}
-      >
-        {node.type === 'folder' && (
-          <Text style={styles.chevron}>
-            {isExpanded ? '▾' : '▸'}
-          </Text>
-        )}
+        activeOpacity={0.6}>
+        {node.type === 'folder' && <Text style={styles.chevron}>{isExpanded ? '▾' : '▸'}</Text>}
         <Text style={styles.nodeIcon}>{getIcon()}</Text>
         <Text
           style={[styles.nodeName, (isFileSelected || isItemSelected) && styles.nodeNameSelected]}
-          numberOfLines={1}
-        >
+          numberOfLines={1}>
           {node.name}
         </Text>
         {isLoading && (
@@ -173,12 +167,7 @@ function TreeNode({
       )}
 
       {isExpanded && error && (
-        <View
-          style={[
-            styles.errorContainer,
-            { paddingLeft: 12 + (level + 1) * 16 },
-          ]}
-        >
+        <View style={[styles.errorContainer, {paddingLeft: 12 + (level + 1) * 16}]}>
           <Text style={styles.errorText}>Failed to load</Text>
         </View>
       )}
@@ -200,17 +189,16 @@ export function FileTree({
   const handleBackgroundPress = () => {
     if (onItemSelect) {
       const rootName = rootPath.split('/').pop() || 'root';
-      onItemSelect({ path: rootPath, type: 'folder', name: rootName });
+      onItemSelect({path: rootPath, type: 'folder', name: rootName});
     }
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={true}
-        contentContainerStyle={styles.scrollContent}
-      >
+        contentContainerStyle={styles.scrollContent}>
         {initialChildren.map((node, index) => (
           <TreeNode
             key={`${node.name}-${index}`}
@@ -226,7 +214,7 @@ export function FileTree({
           />
         ))}
         {/* Empty spacer at bottom - tappable to select root */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.bottomSpacer}
           onPress={handleBackgroundPress}
           activeOpacity={1}

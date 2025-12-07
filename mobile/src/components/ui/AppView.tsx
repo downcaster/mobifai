@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, ViewProps, SafeAreaView, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import {View, ViewProps, SafeAreaView, StyleSheet, StyleProp, ViewStyle} from 'react-native';
+import {colors} from '../../theme/colors';
 
 export interface AppViewProps extends ViewProps {
   safeArea?: boolean;
@@ -8,9 +8,9 @@ export interface AppViewProps extends ViewProps {
   className?: string;
 }
 
-export function AppView({ safeArea, style, children, ...props }: AppViewProps) {
+export function AppView({safeArea, style, children, ...props}: AppViewProps) {
   const Container = safeArea ? SafeAreaView : View;
-  
+
   return (
     <Container style={[styles.base, style]} {...props}>
       {children}
@@ -22,5 +22,5 @@ const styles = StyleSheet.create({
   base: {
     flex: 1,
     backgroundColor: colors.background,
-  }
+  },
 });

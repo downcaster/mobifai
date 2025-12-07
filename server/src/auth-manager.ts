@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
 interface PairingCode {
   code: string;
@@ -25,7 +25,7 @@ export class AuthManager {
       code,
       deviceName,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + this.PAIRING_CODE_EXPIRY)
+      expiresAt: new Date(Date.now() + this.PAIRING_CODE_EXPIRY),
     };
 
     this.pairingCodes.set(code, pairingData);
@@ -56,7 +56,7 @@ export class AuthManager {
     }
 
     // Generate token
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(32).toString("hex");
     this.tokens.add(token);
 
     // Remove pairing code after use

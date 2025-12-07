@@ -1,4 +1,4 @@
-import { io, Socket } from 'socket.io-client';
+import {io, Socket} from 'socket.io-client';
 
 type EventHandler = (data: any) => void;
 
@@ -34,26 +34,26 @@ export class SocketService {
       console.log('Socket connected');
     });
 
-    this.socket.on('connected', (data) => {
+    this.socket.on('connected', data => {
       this.emit('connected', data);
     });
 
-    this.socket.on('output', (data) => {
+    this.socket.on('output', data => {
       this.emit('output', data);
     });
 
-    this.socket.on('error', (error) => {
+    this.socket.on('error', error => {
       this.emit('error', error);
     });
 
-    this.socket.on('disconnect', (reason) => {
+    this.socket.on('disconnect', reason => {
       console.log('Socket disconnected:', reason);
-      this.emit('disconnect', { reason });
+      this.emit('disconnect', {reason});
     });
 
-    this.socket.on('connect_error', (error) => {
+    this.socket.on('connect_error', error => {
       console.error('Connection error:', error);
-      this.emit('error', { message: 'Failed to connect to server' });
+      this.emit('error', {message: 'Failed to connect to server'});
     });
   }
 
@@ -72,7 +72,7 @@ export class SocketService {
 
   resize(cols: number, rows: number): void {
     if (this.socket?.connected) {
-      this.socket.emit('resize', { cols, rows });
+      this.socket.emit('resize', {cols, rows});
     }
   }
 
@@ -86,7 +86,7 @@ export class SocketService {
   private emit(event: string, data: any): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
-      handlers.forEach((handler) => handler(data));
+      handlers.forEach(handler => handler(data));
     }
   }
 

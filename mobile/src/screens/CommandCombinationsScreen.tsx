@@ -1,57 +1,44 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
-import { AppText } from "../components/ui";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SaveCombinationModal } from "../components/SaveCombinationModal";
-import {
-  SavedCombination,
-  SAVED_COMBINATIONS_KEY,
-} from "../types/savedCombinations";
-import { TerminalAction } from "../components/KeyCombinationModal";
+import React, {useState, useEffect, useCallback} from 'react';
+import {View, ScrollView, StyleSheet, TouchableOpacity, Alert} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import {AppText} from '../components/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {SaveCombinationModal} from '../components/SaveCombinationModal';
+import {SavedCombination, SAVED_COMBINATIONS_KEY} from '../types/savedCombinations';
+import {TerminalAction} from '../components/KeyCombinationModal';
 
-export const COMBO_BAR_VISIBLE_KEY = "mobifai_combo_bar_visible";
+export const COMBO_BAR_VISIBLE_KEY = 'mobifai_combo_bar_visible';
 
 // Design tokens for the futuristic theme
 const themeColors = {
   bg: {
-    primary: "#0a0a0f",
-    secondary: "#12121a",
-    tertiary: "#1a1a25",
-    card: "#15151f",
+    primary: '#0a0a0f',
+    secondary: '#12121a',
+    tertiary: '#1a1a25',
+    card: '#15151f',
   },
   accent: {
-    primary: "#6200EE",
-    secondary: "#BB86FC",
-    glow: "rgba(98, 0, 238, 0.3)",
+    primary: '#6200EE',
+    secondary: '#BB86FC',
+    glow: 'rgba(98, 0, 238, 0.3)',
   },
   text: {
-    primary: "#ffffff",
-    secondary: "#8888aa",
-    muted: "#555566",
+    primary: '#ffffff',
+    secondary: '#8888aa',
+    muted: '#555566',
   },
   border: {
-    subtle: "#2a2a3a",
-    accent: "#6200EE40",
+    subtle: '#2a2a3a',
+    accent: '#6200EE40',
   },
 };
 
 export default function CommandCombinationsScreen(): React.ReactElement {
   const navigation = useNavigation();
-  const [savedCombinations, setSavedCombinations] = useState<
-    SavedCombination[]
-  >([]);
+  const [savedCombinations, setSavedCombinations] = useState<SavedCombination[]>([]);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
-  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(
-    null
-  );
+  const [editingCombo, setEditingCombo] = useState<SavedCombination | null>(null);
   const [comboBarVisible, setComboBarVisible] = useState(true);
 
   useEffect(() => {
@@ -68,10 +55,12 @@ export default function CommandCombinationsScreen(): React.ReactElement {
         setSavedCombinations(JSON.parse(saved));
       }
       if (visibleSetting !== null) {
-        setComboBarVisible(visibleSetting === "true");
+        setComboBarVisible(visibleSetting === 'true');
       }
     } catch (error) {
-      if (__DEV__) console.error("Error loading data:", error);
+      if (__DEV__) {
+        console.error('Error loading data:', error);
+      }
     }
   };
 
@@ -81,20 +70,19 @@ export default function CommandCombinationsScreen(): React.ReactElement {
     try {
       await AsyncStorage.setItem(COMBO_BAR_VISIBLE_KEY, String(newValue));
     } catch (error) {
-      if (__DEV__) console.error("Error saving combo bar visibility:", error);
+      if (__DEV__) {
+        console.error('Error saving combo bar visibility:', error);
+      }
     }
   };
 
-  const handleSaveCombination = async (
-    title: string,
-    actions: TerminalAction[]
-  ): Promise<void> => {
+  const handleSaveCombination = async (title: string, actions: TerminalAction[]): Promise<void> => {
     try {
       let updated: SavedCombination[];
 
       if (editingCombo) {
-        updated = savedCombinations.map((c) =>
-          c.id === editingCombo.id ? { ...c, title, actions } : c
+        updated = savedCombinations.map(c =>
+          c.id === editingCombo.id ? {...c, title, actions} : c,
         );
       } else {
         const newCombination: SavedCombination = {
@@ -106,14 +94,13 @@ export default function CommandCombinationsScreen(): React.ReactElement {
       }
 
       setSavedCombinations(updated);
-      await AsyncStorage.setItem(
-        SAVED_COMBINATIONS_KEY,
-        JSON.stringify(updated)
-      );
+      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
       setEditingCombo(null);
     } catch (error) {
-      if (__DEV__) console.error("Error saving combination:", error);
-      Alert.alert("Error", "Failed to save combination");
+      if (__DEV__) {
+        console.error('Error saving combination:', error);
+      }
+      Alert.alert('Error', 'Failed to save combination');
     }
   };
 
@@ -122,45 +109,42 @@ export default function CommandCombinationsScreen(): React.ReactElement {
     setSaveModalVisible(true);
   };
 
-  const handleMoveCombination = async (
-    index: number,
-    direction: "up" | "down"
-  ): Promise<void> => {
+  const handleMoveCombination = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     try {
-      const newIndex = direction === "up" ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= savedCombinations.length) return;
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= savedCombinations.length) {
+        return;
+      }
 
       const updated = [...savedCombinations];
       const [moved] = updated.splice(index, 1);
       updated.splice(newIndex, 0, moved);
 
       setSavedCombinations(updated);
-      await AsyncStorage.setItem(
-        SAVED_COMBINATIONS_KEY,
-        JSON.stringify(updated)
-      );
+      await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
     } catch (error) {
-      if (__DEV__) console.error("Error reordering combinations:", error);
-      Alert.alert("Error", "Failed to reorder");
+      if (__DEV__) {
+        console.error('Error reordering combinations:', error);
+      }
+      Alert.alert('Error', 'Failed to reorder');
     }
   };
 
   const handleDeleteCombination = (id: string): void => {
-    Alert.alert("Delete Combination", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Delete Combination', 'Are you sure?', [
+      {text: 'Cancel', style: 'cancel'},
       {
-        text: "Delete",
-        style: "destructive",
+        text: 'Delete',
+        style: 'destructive',
         onPress: async () => {
           try {
-            const updated = savedCombinations.filter((c) => c.id !== id);
+            const updated = savedCombinations.filter(c => c.id !== id);
             setSavedCombinations(updated);
-            await AsyncStorage.setItem(
-              SAVED_COMBINATIONS_KEY,
-              JSON.stringify(updated)
-            );
+            await AsyncStorage.setItem(SAVED_COMBINATIONS_KEY, JSON.stringify(updated));
           } catch (error) {
-            if (__DEV__) console.error("Error deleting combination:", error);
+            if (__DEV__) {
+              console.error('Error deleting combination:', error);
+            }
           }
         },
       },
@@ -168,44 +152,30 @@ export default function CommandCombinationsScreen(): React.ReactElement {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <AppText style={styles.backButtonText}>←</AppText>
         </TouchableOpacity>
         <AppText style={styles.headerTitle}>Command Combinations</AppText>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Visibility Toggle */}
         <View style={styles.settingCard}>
           <View style={styles.settingRow}>
             <View style={styles.settingTextContainer}>
-              <AppText style={styles.settingLabel}>
-                Show Combo Bar in Terminal
-              </AppText>
+              <AppText style={styles.settingLabel}>Show Combo Bar in Terminal</AppText>
               <AppText style={styles.settingDescription}>
                 Display quick access buttons above the keyboard
               </AppText>
             </View>
             <TouchableOpacity
               style={[styles.toggle, comboBarVisible && styles.toggleActive]}
-              onPress={toggleComboBarVisible}
-            >
-              <View
-                style={[
-                  styles.toggleThumb,
-                  comboBarVisible && styles.toggleThumbActive,
-                ]}
-              />
+              onPress={toggleComboBarVisible}>
+              <View style={[styles.toggleThumb, comboBarVisible && styles.toggleThumbActive]} />
             </TouchableOpacity>
           </View>
         </View>
@@ -215,8 +185,8 @@ export default function CommandCombinationsScreen(): React.ReactElement {
           {savedCombinations.length > 0 ? (
             savedCombinations.map((combo, index) => {
               const preview = combo.actions
-                .map((a) => (a.type === "text" ? a.value : a.label || ""))
-                .join(" ");
+                .map(a => (a.type === 'text' ? a.value : a.label || ''))
+                .join(' ');
 
               return (
                 <View key={combo.id}>
@@ -224,31 +194,24 @@ export default function CommandCombinationsScreen(): React.ReactElement {
                   <View style={styles.comboItem}>
                     <View style={styles.reorderButtons}>
                       <TouchableOpacity
-                        style={[
-                          styles.reorderButton,
-                          index === 0 && styles.reorderButtonDisabled,
-                        ]}
-                        onPress={() => handleMoveCombination(index, "up")}
-                        disabled={index === 0}
-                      >
+                        style={[styles.reorderButton, index === 0 && styles.reorderButtonDisabled]}
+                        onPress={() => handleMoveCombination(index, 'up')}
+                        disabled={index === 0}>
                         <AppText style={styles.reorderButtonText}>↑</AppText>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[
                           styles.reorderButton,
-                          index === savedCombinations.length - 1 &&
-                            styles.reorderButtonDisabled,
+                          index === savedCombinations.length - 1 && styles.reorderButtonDisabled,
                         ]}
-                        onPress={() => handleMoveCombination(index, "down")}
-                        disabled={index === savedCombinations.length - 1}
-                      >
+                        onPress={() => handleMoveCombination(index, 'down')}
+                        disabled={index === savedCombinations.length - 1}>
                         <AppText style={styles.reorderButtonText}>↓</AppText>
                       </TouchableOpacity>
                     </View>
                     <TouchableOpacity
                       style={styles.comboContent}
-                      onPress={() => handleEditCombination(combo)}
-                    >
+                      onPress={() => handleEditCombination(combo)}>
                       <AppText style={styles.comboTitle}>{combo.title}</AppText>
                       <AppText style={styles.comboPreview} numberOfLines={1}>
                         {preview}
@@ -256,8 +219,7 @@ export default function CommandCombinationsScreen(): React.ReactElement {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
-                      onPress={() => handleDeleteCombination(combo.id)}
-                    >
+                      onPress={() => handleDeleteCombination(combo.id)}>
                       <AppText style={styles.deleteButtonText}>×</AppText>
                     </TouchableOpacity>
                   </View>
@@ -269,18 +231,14 @@ export default function CommandCombinationsScreen(): React.ReactElement {
               <AppText style={styles.emptyIcon}>⌘</AppText>
               <AppText style={styles.emptyTitle}>No Combinations Yet</AppText>
               <AppText style={styles.emptyText}>
-                Create command combinations to quickly execute{"\n"}multi-step
-                terminal operations
+                Create command combinations to quickly execute{'\n'}multi-step terminal operations
               </AppText>
             </View>
           )}
         </View>
 
         {/* Add Button */}
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setSaveModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.addButton} onPress={() => setSaveModalVisible(true)}>
           <AppText style={styles.addButtonText}>+ New Combination</AppText>
         </TouchableOpacity>
 
@@ -288,9 +246,8 @@ export default function CommandCombinationsScreen(): React.ReactElement {
         <View style={styles.helpSection}>
           <AppText style={styles.helpTitle}>How it works</AppText>
           <AppText style={styles.helpText}>
-            Command combinations allow you to chain multiple terminal actions
-            together. Use text input for commands, and special keys for control
-            sequences like Enter, Tab, or Ctrl+C.
+            Command combinations allow you to chain multiple terminal actions together. Use text
+            input for commands, and special keys for control sequences like Enter, Tab, or Ctrl+C.
           </AppText>
         </View>
       </ScrollView>
@@ -316,8 +273,8 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.bg.primary,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -326,8 +283,8 @@ const styles = StyleSheet.create({
   backButton: {
     width: 40,
     height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 20,
     backgroundColor: themeColors.bg.tertiary,
   },
@@ -338,9 +295,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     color: themeColors.text.primary,
-    textAlign: "center",
+    textAlign: 'center',
   },
   headerSpacer: {
     width: 40,
@@ -355,11 +312,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: themeColors.border.subtle,
     marginBottom: 20,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   settingRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
   },
   settingTextContainer: {
@@ -368,7 +325,7 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.primary,
     marginBottom: 4,
   },
@@ -384,7 +341,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: themeColors.border.subtle,
     padding: 2,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
   toggleActive: {
     backgroundColor: themeColors.accent.primary,
@@ -397,15 +354,15 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.text.muted,
   },
   toggleThumbActive: {
-    backgroundColor: "#ffffff",
-    alignSelf: "flex-end",
+    backgroundColor: '#ffffff',
+    alignSelf: 'flex-end',
   },
   card: {
     backgroundColor: themeColors.bg.card,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: themeColors.border.subtle,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   divider: {
     height: 1,
@@ -413,20 +370,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
   },
   comboItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
   },
   reorderButtons: {
-    flexDirection: "column",
+    flexDirection: 'column',
     gap: 4,
     marginRight: 12,
   },
   reorderButton: {
     width: 28,
     height: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: themeColors.bg.tertiary,
     borderRadius: 4,
     borderWidth: 1,
@@ -438,7 +395,7 @@ const styles = StyleSheet.create({
   reorderButtonText: {
     fontSize: 14,
     color: themeColors.accent.secondary,
-    fontWeight: "700",
+    fontWeight: '700',
     marginTop: -2,
   },
   comboContent: {
@@ -447,34 +404,34 @@ const styles = StyleSheet.create({
   },
   comboTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.primary,
     marginBottom: 4,
   },
   comboPreview: {
     fontSize: 12,
-    fontWeight: "400",
+    fontWeight: '400',
     color: themeColors.text.muted,
   },
   deleteButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(255, 68, 68, 0.1)",
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
     borderWidth: 1,
-    borderColor: "rgba(255, 68, 68, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: 'rgba(255, 68, 68, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   deleteButtonText: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#ff4444",
+    fontWeight: '600',
+    color: '#ff4444',
     marginTop: -2,
   },
   emptyState: {
     padding: 40,
-    alignItems: "center",
+    alignItems: 'center',
   },
   emptyIcon: {
     fontSize: 48,
@@ -483,14 +440,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.primary,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
     color: themeColors.text.muted,
-    textAlign: "center",
+    textAlign: 'center',
     lineHeight: 20,
   },
   addButton: {
@@ -500,11 +457,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: themeColors.accent.primary,
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
   },
   addButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.accent.secondary,
   },
   helpSection: {
@@ -517,7 +474,7 @@ const styles = StyleSheet.create({
   },
   helpTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: themeColors.text.secondary,
     marginBottom: 8,
   },

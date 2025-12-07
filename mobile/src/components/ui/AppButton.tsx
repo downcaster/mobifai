@@ -1,8 +1,15 @@
 import React from 'react';
-import { TouchableOpacity, TouchableOpacityProps, ActivityIndicator, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { AppText } from './AppText';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+import {
+  TouchableOpacity,
+  TouchableOpacityProps,
+  ActivityIndicator,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
+import {AppText} from './AppText';
+import {colors} from '../../theme/colors';
+import {spacing} from '../../theme/spacing';
 
 export interface AppButtonProps extends TouchableOpacityProps {
   title: string;
@@ -12,22 +19,20 @@ export interface AppButtonProps extends TouchableOpacityProps {
   className?: string;
 }
 
-export function AppButton({ title, loading, variant = 'primary', style, ...props }: AppButtonProps) {
+export function AppButton({title, loading, variant = 'primary', style, ...props}: AppButtonProps) {
   return (
-    <TouchableOpacity 
-      style={[
-        styles.base, 
-        styles[variant], 
-        props.disabled && styles.disabled,
-        style
-      ]} 
+    <TouchableOpacity
+      style={[styles.base, styles[variant], props.disabled && styles.disabled, style]}
       disabled={loading || props.disabled}
-      {...props}
-    >
+      {...props}>
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : '#FFF'} />
+        <ActivityIndicator
+          color={variant === 'outline' || variant === 'ghost' ? colors.primary : '#FFF'}
+        />
       ) : (
-        <AppText style={[styles.textBase, styles[`text_${variant}` as keyof typeof styles]]}>{title}</AppText>
+        <AppText style={[styles.textBase, styles[`text_${variant}` as keyof typeof styles]]}>
+          {title}
+        </AppText>
       )}
     </TouchableOpacity>
   );

@@ -796,7 +796,7 @@ async function handleCodeGetProjectsHistory(): Promise<void> {
 /**
  * Handle code.openCurrentDir - get current directory from a process and init as project
  */
-function handleCodeOpenCurrentDir(payload: { uuid: string }): void {
+async function handleCodeOpenCurrentDir(payload: { uuid: string }): Promise<void> {
   const { uuid } = payload;
   
   console.log(chalk.cyan(`📂 Opening current directory for process ${uuid.substring(0, 8)}`));
@@ -819,10 +819,11 @@ function handleCodeOpenCurrentDir(payload: { uuid: string }): void {
   
   console.log(chalk.cyan(`  └─ Current directory: ${cwd}`));
   
-  // Initialize the project (this also adds to history)
+  // Initialize the project (this also adds to history) - now async!
   try {
-    const result = codeManager.initProject(cwd);
+    const result = await codeManager.initProject(cwd);
     sendToClient("code:projectInitialized", result);
+    sendToClient("code:currentDirOpened", { projectPath: cwd }); // Also send this for iOS navigation
   } catch (error: any) {
     console.error(chalk.red(`❌ Failed to init project: ${error.message}`));
     sendToClient("code:error", { action: "openCurrentDir", error: error.message });

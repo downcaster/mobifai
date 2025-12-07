@@ -28,3 +28,10 @@ model OpenFile {
 
   @@unique([projectPath, filePath])
 }
+
+model ProjectHistory {
+  id         String   @id @default(uuid())
+  path       String   @unique
+  name       String
+  lastOpened DateTime @default(now())
+}

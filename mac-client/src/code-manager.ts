@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { exec } from "child_process";
+import { getPrismaClient } from "./db.js";
 
 /**
  * Represents a project in the history
@@ -59,77 +60,50 @@ export interface FileDiff {
  * CodeManager handles all file system operations for the code editor
  */
 export class CodeManager {
-  private projectsHistory: ProjectHistory[] = [];
-  private historyFilePath: string;
   private currentProject: string | null = null;
 
   constructor() {
-    this.historyFilePath = path.join(process.cwd(), ".projects_history.json");
-    this.loadHistory();
+    // Projects history is now stored in SQLite via Prisma
+    // No need to load from JSON file
   }
 
   /**
-   * Load projects history from disk
+   * Add or update a project in history (now using Prisma/SQLite)
    */
-  private loadHistory(): void {
+  private async addToHistory(projectPath: string): Promise<void> {
+    const name = path.basename(projectPath);
+    const prisma = getPrismaClient();
+
     try {
-      if (fs.existsSync(this.historyFilePath)) {
-        const data = fs.readFileSync(this.historyFilePath, "utf-8");
-        this.projectsHistory = JSON.parse(data);
-        console.log(
-          chalk.gray(
-            `📚 Loaded ${this.projectsHistory.length} project(s) from history`
-          )
-        );
+      // Upsert the project (update if exists, create if not)
+      await prisma.projectHistory.upsert({
+        where: { path: projectPath },
+        update: { lastOpened: new Date() },
+        create: {
+          path: projectPath,
+          name,
+          lastOpened: new Date(),
+        },
+      });
+
+      // Keep only last 20 projects
+      const allProjects = await prisma.projectHistory.findMany({
+        orderBy: { lastOpened: 'desc' },
+      });
+
+      if (allProjects.length > 20) {
+        const projectsToDelete = allProjects.slice(20);
+        await prisma.projectHistory.deleteMany({
+          where: {
+            id: {
+              in: projectsToDelete.map(p => p.id),
+            },
+          },
+        });
       }
     } catch (error) {
-      console.error(chalk.red("❌ Failed to load projects history:"), error);
-      this.projectsHistory = [];
+      console.error(chalk.red("❌ Failed to save project to history:"), error);
     }
-  }
-
-  /**
-   * Save projects history to disk
-   */
-  private saveHistory(): void {
-    try {
-      fs.writeFileSync(
-        this.historyFilePath,
-        JSON.stringify(this.projectsHistory, null, 2)
-      );
-    } catch (error) {
-      console.error(chalk.red("❌ Failed to save projects history:"), error);
-    }
-  }
-
-  /**
-   * Add or update a project in history
-   */
-  private addToHistory(projectPath: string): void {
-    const name = path.basename(projectPath);
-    const existingIndex = this.projectsHistory.findIndex(
-      (p) => p.path === projectPath
-    );
-
-    if (existingIndex >= 0) {
-      // Update existing entry
-      this.projectsHistory[existingIndex].lastOpened = Date.now();
-    } else {
-      // Add new entry
-      this.projectsHistory.unshift({
-        path: projectPath,
-        name,
-        lastOpened: Date.now(),
-      });
-    }
-
-    // Keep only last 20 projects
-    this.projectsHistory = this.projectsHistory.slice(0, 20);
-
-    // Sort by lastOpened (most recent first)
-    this.projectsHistory.sort((a, b) => b.lastOpened - a.lastOpened);
-
-    this.saveHistory();
   }
 
   /**
@@ -205,7 +179,7 @@ export class CodeManager {
   /**
    * Initialize a project - returns first-level children
    */
-  public initProject(projectPath: string): { rootPath: string; children: FileNode[] } {
+  public async initProject(projectPath: string): Promise<{ rootPath: string; children: FileNode[] }> {
     console.log(chalk.cyan(`📂 Initializing project: ${projectPath}`));
 
     // Check if path exists
@@ -222,8 +196,8 @@ export class CodeManager {
     // Set as current project
     this.currentProject = projectPath;
 
-    // Add to history
-    this.addToHistory(projectPath);
+    // Add to history (now async)
+    await this.addToHistory(projectPath);
 
     // Read first-level children
     const children = this.readDirChildren(projectPath);
@@ -346,8 +320,22 @@ export class CodeManager {
   /**
    * Get projects history
    */
-  public getProjectsHistory(): ProjectHistory[] {
-    return this.projectsHistory;
+  public async getProjectsHistory(): Promise<ProjectHistory[]> {
+    const prisma = getPrismaClient();
+    try {
+      const projects = await prisma.projectHistory.findMany({
+        orderBy: { lastOpened: 'desc' },
+      });
+      
+      return projects.map(p => ({
+        path: p.path,
+        name: p.name,
+        lastOpened: p.lastOpened.getTime(),
+      }));
+    } catch (error) {
+      console.error(chalk.red("❌ Failed to load projects history:"), error);
+      return [];
+    }
   }
 
   /**

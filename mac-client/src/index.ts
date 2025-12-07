@@ -723,8 +723,8 @@ function handleCodeMessage(action: string, payload: unknown): void {
 /**
  * Handle code.initProject
  */
-function handleCodeInitProject(payload: { projectPath: string }): void {
-  const result = codeManager.initProject(payload.projectPath);
+async function handleCodeInitProject(payload: { projectPath: string }): Promise<void> {
+  const result = await codeManager.initProject(payload.projectPath);
   sendToClient("code:projectInitialized", result);
   
   // Start watching for git changes in this project
@@ -788,8 +788,8 @@ function handleCodeCloseProject(payload: { projectPath: string }): void {
 /**
  * Handle code.getProjectsHistory
  */
-function handleCodeGetProjectsHistory(): void {
-  const projects = codeManager.getProjectsHistory();
+async function handleCodeGetProjectsHistory(): Promise<void> {
+  const projects = await codeManager.getProjectsHistory();
   sendToClient("code:projectsHistory", { projects });
 }
 

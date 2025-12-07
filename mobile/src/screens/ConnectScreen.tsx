@@ -2,11 +2,9 @@ import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Platform,
   Alert,
   Linking,
 } from 'react-native';
@@ -122,7 +120,7 @@ export default function ConnectScreen({navigation}: ConnectScreenProps) {
             });
           });
 
-          socket.on('authenticated', async ({token, user}) => {
+          socket.on('authenticated', async ({token: _token, user}) => {
             console.log('✅ Server confirmed authentication');
             setStatusMessage(`Connected as ${user.email}`);
 
@@ -192,7 +190,7 @@ export default function ConnectScreen({navigation}: ConnectScreenProps) {
 
           socket.on(
             'handshake:verify',
-            ({peerId, signature}: {peerId: string; signature: string}) => {
+            ({peerId, signature: _signature}: {peerId: string; signature: string}) => {
               // Mobile side usually initiates connection, so verification happens on response
               // But if verification is needed here, we can implement it
               console.log(`✅ Peer verified: ${peerId}`);
@@ -231,7 +229,7 @@ export default function ConnectScreen({navigation}: ConnectScreenProps) {
       }
       subscription.remove();
     };
-  }, []);
+  }, [navigation]);
 
   const getDeviceId = async () => {
     let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
@@ -351,10 +349,11 @@ export default function ConnectScreen({navigation}: ConnectScreenProps) {
       socket.on('error', ({message}) => {
         Alert.alert('Error', message);
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setLoading(false);
       setStatusMessage('');
-      Alert.alert('Error', error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', errorMessage);
     }
   };
 

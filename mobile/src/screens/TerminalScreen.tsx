@@ -41,8 +41,7 @@ import {
 import {MainTabParamList} from '../navigation/MainTabNavigator';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {useFocusEffect} from '@react-navigation/native';
-import {AppView, AppText, AppButton, AppCard} from '../components/ui';
-import {colors} from '../theme/colors';
+import {AppView, AppText, AppButton} from '../components/ui';
 import {spacing} from '../theme/spacing';
 import {getThemeById} from '../theme/terminalThemes';
 import {KeyCombinationModal, TerminalAction} from '../components/KeyCombinationModal';
@@ -76,10 +75,14 @@ export default function TerminalScreen({
   navigation: propNavigation,
   route: propRoute,
 }: TerminalScreenProps): React.ReactElement {
-  const navigation =
-    propNavigation || useNavigation<BottomTabNavigationProp<MainTabParamList, 'Terminal'>>();
-  const route = propRoute || useRoute<RouteProp<MainTabParamList, 'Terminal'>>();
+  // Always call hooks unconditionally (Rules of Hooks)
+  const defaultNavigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'Terminal'>>();
+  const defaultRoute = useRoute<RouteProp<MainTabParamList, 'Terminal'>>();
   const isFocused = useIsFocused();
+
+  // Use prop values if provided, otherwise use default hooks
+  const navigation = propNavigation || defaultNavigation;
+  const route = propRoute || defaultRoute;
   const insets = useSafeAreaInsets();
 
   // Get params from route - may be undefined when accessed from tab
@@ -183,7 +186,6 @@ export default function TerminalScreen({
   // Keyboard-aware terminal sizing
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [fixedTerminalHeight, setFixedTerminalHeight] = useState<number | null>(null);
   const terminalWrapperRef = useRef<ScrollView>(null);
 
   const webViewRef = useRef<WebView>(null);
@@ -412,6 +414,7 @@ export default function TerminalScreen({
       // Reset connection context
       connectionContext.reset();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasConnectionParams]);
 
   // Apply terminal theme when it changes
@@ -466,15 +469,15 @@ export default function TerminalScreen({
     }
   };
 
-  const handleRefreshDimensions = () => {
-    sendToTerminal('fit', {});
-
-    if (terminalDimensionsRef.current && paired && socketRef.current) {
-      console.log('📐 Manually refreshing dimensions:', terminalDimensionsRef.current);
-      socketRef.current.emit('terminal:dimensions', terminalDimensionsRef.current);
-      socketRef.current.emit('terminal:resize', terminalDimensionsRef.current);
-    }
-  };
+  // Commenting out - not currently used but keeping for potential future use
+  // const handleRefreshDimensions = () => {
+  //   sendToTerminal('fit', {});
+  //   if (terminalDimensionsRef.current && paired && socketRef.current) {
+  //     console.log('📐 Manually refreshing dimensions:', terminalDimensionsRef.current);
+  //     socketRef.current.emit('terminal:dimensions', terminalDimensionsRef.current);
+  //     socketRef.current.emit('terminal:resize', terminalDimensionsRef.current);
+  //   }
+  // };
 
   const handleAiPromptSubmit = () => {
     if (!aiPrompt.trim()) {
@@ -565,7 +568,7 @@ export default function TerminalScreen({
     }
 
     // Navigate to Code tab - the CodeScreen will handle the projectInitialized response
-    navigation.navigate('Code' as any);
+    navigation.navigate('Code' as never);
   };
 
   /**
@@ -1384,20 +1387,19 @@ export default function TerminalScreen({
     };
   }, []);
 
-  // Capture the terminal wrapper height once (before keyboard opens)
-  // This ensures the terminal size never changes, even when keyboard appears
-  const handleTerminalWrapperLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      if (fixedTerminalHeight === null && !keyboardVisible) {
-        const {height} = event.nativeEvent.layout;
-        setFixedTerminalHeight(height);
-      }
-    },
-    [fixedTerminalHeight, keyboardVisible],
-  );
+  // Commenting out - not currently used but keeping for potential future use
+  // const handleTerminalWrapperLayout = useCallback(
+  //   (event: LayoutChangeEvent) => {
+  //     if (fixedTerminalHeight === null && !keyboardVisible) {
+  //       const {height} = event.nativeEvent.layout;
+  //       setFixedTerminalHeight(height);
+  //     }
+  //   },
+  //   [fixedTerminalHeight, keyboardVisible],
+  // );
 
   // Use the fixed height, or flex until it's measured
-  const terminalHeight = fixedTerminalHeight;
+  // const terminalHeight = fixedTerminalHeight;
 
   const terminalHtml = `
 <!DOCTYPE html>
@@ -1865,7 +1867,7 @@ export default function TerminalScreen({
   /**
    * Render a single tab
    */
-  const renderTab = (process: TerminalProcess, index: number) => {
+  const renderTab = (process: TerminalProcess, _index: number) => {
     const isActive = process.uuid === activeProcessUuid;
 
     return (

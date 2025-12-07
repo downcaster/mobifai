@@ -6,9 +6,16 @@ import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChann
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent';
 import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent';
 
-export type WebRTCMessageHandler = (data: any) => void;
+export type WebRTCMessageHandler = (data: unknown) => void;
 
 export type WebRTCNamespace = 'terminal' | 'code';
+
+interface WebRTCMessage {
+  namespace: string;
+  action: string;
+  payload: unknown;
+  type?: string;
+}
 
 export class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
@@ -48,7 +55,7 @@ export class WebRTCService {
       await this.peerConnection!.setRemoteDescription(
         new RTCSessionDescription({
           sdp: offer.sdp,
-          type: offer.type as any, // Type cast to satisfy TS
+          type: offer.type as 'offer' | 'answer' | 'pranswer' | 'rollback',
         }),
       );
 
@@ -215,14 +222,14 @@ export class WebRTCService {
       this.isConnected = false;
     });
 
-    this.dataChannel.addEventListener('error', (error: any) => {
+    this.dataChannel.addEventListener('error', (error: Event) => {
       console.error('❌ WebRTC data channel error:', error);
       this.isConnected = false;
     });
 
-    this.dataChannel.addEventListener('message', (event: any) => {
+    this.dataChannel.addEventListener('message', (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(event.data as string);
         // Log all incoming messages for debugging
         console.log(`📨 WebRTC raw message: type=${data.type}`);
         if (this.messageHandler) {
@@ -242,30 +249,20 @@ export class WebRTCService {
   }
 
   /**
-   * Send message with namespace support (new format)
-   * @param namespace - 'terminal' or 'code'
-   * @param action - action type (e.g., 'input', 'initProject')
-   * @param payload - message payload
+   * Send message via WebRTC data channel
+   * Supports both namespace format (3 args) and legacy format (2 args)
    */
-  public sendMessage(namespace: WebRTCNamespace, action: string, payload: any): boolean;
-  /**
-   * Send message with legacy format (backward compatibility)
-   * @param type - message type
-   * @param payload - message payload
-   */
-  public sendMessage(type: string, payload: any): boolean;
-
   public sendMessage(
     namespaceOrType: WebRTCNamespace | string,
-    actionOrPayload: string | any,
-    payload?: any,
+    actionOrPayload: string | unknown,
+    payload?: unknown,
   ): boolean {
     if (this.isConnected && this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
-        let message: any;
+        let message: WebRTCMessage;
 
         // Check if using new namespace format (3 arguments)
-        if (payload !== undefined) {
+        if (payload !== undefined && typeof actionOrPayload === 'string') {
           // New format: namespace, action, payload
           message = {
             namespace: namespaceOrType,

@@ -16,7 +16,7 @@ import {
   CodeErrorResponse,
 } from '../types/code';
 
-type CodeMessageHandler = (action: string, payload: any) => void;
+type CodeMessageHandler = (action: string, payload: unknown) => void;
 
 /**
  * Represents deleted lines at a specific position
@@ -85,7 +85,7 @@ export class CodeService {
   /**
    * Handle incoming code message
    */
-  public handleIncomingMessage(action: string, payload: any): void {
+  public handleIncomingMessage(action: string, payload: unknown): void {
     const handlers = this.messageHandlers.get(action);
     if (handlers) {
       handlers.forEach(handler => handler(action, payload));
@@ -102,7 +102,7 @@ export class CodeService {
   /**
    * Send a code layer message
    */
-  private sendMessage(action: string, payload: any): boolean {
+  private sendMessage(action: string, payload: unknown): boolean {
     if (!this.webrtcService) {
       console.warn('CodeService: Not connected to WebRTC service');
       return false;

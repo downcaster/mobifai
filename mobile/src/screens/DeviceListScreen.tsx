@@ -144,7 +144,7 @@ export default function DeviceListScreen(): React.ReactElement {
           Alert.alert('Connection Error', err.message || 'Unknown error');
         });
 
-        newSocket.on('auth_error', async (err: {message: string}) => {
+        newSocket.on('auth_error', async (_err: {message: string}) => {
           Alert.alert('Session Expired', 'Your session has expired. Please sign in again.');
           await AsyncStorage.removeItem(TOKEN_KEY);
           navigation.dispatch(

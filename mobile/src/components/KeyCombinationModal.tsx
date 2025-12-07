@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,17 @@ import {
   FlatList,
   StyleSheet,
   Keyboard,
-} from "react-native";
+} from 'react-native';
 import {
   KEY_DEFINITIONS,
   KeyDefinition,
   searchKeys,
   combineKeys,
   formatKeysLabel,
-} from "../config/keyCombinations";
+} from '../config/keyCombinations';
 
 export interface TerminalAction {
-  type: "text" | "command";
+  type: 'text' | 'command';
   value: string; // For text, the actual text. For command, the escape sequence
   label?: string; // For command display (e.g., "CTRL+C")
 }
@@ -30,8 +30,8 @@ interface KeyCombinationModalProps {
 }
 
 type Item =
-  | { type: "text"; value: string }
-  | { type: "command"; keys: KeyDefinition[]; label: string; value: string };
+  | {type: 'text'; value: string}
+  | {type: 'command'; keys: KeyDefinition[]; label: string; value: string};
 
 export function KeyCombinationModal({
   visible,
@@ -39,7 +39,7 @@ export function KeyCombinationModal({
   onSend,
 }: KeyCombinationModalProps): React.ReactElement {
   const [items, setItems] = useState<Item[]>([]);
-  const [currentText, setCurrentText] = useState("");
+  const [currentText, setCurrentText] = useState('');
   const [suggestions, setSuggestions] = useState<KeyDefinition[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -54,7 +54,7 @@ export function KeyCombinationModal({
   useEffect(() => {
     if (currentText.trim()) {
       // Get the last word for command search
-      const words = currentText.split(" ");
+      const words = currentText.split(' ');
       const lastWord = words[words.length - 1];
 
       if (lastWord) {
@@ -80,7 +80,7 @@ export function KeyCombinationModal({
     } else {
       // Reset state when modal closes
       setItems([]);
-      setCurrentText("");
+      setCurrentText('');
       setSuggestions([]);
       setShowSuggestions(false);
       setBuildingMode(false);
@@ -91,24 +91,24 @@ export function KeyCombinationModal({
   const addKeyToBuilding = (key: KeyDefinition): void => {
     if (!buildingMode) {
       // Before entering building mode, convert any existing text to a text tile
-      const words = currentText.split(" ");
+      const words = currentText.split(' ');
       const lastWord = words[words.length - 1]; // This is the search term
-      const textBefore = words.slice(0, -1).join(" "); // Everything before the search
+      const textBefore = words.slice(0, -1).join(' '); // Everything before the search
 
       // Add text before search as a text tile (if any)
       if (textBefore.trim()) {
-        setItems((prev) => [...prev, { type: "text", value: textBefore }]);
+        setItems(prev => [...prev, {type: 'text', value: textBefore}]);
       }
 
       // Enter building mode with the selected key
       setBuildingMode(true);
       setBuildingKeys([key]);
-      setCurrentText("");
+      setCurrentText('');
       setShowSuggestions(false);
     } else {
       // Add to existing building
       setBuildingKeys([...buildingKeys, key]);
-      setCurrentText("");
+      setCurrentText('');
       setShowSuggestions(false);
     }
     inputRef.current?.focus();
@@ -120,18 +120,19 @@ export function KeyCombinationModal({
       const combinedEscape = combineKeys(buildingKeys);
       const label = formatKeysLabel(buildingKeys);
 
-      setItems((prev) => [
+      setItems(prev => [
         ...prev,
         {
-          type: "command",
+          type: 'command',
           keys: buildingKeys,
           label,
           value: combinedEscape,
         },
+      ]);
 
       setBuildingMode(false);
       setBuildingKeys([]);
-      setCurrentText("");
+      setCurrentText('');
     }
     inputRef.current?.focus();
   };
@@ -139,7 +140,7 @@ export function KeyCombinationModal({
   const cancelBuilding = (): void => {
     setBuildingMode(false);
     setBuildingKeys([]);
-    setCurrentText("");
+    setCurrentText('');
     inputRef.current?.focus();
   };
 
@@ -157,21 +158,23 @@ export function KeyCombinationModal({
     // Build final items array including any remaining text
     const finalItems = [...items];
     if (currentText.trim()) {
-      finalItems.push({ type: "text", value: currentText });
+      finalItems.push({type: 'text', value: currentText});
     }
 
-    if (finalItems.length === 0) {return;}
+    if (finalItems.length === 0) {
+      return;
+    }
 
     // Convert to action array
-    const actions: TerminalAction[] = finalItems.map((item) => {
-      if (item.type === "text") {
+    const actions: TerminalAction[] = finalItems.map(item => {
+      if (item.type === 'text') {
         return {
-          type: "text",
+          type: 'text',
           value: item.value,
         };
       } else {
         return {
-          type: "command",
+          type: 'command',
           value: item.value,
           label: item.label,
         };
@@ -186,17 +189,17 @@ export function KeyCombinationModal({
     setCurrentText(text);
   };
 
-  const handleKeyPress = (e: { nativeEvent: { key: string } }): void => {
+  const handleKeyPress = (e: {nativeEvent: {key: string}}): void => {
     const key = e.nativeEvent.key;
 
     // Escape key cancels building mode
-    if (key === "Escape" && buildingMode) {
+    if (key === 'Escape' && buildingMode) {
       cancelBuilding();
       return;
     }
 
     // Enter key behavior
-    if (key === "Enter") {
+    if (key === 'Enter') {
       if (buildingMode && buildingKeys.length > 0) {
         // Confirm the building
         confirmBuilding();
@@ -208,16 +211,13 @@ export function KeyCombinationModal({
   };
 
   const renderItem = (item: Item, index: number): React.ReactElement => {
-    if (item.type === "text") {
+    if (item.type === 'text') {
       return (
         <View key={`text-${index}`} style={styles.textTile}>
           <Text style={styles.textTileText} numberOfLines={1}>
             "{item.value}"
           </Text>
-          <TouchableOpacity
-            onPress={() => removeItem(index)}
-            style={styles.tileRemove}
-          >
+          <TouchableOpacity onPress={() => removeItem(index)} style={styles.tileRemove}>
             <Text style={styles.tileRemoveText}>×</Text>
           </TouchableOpacity>
         </View>
@@ -226,10 +226,7 @@ export function KeyCombinationModal({
       return (
         <View key={`cmd-${index}`} style={styles.commandTile}>
           <Text style={styles.commandTileText}>{item.label}</Text>
-          <TouchableOpacity
-            onPress={() => removeItem(index)}
-            style={styles.tileRemove}
-          >
+          <TouchableOpacity onPress={() => removeItem(index)} style={styles.tileRemove}>
             <Text style={styles.tileRemoveText}>×</Text>
           </TouchableOpacity>
         </View>
@@ -245,34 +242,20 @@ export function KeyCombinationModal({
     index: number;
   }): React.ReactElement => (
     <TouchableOpacity
-      style={[
-        styles.suggestionItem,
-        index === 0 && styles.suggestionItemSelected,
-      ]}
-      onPress={() => addKeyToBuilding(item)}
-    >
+      style={[styles.suggestionItem, index === 0 && styles.suggestionItemSelected]}
+      onPress={() => addKeyToBuilding(item)}>
       <Text style={styles.suggestionSymbol}>{item.symbol}</Text>
       {item.name && <Text style={styles.suggestionName}>{item.name}</Text>}
     </TouchableOpacity>
   );
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
+    <Modal visible={visible} transparent={true} animationType="none" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity
           style={styles.modalContainer}
           activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
-        >
+          onPress={e => e.stopPropagation()}>
           {/* Building Mode Preview */}
           {buildingMode && (
             <View style={styles.buildingPreview}>
@@ -282,23 +265,15 @@ export function KeyCombinationModal({
                     <View style={styles.buildingKeyBadge}>
                       <Text style={styles.buildingKeyText}>{key.symbol}</Text>
                     </View>
-                    {index < buildingKeys.length - 1 && (
-                      <Text style={styles.buildingPlus}>+</Text>
-                    )}
+                    {index < buildingKeys.length - 1 && <Text style={styles.buildingPlus}>+</Text>}
                   </React.Fragment>
                 ))}
               </View>
               <View style={styles.buildingActions}>
-                <TouchableOpacity
-                  style={styles.buildingConfirm}
-                  onPress={confirmBuilding}
-                >
+                <TouchableOpacity style={styles.buildingConfirm} onPress={confirmBuilding}>
                   <Text style={styles.buildingConfirmText}>✓</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.buildingCancel}
-                  onPress={cancelBuilding}
-                >
+                <TouchableOpacity style={styles.buildingCancel} onPress={cancelBuilding}>
                   <Text style={styles.buildingCancelText}>×</Text>
                 </TouchableOpacity>
               </View>
@@ -316,16 +291,14 @@ export function KeyCombinationModal({
                 onChangeText={handleTextChange}
                 onKeyPress={handleKeyPress}
                 placeholder={
-                  items.length === 0 && !currentText
-                    ? "Type text or search commands..."
-                    : ""
+                  items.length === 0 && !currentText ? 'Type text or search commands...' : ''
                 }
                 placeholderTextColor="#555566"
                 autoCapitalize="none"
                 autoCorrect={false}
                 multiline={false}
                 blurOnSubmit={false}
-                onSubmitEditing={(e) => {
+                onSubmitEditing={e => {
                   // Prevent default behavior
                   e.preventDefault();
                   if (buildingMode && buildingKeys.length > 0) {
@@ -356,13 +329,10 @@ export function KeyCombinationModal({
           <TouchableOpacity
             style={[
               styles.sendButton,
-              items.length === 0 &&
-                !currentText.trim() &&
-                styles.sendButtonDisabled,
+              items.length === 0 && !currentText.trim() && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={items.length === 0 && !currentText.trim()}
-          >
+            disabled={items.length === 0 && !currentText.trim()}>
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -374,59 +344,59 @@ export function KeyCombinationModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(10, 10, 15, 0.6)",
-    justifyContent: "flex-start",
-    alignItems: "center",
+    backgroundColor: 'rgba(10, 10, 15, 0.6)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     paddingTop: 80,
   },
   modalContainer: {
-    width: "85%",
+    width: '85%',
     maxWidth: 400,
-    backgroundColor: "rgba(26, 26, 37, 0.85)",
+    backgroundColor: 'rgba(26, 26, 37, 0.85)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(98, 0, 238, 0.3)",
+    borderColor: 'rgba(98, 0, 238, 0.3)',
   },
   buildingPreview: {
-    backgroundColor: "rgba(98, 0, 238, 0.15)",
+    backgroundColor: 'rgba(98, 0, 238, 0.15)',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: "rgba(98, 0, 238, 0.3)",
+    borderColor: 'rgba(98, 0, 238, 0.3)',
   },
   buildingKeys: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    flexWrap: "wrap",
+    flexWrap: 'wrap',
     gap: 6,
   },
   buildingKeyBadge: {
-    backgroundColor: "rgba(42, 42, 58, 0.8)",
+    backgroundColor: 'rgba(42, 42, 58, 0.8)',
     borderRadius: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: "rgba(98, 0, 238, 0.4)",
+    borderColor: 'rgba(98, 0, 238, 0.4)',
   },
   buildingKeyText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   buildingPlus: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     marginHorizontal: 2,
   },
   buildingActions: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
     marginLeft: 12,
   },
@@ -434,51 +404,51 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(0, 200, 100, 0.3)",
+    backgroundColor: 'rgba(0, 200, 100, 0.3)',
     borderWidth: 1,
-    borderColor: "rgba(0, 200, 100, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: 'rgba(0, 200, 100, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buildingConfirmText: {
-    color: "#00ff88",
+    color: '#00ff88',
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   buildingCancel: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(255, 50, 50, 0.3)",
+    backgroundColor: 'rgba(255, 50, 50, 0.3)',
     borderWidth: 1,
-    borderColor: "rgba(255, 50, 50, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: 'rgba(255, 50, 50, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buildingCancelText: {
-    color: "#ff6666",
+    color: '#ff6666',
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginTop: -2,
   },
   inputContainer: {
-    backgroundColor: "#12121a",
+    backgroundColor: '#12121a',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
     padding: 8,
     minHeight: 48,
   },
   itemsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 6,
   },
   textTile: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a25",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a25',
     borderRadius: 6,
     paddingLeft: 10,
     paddingRight: 6,
@@ -487,24 +457,24 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   textTileText: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 14,
-    fontWeight: "400",
-    fontStyle: "italic",
+    fontWeight: '400',
+    fontStyle: 'italic',
   },
   textTileInput: {
-    color: "#BB86FC",
+    color: '#BB86FC',
     fontSize: 14,
-    fontWeight: "400",
-    fontStyle: "italic",
+    fontWeight: '400',
+    fontStyle: 'italic',
     flex: 1,
     padding: 0,
     minWidth: 50,
   },
   commandTile: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#6200EE",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6200EE',
     borderRadius: 6,
     paddingLeft: 10,
     paddingRight: 6,
@@ -512,40 +482,40 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   commandTileText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   tileRemove: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tileRemoveText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginTop: -2,
   },
   textInput: {
     flex: 1,
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 14,
     minWidth: 100,
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
   suggestionsContainer: {
-    backgroundColor: "#12121a",
+    backgroundColor: '#12121a',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#2a2a3a",
+    borderColor: '#2a2a3a',
     marginTop: 8,
     maxHeight: 200,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   suggestionsList: {
     flexGrow: 0,
@@ -553,40 +523,40 @@ const styles = StyleSheet.create({
   suggestionItem: {
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#1a1a25",
-    flexDirection: "column",
-    alignItems: "center",
+    borderBottomColor: '#1a1a25',
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   suggestionItemSelected: {
-    backgroundColor: "rgba(98, 0, 238, 0.2)",
+    backgroundColor: 'rgba(98, 0, 238, 0.2)',
     borderLeftWidth: 3,
-    borderLeftColor: "#6200EE",
+    borderLeftColor: '#6200EE',
   },
   suggestionSymbol: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 1,
   },
   suggestionName: {
-    color: "#8888aa",
+    color: '#8888aa',
     fontSize: 9,
-    fontWeight: "400",
+    fontWeight: '400',
   },
   sendButton: {
-    backgroundColor: "#6200EE",
+    backgroundColor: '#6200EE',
     borderRadius: 8,
     padding: 14,
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: 16,
   },
   sendButtonDisabled: {
     opacity: 0.4,
   },
   sendButtonText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
 });

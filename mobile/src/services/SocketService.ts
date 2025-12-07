@@ -1,6 +1,6 @@
 import {io, Socket} from 'socket.io-client';
 
-type EventHandler = (data: any) => void;
+type EventHandler = (data: unknown) => void;
 
 export class SocketService {
   private socket: Socket | null = null;
@@ -83,7 +83,7 @@ export class SocketService {
     this.eventHandlers.get(event)!.push(handler);
   }
 
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: unknown): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
       handlers.forEach(handler => handler(data));

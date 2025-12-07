@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback, useMemo, memo} from 'react';
+import React, {useEffect, useState, useCallback, memo} from 'react';
 import {
   View,
   ScrollView,
@@ -7,7 +7,6 @@ import {
   Image,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import {AppText, Slider} from '../components/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,22 +17,19 @@ import {terminalThemes, TerminalTheme} from '../theme/terminalThemes';
 import {SavedCombination, SAVED_COMBINATIONS_KEY} from '../types/savedCombinations';
 import {ProfileStackParamList} from '../navigation/ProfileStackNavigator';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-
 // Memoized theme preview component to prevent re-renders during scroll
 interface ThemePreviewProps {
   terminalTheme: TerminalTheme;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  theme: typeof themeColors;
 }
 
 const ThemePreviewItem = memo(function ThemePreviewItem({
   terminalTheme,
   isSelected,
   onSelect,
-  theme,
-}: ThemePreviewProps) {
+  theme: _theme,
+}: ThemePreviewProps & {theme?: typeof themeColors}) {
   const handlePress = useCallback(() => {
     onSelect(terminalTheme.id);
   }, [onSelect, terminalTheme.id]);
@@ -121,6 +117,7 @@ export default function ProfileScreen(): React.ReactElement {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async (): Promise<void> => {

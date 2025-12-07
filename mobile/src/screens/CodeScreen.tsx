@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   StyleSheet,
@@ -14,30 +14,30 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CodeEditor } from '../components/code/CodeEditor';
-import { FileTree, SelectedItem } from '../components/code/FileTree';
-import { EditorTabs, OpenFile } from '../components/code/EditorTabs';
-import { CodeProject, FileNode, FileChange } from '../types/code';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {CodeEditor} from '../components/code/CodeEditor';
+import {FileTree, SelectedItem} from '../components/code/FileTree';
+import {EditorTabs, OpenFile} from '../components/code/EditorTabs';
+import {CodeProject, FileNode, FileChange} from '../types/code';
 import {
   useInitProject,
   useFileContent,
   useSaveFile,
   useProjectsHistory,
 } from '../hooks/useCodeQueries';
-import { codeService, FileDiff } from '../services/CodeService';
-import { DiffMode } from '../components/code/CodeEditor';
-import { useQueryClient } from '@tanstack/react-query';
-import { useIsConnected } from '../services/ConnectionContext';
-import { MainTabParamList } from '../navigation/MainTabNavigator';
-import { AppView, AppText, AppButton } from '../components/ui';
+import {codeService, FileDiff} from '../services/CodeService';
+import {DiffMode} from '../components/code/CodeEditor';
+import {useQueryClient} from '@tanstack/react-query';
+import {useIsConnected} from '../services/ConnectionContext';
+import {MainTabParamList} from '../navigation/MainTabNavigator';
+import {AppView, AppText, AppButton} from '../components/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RELAY_SERVER_URL } from '../config';
-import { getThemeById, TerminalTheme } from '../theme/terminalThemes';
+import {RELAY_SERVER_URL} from '../config';
+import {getThemeById, TerminalTheme} from '../theme/terminalThemes';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 const SIDEBAR_WIDTH = 280;
 
 // Dark theme colors (matching terminal)
@@ -82,9 +82,7 @@ export default function CodeScreen(): React.ReactElement {
   const [isCreating, setIsCreating] = useState(false);
 
   // Project state - MUST be declared before any conditional returns
-  const [currentProject, setCurrentProject] = useState<ProjectState | null>(
-    null,
-  );
+  const [currentProject, setCurrentProject] = useState<ProjectState | null>(null);
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
@@ -96,16 +94,14 @@ export default function CodeScreen(): React.ReactElement {
   // Diff state (loaded from settings)
   const [diffMode, setDiffMode] = useState<DiffMode>('off');
   const [diffData, setDiffData] = useState<FileDiff | null>(null);
-  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+  const [_isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   // Editor settings (from user preferences)
   const [editorFontSize, setEditorFontSize] = useState(14);
   const [editorTheme, setEditorTheme] = useState<TerminalTheme | null>(null);
 
   // Context menu state (for long press)
-  const [contextMenuItem, setContextMenuItem] = useState<SelectedItem | null>(
-    null,
-  );
+  const [contextMenuItem, setContextMenuItem] = useState<SelectedItem | null>(null);
 
   // Rename modal state
   const [renameItem, setRenameItem] = useState<SelectedItem | null>(null);
@@ -119,44 +115,20 @@ export default function CodeScreen(): React.ReactElement {
   // Sidebar tabs state
   const [sidebarTab, setSidebarTab] = useState<'files' | 'changes'>('files');
   const [projectChanges, setProjectChanges] = useState<{
-    staged: Array<{ path: string; type: string }>;
-    unstaged: Array<{ path: string; type: string }>;
-  }>({ staged: [], unstaged: [] });
+    staged: Array<{path: string; type: string}>;
+    unstaged: Array<{path: string; type: string}>;
+  }>({staged: [], unstaged: []});
 
   // Queries - MUST be called before any conditional returns
-  const { data: projects, isLoading: isLoadingProjects } = useProjectsHistory();
+  const {data: projects, isLoading: isLoadingProjects} = useProjectsHistory();
   const initProjectMutation = useInitProject();
   const saveFileMutation = useSaveFile();
 
   // Fetch active file content
-  const { data: activeFileContent, isLoading: isLoadingFile } = useFileContent(
+  const {data: activeFileContent, isLoading: isLoadingFile} = useFileContent(
     activeFile,
     currentProject?.path,
   );
-
-  // Show "No Active Connection" screen when not connected
-  if (!isConnected) {
-    return (
-      <AppView safeArea style={notConnectedStyles.container}>
-        <View style={notConnectedStyles.content}>
-          <View style={notConnectedStyles.iconContainer}>
-            <Text style={notConnectedStyles.icon}>◎</Text>
-          </View>
-          <AppText variant="h2" weight="bold" style={notConnectedStyles.title}>
-            No Active Connection
-          </AppText>
-          <AppText style={notConnectedStyles.subtitle}>
-            Connect to your Mac to browse and edit files
-          </AppText>
-          <AppButton
-            title="Connect to Mac"
-            onPress={() => navigation.navigate('Connections')}
-            style={notConnectedStyles.button}
-          />
-        </View>
-      </AppView>
-    );
-  }
 
   // Fetch editor settings when screen comes into focus (to pick up changes from Profile)
   useFocusEffect(
@@ -164,7 +136,9 @@ export default function CodeScreen(): React.ReactElement {
       const fetchEditorSettings = async () => {
         try {
           const token = await AsyncStorage.getItem('mobifai_auth_token');
-          if (!token) {return;}
+          if (!token) {
+            return;
+          }
 
           const response = await fetch(`${RELAY_SERVER_URL}/api/settings`, {
             method: 'GET',
@@ -201,9 +175,10 @@ export default function CodeScreen(): React.ReactElement {
     // This ensures we get fresh content every time, even when reopening files
     if (activeFile && activeFileContent !== undefined) {
       console.log(
-        `📄 Received content for: ${activeFile.split("/").pop()} (${activeFileContent.length} bytes)`,
+        `📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`,
+      );
 
-      setFileContents((prev) => ({
+      setFileContents(prev => ({
         ...prev,
         [activeFile]: activeFileContent,
       }));
@@ -255,14 +230,16 @@ export default function CodeScreen(): React.ReactElement {
             name: projectName,
           });
 
-          queryClient.setQueryData<CodeProject[]>(['projects'], (old) => {
+          queryClient.setQueryData<CodeProject[]>(['projects'], old => {
             const newProject: CodeProject = {
               path: payload.rootPath,
               name: projectName,
               lastOpened: Date.now(),
             };
-            if (!old) {return [newProject];}
-            const filtered = old.filter((p) => p.path !== payload.rootPath);
+            if (!old) {
+              return [newProject];
+            }
+            const filtered = old.filter(p => p.path !== payload.rootPath);
             return [newProject, ...filtered];
           });
         }
@@ -298,7 +275,7 @@ export default function CodeScreen(): React.ReactElement {
           if (syncedState.files && syncedState.files.length > 0) {
             // Restore open file tabs
             const restoredFiles: OpenFile[] = syncedState.files.map(
-              (file: { path: string; content: string; isActive: boolean }) => ({
+              (file: {path: string; content: string; isActive: boolean}) => ({
                 path: file.path,
                 name: file.path.split('/').pop() || file.path,
                 isDirty: false,
@@ -308,8 +285,7 @@ export default function CodeScreen(): React.ReactElement {
 
             // Restore active file and its content
             const activeFileData = syncedState.files.find(
-              (f: { path: string; content: string; isActive: boolean }) =>
-                f.isActive,
+              (f: {path: string; content: string; isActive: boolean}) => f.isActive,
             );
             if (activeFileData) {
               setActiveFile(activeFileData.path);
@@ -327,7 +303,7 @@ export default function CodeScreen(): React.ReactElement {
               const firstFile = restoredFiles[0];
               setActiveFile(firstFile.path);
               const firstFileData = syncedState.files[0];
-              setFileContents({ [firstFile.path]: firstFileData.content });
+              setFileContents({[firstFile.path]: firstFileData.content});
               // Notify Mac client
               try {
                 await codeService.setActiveFile(firstFile.path);
@@ -343,8 +319,7 @@ export default function CodeScreen(): React.ReactElement {
           // Non-critical error, continue
         }
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         Alert.alert('Error', `Failed to open project: ${errorMessage}`);
       }
     },
@@ -357,7 +332,7 @@ export default function CodeScreen(): React.ReactElement {
       console.log(`📂 Opening file: ${filePath}`);
       const fileName = filePath.split('/').pop() || filePath;
 
-      const existingFile = openFiles.find((f) => f.path === filePath);
+      const existingFile = openFiles.find(f => f.path === filePath);
       if (existingFile) {
         console.log('   File already open, switching to it');
         setActiveFile(filePath);
@@ -378,7 +353,7 @@ export default function CodeScreen(): React.ReactElement {
         name: fileName,
         isDirty: false,
       };
-      setOpenFiles((prev) => [...prev, newFile]);
+      setOpenFiles(prev => [...prev, newFile]);
       setActiveFile(filePath);
       // Notify Mac client about active file change
       try {
@@ -408,50 +383,45 @@ export default function CodeScreen(): React.ReactElement {
       const isDirty = dirtyFiles.has(filePath);
 
       if (isDirty) {
-        Alert.alert(
-          'Unsaved Changes',
-          'Do you want to save changes before closing?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: "Don't Save",
-              style: 'destructive',
-              onPress: () => performCloseFile(filePath),
+        Alert.alert('Unsaved Changes', 'Do you want to save changes before closing?', [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: "Don't Save",
+            style: 'destructive',
+            onPress: () => performCloseFile(filePath),
+          },
+          {
+            text: 'Save',
+            onPress: async () => {
+              await handleSaveFile(filePath);
+              performCloseFile(filePath);
             },
-            {
-              text: 'Save',
-              onPress: async () => {
-                await handleSaveFile(filePath);
-                performCloseFile(filePath);
-              },
-            },
-          ],
-        );
+          },
+        ]);
       } else {
         performCloseFile(filePath);
       }
     },
-    [dirtyFiles],
+    [dirtyFiles, handleSaveFile, performCloseFile],
   );
 
   const performCloseFile = async (filePath: string) => {
     // Remove from local state
-    setOpenFiles((prev) => prev.filter((f) => f.path !== filePath));
-    setFileContents((prev) => {
-      const newContents = { ...prev };
+    setOpenFiles(prev => prev.filter(f => f.path !== filePath));
+    setFileContents(prev => {
+      const newContents = {...prev};
       delete newContents[filePath];
       return newContents;
     });
-    setDirtyFiles((prev) => {
+    setDirtyFiles(prev => {
       const newDirty = new Set(prev);
       newDirty.delete(filePath);
       return newDirty;
     });
 
     if (activeFile === filePath) {
-      const remainingFiles = openFiles.filter((f) => f.path !== filePath);
-      const newActiveFile =
-        remainingFiles.length > 0 ? remainingFiles[0].path : null;
+      const remainingFiles = openFiles.filter(f => f.path !== filePath);
+      const newActiveFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
       setActiveFile(newActiveFile);
 
       // Notify Mac about the new active file
@@ -474,9 +444,11 @@ export default function CodeScreen(): React.ReactElement {
   // Handle content change
   const handleContentChange = useCallback(
     (content: string) => {
-      if (!activeFile) {return;}
+      if (!activeFile) {
+        return;
+      }
 
-      setFileContents((prev) => ({
+      setFileContents(prev => ({
         ...prev,
         [activeFile]: content,
       }));
@@ -484,7 +456,7 @@ export default function CodeScreen(): React.ReactElement {
       const originalContent = activeFileContent || '';
       const isDirty = content !== originalContent;
 
-      setDirtyFiles((prev) => {
+      setDirtyFiles(prev => {
         const newDirty = new Set(prev);
         if (isDirty) {
           newDirty.add(activeFile);
@@ -494,9 +466,7 @@ export default function CodeScreen(): React.ReactElement {
         return newDirty;
       });
 
-      setOpenFiles((prev) =>
-        prev.map((f) => (f.path === activeFile ? { ...f, isDirty } : f)),
-      );
+      setOpenFiles(prev => prev.map(f => (f.path === activeFile ? {...f, isDirty} : f)));
     },
     [activeFile, activeFileContent],
   );
@@ -505,10 +475,14 @@ export default function CodeScreen(): React.ReactElement {
   const handleSaveFile = useCallback(
     async (filePath?: string) => {
       const pathToSave = filePath || activeFile;
-      if (!pathToSave) {return;}
+      if (!pathToSave) {
+        return;
+      }
 
       const content = fileContents[pathToSave];
-      if (content === undefined) {return;}
+      if (content === undefined) {
+        return;
+      }
 
       try {
         await saveFileMutation.mutateAsync({
@@ -516,20 +490,15 @@ export default function CodeScreen(): React.ReactElement {
           content,
         });
 
-        setDirtyFiles((prev) => {
+        setDirtyFiles(prev => {
           const newDirty = new Set(prev);
           newDirty.delete(pathToSave);
           return newDirty;
         });
 
-        setOpenFiles((prev) =>
-          prev.map((f) =>
-            f.path === pathToSave ? { ...f, isDirty: false } : f,
-          )
-        );
+        setOpenFiles(prev => prev.map(f => (f.path === pathToSave ? {...f, isDirty: false} : f)));
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         Alert.alert('Error', `Failed to save file: ${errorMessage}`);
       }
     },
@@ -538,7 +507,9 @@ export default function CodeScreen(): React.ReactElement {
 
   // Get target folder for creation
   const getTargetFolder = (): string | null => {
-    if (!currentProject) {return null;}
+    if (!currentProject) {
+      return null;
+    }
 
     if (!selectedItem) {
       return currentProject.path; // Default to root
@@ -568,23 +539,24 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle create submit
   const handleCreateSubmit = useCallback(async () => {
-    if (!createName.trim() || !currentProject) {return;}
+    if (!createName.trim() || !currentProject) {
+      return;
+    }
 
     const targetFolder = getTargetFolder();
-    if (!targetFolder) {return;}
+    if (!targetFolder) {
+      return;
+    }
 
     setIsCreating(true);
 
     try {
       if (createMode === 'file') {
-        const result = await codeService.createFile(
-          targetFolder,
-          createName.trim(),
-        );
+        const result = await codeService.createFile(targetFolder, createName.trim());
 
         // Update the project's children if we created in root
         if (targetFolder === currentProject.path) {
-          setCurrentProject((prev) =>
+          setCurrentProject(prev =>
             prev
               ? {
                   ...prev,
@@ -602,14 +574,11 @@ export default function CodeScreen(): React.ReactElement {
         // Optionally open the new file
         handleFileSelect(result.filePath);
       } else if (createMode === 'folder') {
-        const result = await codeService.createFolder(
-          targetFolder,
-          createName.trim(),
-        );
+        const result = await codeService.createFolder(targetFolder, createName.trim());
 
         // Update the project's children if we created in root
         if (targetFolder === currentProject.path) {
-          setCurrentProject((prev) =>
+          setCurrentProject(prev =>
             prev
               ? {
                   ...prev,
@@ -628,13 +597,12 @@ export default function CodeScreen(): React.ReactElement {
       setCreateMode(null);
       setCreateName('');
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert('Error', `Failed to create ${createMode}: ${errorMessage}`);
     } finally {
       setIsCreating(false);
     }
-  }, [createMode, createName, currentProject, queryClient, handleFileSelect]);
+  }, [createMode, createName, currentProject, queryClient, handleFileSelect, getTargetFolder]);
 
   // Handle rename - open rename modal
   const handleOpenRename = useCallback(() => {
@@ -647,21 +615,20 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle rename submit
   const handleRenameSubmit = useCallback(async () => {
-    if (!renameName.trim() || !renameItem || !currentProject) {return;}
+    if (!renameName.trim() || !renameItem || !currentProject) {
+      return;
+    }
 
     setIsRenaming(true);
 
     try {
-      const result = await codeService.renameItem(
-        renameItem.path,
-        renameName.trim(),
-      );
+      const result = await codeService.renameItem(renameItem.path, renameName.trim());
 
       const parentFolder = result.parentFolder;
 
       // Update the project's children if renamed in root
       if (parentFolder === currentProject.path) {
-        setCurrentProject((prev) =>
+        setCurrentProject(prev =>
           prev
             ? {
                 ...prev,
@@ -678,10 +645,10 @@ export default function CodeScreen(): React.ReactElement {
 
       // Update open files if the renamed item was open
       if (renameItem.type === 'file') {
-        setOpenFiles((prev) =>
-          prev.map((f) => {
+        setOpenFiles(prev =>
+          prev.map(f => {
             if (f.path === renameItem.path) {
-              return { ...f, path: result.newPath, name: renameName.trim() };
+              return {...f, path: result.newPath, name: renameName.trim()};
             }
             return f;
           }),
@@ -694,8 +661,8 @@ export default function CodeScreen(): React.ReactElement {
 
         // Update file contents
         if (renameItem.path in fileContents) {
-          setFileContents((prev) => {
-            const newContents = { ...prev };
+          setFileContents(prev => {
+            const newContents = {...prev};
             newContents[result.newPath] = newContents[renameItem.path];
             delete newContents[renameItem.path];
             return newContents;
@@ -704,7 +671,7 @@ export default function CodeScreen(): React.ReactElement {
 
         // Update dirty files
         if (dirtyFiles.has(renameItem.path)) {
-          setDirtyFiles((prev) => {
+          setDirtyFiles(prev => {
             const newDirty = new Set(prev);
             newDirty.delete(renameItem.path);
             newDirty.add(result.newPath);
@@ -725,8 +692,7 @@ export default function CodeScreen(): React.ReactElement {
       setRenameItem(null);
       setRenameName('');
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert('Error', `Failed to rename: ${errorMessage}`);
     } finally {
       setIsRenaming(false);
@@ -752,7 +718,9 @@ export default function CodeScreen(): React.ReactElement {
 
   // Handle delete confirm
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteItem || !currentProject) {return;}
+    if (!deleteItem || !currentProject) {
+      return;
+    }
 
     setIsDeleting(true);
 
@@ -763,7 +731,7 @@ export default function CodeScreen(): React.ReactElement {
 
       // Update the project's children if deleted from root
       if (parentFolder === currentProject.path) {
-        setCurrentProject((prev) =>
+        setCurrentProject(prev =>
           prev
             ? {
                 ...prev,
@@ -779,17 +747,14 @@ export default function CodeScreen(): React.ReactElement {
       });
 
       // Close the file if it was open
-      if (
-        deleteItem.type === 'file' &&
-        openFiles.some((f) => f.path === deleteItem.path)
-      ) {
+      if (deleteItem.type === 'file' && openFiles.some(f => f.path === deleteItem.path)) {
         performCloseFile(deleteItem.path);
       }
 
       // If a folder was deleted, close all files inside it
       if (deleteItem.type === 'folder') {
         const deletedPath = deleteItem.path + '/';
-        openFiles.forEach((f) => {
+        openFiles.forEach(f => {
           if (f.path.startsWith(deletedPath)) {
             performCloseFile(f.path);
           }
@@ -799,21 +764,19 @@ export default function CodeScreen(): React.ReactElement {
       // Clear selected item if it was deleted
       if (
         selectedItem?.path === deleteItem.path ||
-        (deleteItem.type === 'folder' &&
-          selectedItem?.path.startsWith(deleteItem.path + '/'))
+        (deleteItem.type === 'folder' && selectedItem?.path.startsWith(deleteItem.path + '/'))
       ) {
         setSelectedItem(null);
       }
 
       setDeleteItem(null);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert('Error', `Failed to delete: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteItem, currentProject, queryClient, openFiles, selectedItem]);
+  }, [deleteItem, currentProject, queryClient, openFiles, selectedItem, performCloseFile]);
 
   // Fetch diff data for the active file
   const fetchDiffData = useCallback(async (filePath: string) => {
@@ -848,8 +811,8 @@ export default function CodeScreen(): React.ReactElement {
     if (currentProject?.path && sidebarTab === 'changes') {
       codeService
         .getProjectChanges(currentProject.path)
-        .then((changes) => setProjectChanges(changes))
-        .catch((err) => console.error('Failed to fetch project changes:', err));
+        .then(changes => setProjectChanges(changes))
+        .catch(err => console.error('Failed to fetch project changes:', err));
     }
   }, [currentProject?.path, sidebarTab]);
 
@@ -858,11 +821,11 @@ export default function CodeScreen(): React.ReactElement {
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
       'code:fileUpdated',
-      (_action, payload: { filePath: string; content: string }) => {
+      (_action, payload: {filePath: string; content: string}) => {
         // Only update if this is the active file
         if (payload.filePath === activeFile) {
           console.log('📝 File updated from Mac:', payload.filePath);
-          setFileContents((prev) => ({
+          setFileContents(prev => ({
             ...prev,
             [payload.filePath]: payload.content,
           }));
@@ -875,19 +838,16 @@ export default function CodeScreen(): React.ReactElement {
 
   // Listen for diff updates from Mac (sent automatically after file changes)
   useEffect(() => {
-    const unsubscribe = codeService.onMessage(
-      'code:fileDiff',
-      (_action, payload: FileDiff) => {
-        // Only update if this is the active file and diff mode is enabled
-        if (payload.filePath === activeFile && diffMode !== 'off') {
-          console.log('📊 Received live diff update from Mac:', payload.filePath);
-          console.log(
-            `   Added: ${payload.addedLines.length}, Deleted: ${payload.deletedLines.length}, Modified: ${payload.modifiedLines.length}`,
-          );
-          setDiffData(payload);
-        }
-      },
-    );
+    const unsubscribe = codeService.onMessage('code:fileDiff', (_action, payload: FileDiff) => {
+      // Only update if this is the active file and diff mode is enabled
+      if (payload.filePath === activeFile && diffMode !== 'off') {
+        console.log('📊 Received live diff update from Mac:', payload.filePath);
+        console.log(
+          `   Added: ${payload.addedLines.length}, Deleted: ${payload.deletedLines.length}, Modified: ${payload.modifiedLines.length}`,
+        );
+        setDiffData(payload);
+      }
+    });
 
     return () => unsubscribe();
   }, [activeFile, diffMode]);
@@ -907,9 +867,7 @@ export default function CodeScreen(): React.ReactElement {
         // Only update if this is the current project
         if (payload.projectPath === currentProject?.path) {
           console.log('🔄 Received project changes from Mac:');
-          console.log(
-            `   Staged: ${payload.staged.length}, Unstaged: ${payload.unstaged.length}`,
-          );
+          console.log(`   Staged: ${payload.staged.length}, Unstaged: ${payload.unstaged.length}`);
           setProjectChanges({
             staged: payload.staged,
             unstaged: payload.unstaged,
@@ -958,22 +916,28 @@ export default function CodeScreen(): React.ReactElement {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) {return `${days}d ago`;}
-    if (hours > 0) {return `${hours}h ago`;}
-    if (minutes > 0) {return `${minutes}m ago`;}
+    if (days > 0) {
+      return `${days}d ago`;
+    }
+    if (hours > 0) {
+      return `${hours}h ago`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m ago`;
+    }
     return 'Just now';
   };
 
   // Handle removing a project from history
   const handleRemoveProject = useCallback(
-    async (projectPath: string, event: any) => {
+    async (projectPath: string, event: {stopPropagation: () => void}) => {
       // Stop propagation so it doesn't trigger project selection
       event.stopPropagation();
 
       try {
         await codeService.removeFromHistory(projectPath);
         // Invalidate projects query to refresh the list
-        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        queryClient.invalidateQueries({queryKey: ['projects']});
       } catch (error) {
         console.error('Failed to remove project:', error);
         Alert.alert('Error', 'Failed to remove project from history');
@@ -995,7 +959,9 @@ export default function CodeScreen(): React.ReactElement {
 
   // Get selected folder name for display
   const getSelectedFolderName = (): string => {
-    if (!selectedItem) {return currentProject?.name || "root";}
+    if (!selectedItem) {
+      return currentProject?.name || 'root';
+    }
     if (selectedItem.type === 'folder') {
       return selectedItem.path.split('/').pop() || 'root';
     }
@@ -1014,10 +980,7 @@ export default function CodeScreen(): React.ReactElement {
           <Text style={styles.headerTitle}>Code Editor</Text>
         </View>
 
-        <ScrollView
-          style={styles.historyContainer}
-          contentContainerStyle={styles.historyContent}
-        >
+        <ScrollView style={styles.historyContainer} contentContainerStyle={styles.historyContent}>
           {/* Section Header */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>RECENT PROJECTS</Text>
@@ -1034,13 +997,12 @@ export default function CodeScreen(): React.ReactElement {
           {/* Projects List */}
           {!isLoadingProjects && projects && projects.length > 0 && (
             <View style={styles.projectsList}>
-              {projects.map((project) => (
+              {projects.map(project => (
                 <View key={project.path} style={styles.projectCardWrapper}>
                   <TouchableOpacity
                     onPress={() => handleProjectSelect(project)}
                     activeOpacity={0.7}
-                    style={styles.projectCard}
-                  >
+                    style={styles.projectCard}>
                     <View style={styles.projectIconWrapper}>
                       <Text style={styles.projectIcon}>📁</Text>
                     </View>
@@ -1052,15 +1014,12 @@ export default function CodeScreen(): React.ReactElement {
                         {project.path}
                       </Text>
                     </View>
-                    <Text style={styles.projectTime}>
-                      {getTimeAgo(project.lastOpened)}
-                    </Text>
+                    <Text style={styles.projectTime}>{getTimeAgo(project.lastOpened)}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.removeButton}
-                    onPress={(e) => handleRemoveProject(project.path, e)}
-                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                  >
+                    onPress={e => handleRemoveProject(project.path, e)}
+                    hitSlop={{top: 8, right: 8, bottom: 8, left: 8}}>
                     <Text style={styles.removeButtonText}>×</Text>
                   </TouchableOpacity>
                 </View>
@@ -1073,21 +1032,43 @@ export default function CodeScreen(): React.ReactElement {
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📂</Text>
               <Text style={styles.emptyTitle}>No Projects Yet</Text>
-              <Text style={styles.emptyText}>
-                Your recently opened projects will appear here.
-              </Text>
+              <Text style={styles.emptyText}>Your recently opened projects will appear here.</Text>
             </View>
           )}
 
           {/* Help Text */}
           <View style={styles.helpContainer}>
             <Text style={styles.helpText}>
-              To open a new project, tap the {'{ }'} button in the Terminal
-              while navigated to your project directory.
+              To open a new project, tap the {'{ }'} button in the Terminal while navigated to your
+              project directory.
             </Text>
           </View>
         </ScrollView>
       </SafeAreaView>
+    );
+  }
+
+  // Show "No Active Connection" screen when not connected
+  if (!isConnected) {
+    return (
+      <AppView safeArea style={notConnectedStyles.container}>
+        <View style={notConnectedStyles.content}>
+          <View style={notConnectedStyles.iconContainer}>
+            <Text style={notConnectedStyles.icon}>◎</Text>
+          </View>
+          <AppText variant="h2" weight="bold" style={notConnectedStyles.title}>
+            No Active Connection
+          </AppText>
+          <AppText style={notConnectedStyles.subtitle}>
+            Connect to your Mac to browse and edit files
+          </AppText>
+          <AppButton
+            title="Connect to Mac"
+            onPress={() => navigation.navigate('Connections')}
+            style={notConnectedStyles.button}
+          />
+        </View>
+      </AppView>
     );
   }
 
@@ -1096,37 +1077,15 @@ export default function CodeScreen(): React.ReactElement {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBackToHistory}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleBackToHistory}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={toggleSidebar}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar} activeOpacity={0.7}>
           <View style={styles.hamburger}>
-            <View
-              style={[
-                styles.hamburgerLine,
-                sidebarOpen && styles.hamburgerLineActive,
-              ]}
-            />
-            <View
-              style={[
-                styles.hamburgerLine,
-                sidebarOpen && styles.hamburgerLineActive,
-              ]}
-            />
-            <View
-              style={[
-                styles.hamburgerLine,
-                sidebarOpen && styles.hamburgerLineActive,
-              ]}
-            />
+            <View style={[styles.hamburgerLine, sidebarOpen && styles.hamburgerLineActive]} />
+            <View style={[styles.hamburgerLine, sidebarOpen && styles.hamburgerLineActive]} />
+            <View style={[styles.hamburgerLine, sidebarOpen && styles.hamburgerLineActive]} />
           </View>
         </TouchableOpacity>
 
@@ -1135,10 +1094,7 @@ export default function CodeScreen(): React.ReactElement {
         </Text>
 
         {activeFile && dirtyFiles.has(activeFile) && (
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={() => handleSaveFile()}
-          >
+          <TouchableOpacity style={styles.saveButton} onPress={() => handleSaveFile()}>
             <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
         )}
@@ -1148,7 +1104,7 @@ export default function CodeScreen(): React.ReactElement {
       <EditorTabs
         files={openFiles}
         activeFile={activeFile}
-        onSelectFile={async (filePath) => {
+        onSelectFile={async filePath => {
           setActiveFile(filePath);
           // Notify Mac client about active file change
           try {
@@ -1179,13 +1135,8 @@ export default function CodeScreen(): React.ReactElement {
         ) : (
           <View style={styles.noFileSelected}>
             <Text style={styles.noFileIcon}>📄</Text>
-            <Text style={styles.noFileText}>
-              Select a file to start editing
-            </Text>
-            <TouchableOpacity
-              style={styles.openFilesButton}
-              onPress={toggleSidebar}
-            >
+            <Text style={styles.noFileText}>Select a file to start editing</Text>
+            <TouchableOpacity style={styles.openFilesButton} onPress={toggleSidebar}>
               <Text style={styles.openFilesButtonText}>Browse Files</Text>
             </TouchableOpacity>
           </View>
@@ -1193,7 +1144,7 @@ export default function CodeScreen(): React.ReactElement {
 
         {/* Overlay when sidebar is open */}
         {sidebarOpen && (
-          <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+          <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               onPress={closeSidebar}
@@ -1203,52 +1154,35 @@ export default function CodeScreen(): React.ReactElement {
         )}
 
         {/* Animated Sidebar */}
-        <Animated.View
-          style={[
-            styles.sidebar,
-            { transform: [{ translateX: sidebarTranslateX }] },
-          ]}
-        >
+        <Animated.View style={[styles.sidebar, {transform: [{translateX: sidebarTranslateX}]}]}>
           {/* Sidebar Header with tabs and actions */}
           <View style={styles.sidebarHeader}>
             <View style={styles.sidebarTabs}>
               <TouchableOpacity
-                style={[
-                  styles.sidebarTab,
-                  sidebarTab === 'files' && styles.sidebarTabActive,
-                ]}
-                onPress={() => setSidebarTab('files')}
-              >
+                style={[styles.sidebarTab, sidebarTab === 'files' && styles.sidebarTabActive]}
+                onPress={() => setSidebarTab('files')}>
                 <Text
                   style={[
                     styles.sidebarTabText,
                     sidebarTab === 'files' && styles.sidebarTabTextActive,
-                  ]}
-                >
+                  ]}>
                   Files
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.sidebarTab,
-                  sidebarTab === 'changes' && styles.sidebarTabActive,
-                ]}
-                onPress={() => setSidebarTab('changes')}
-              >
+                style={[styles.sidebarTab, sidebarTab === 'changes' && styles.sidebarTabActive]}
+                onPress={() => setSidebarTab('changes')}>
                 <Text
                   style={[
                     styles.sidebarTabText,
                     sidebarTab === 'changes' && styles.sidebarTabTextActive,
-                  ]}
-                >
+                  ]}>
                   Changes
                 </Text>
-                {projectChanges.staged.length + projectChanges.unstaged.length >
-                  0 && (
+                {projectChanges.staged.length + projectChanges.unstaged.length > 0 && (
                   <View style={styles.changesBadge}>
                     <Text style={styles.changesBadgeText}>
-                      {projectChanges.staged.length +
-                        projectChanges.unstaged.length}
+                      {projectChanges.staged.length + projectChanges.unstaged.length}
                     </Text>
                   </View>
                 )}
@@ -1260,23 +1194,18 @@ export default function CodeScreen(): React.ReactElement {
                   <TouchableOpacity
                     onPress={handleCreateFile}
                     style={styles.createButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
                     <Text style={styles.createButtonText}>+📄</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleCreateFolder}
                     style={styles.createButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
                     <Text style={styles.createButtonText}>+📁</Text>
                   </TouchableOpacity>
                 </>
               )}
-              <TouchableOpacity
-                onPress={closeSidebar}
-                style={styles.closeSidebar}
-              >
+              <TouchableOpacity onPress={closeSidebar} style={styles.closeSidebar}>
                 <Text style={styles.closeSidebarText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -1289,8 +1218,7 @@ export default function CodeScreen(): React.ReactElement {
               {selectedItem && (
                 <View style={styles.selectedIndicator}>
                   <Text style={styles.selectedIndicatorText}>
-                    Selected: {selectedItem.type === 'folder' ? '📁' : '📄'}{' '}
-                    {selectedItem.name}
+                    Selected: {selectedItem.type === 'folder' ? '📁' : '📄'} {selectedItem.name}
                   </Text>
                 </View>
               )}
@@ -1316,18 +1244,12 @@ export default function CodeScreen(): React.ReactElement {
               {projectChanges.staged.length > 0 && (
                 <View style={styles.changesSection}>
                   <Text style={styles.changesSectionTitle}>STAGED</Text>
-                  {projectChanges.staged.map((change) => (
+                  {projectChanges.staged.map(change => (
                     <TouchableOpacity
                       key={change.path}
                       style={styles.changeItem}
-                      onPress={() => handleFileSelect(change.path)}
-                    >
-                      <View
-                        style={[
-                          styles.changeTypeIndicator,
-                          styles.changeTypeStaged,
-                        ]}
-                      />
+                      onPress={() => handleFileSelect(change.path)}>
+                      <View style={[styles.changeTypeIndicator, styles.changeTypeStaged]} />
                       <Text style={styles.changeTypeBadge}>{change.type}</Text>
                       <Text style={styles.changeFileName} numberOfLines={1}>
                         {change.path.split('/').pop()}
@@ -1341,12 +1263,11 @@ export default function CodeScreen(): React.ReactElement {
               {projectChanges.unstaged.length > 0 && (
                 <View style={styles.changesSection}>
                   <Text style={styles.changesSectionTitle}>UNSTAGED</Text>
-                  {projectChanges.unstaged.map((change) => (
+                  {projectChanges.unstaged.map(change => (
                     <TouchableOpacity
                       key={change.path}
                       style={styles.changeItem}
-                      onPress={() => handleFileSelect(change.path)}
-                    >
+                      onPress={() => handleFileSelect(change.path)}>
                       <View
                         style={[
                           styles.changeTypeIndicator,
@@ -1369,16 +1290,13 @@ export default function CodeScreen(): React.ReactElement {
               )}
 
               {/* Empty State */}
-              {projectChanges.staged.length === 0 &&
-                projectChanges.unstaged.length === 0 && (
-                  <View style={styles.changesEmpty}>
-                    <Text style={styles.changesEmptyIcon}>✓</Text>
-                    <Text style={styles.changesEmptyText}>No changes</Text>
-                    <Text style={styles.changesEmptySubtext}>
-                      Working tree is clean
-                    </Text>
-                  </View>
-                )}
+              {projectChanges.staged.length === 0 && projectChanges.unstaged.length === 0 && (
+                <View style={styles.changesEmpty}>
+                  <Text style={styles.changesEmptyIcon}>✓</Text>
+                  <Text style={styles.changesEmptyText}>No changes</Text>
+                  <Text style={styles.changesEmptySubtext}>Working tree is clean</Text>
+                </View>
+              )}
             </ScrollView>
           )}
         </Animated.View>
@@ -1389,35 +1307,24 @@ export default function CodeScreen(): React.ReactElement {
         visible={contextMenuItem !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setContextMenuItem(null)}
-      >
+        onRequestClose={() => setContextMenuItem(null)}>
         <TouchableOpacity
           style={styles.contextMenuOverlay}
           activeOpacity={1}
-          onPress={() => setContextMenuItem(null)}
-        >
+          onPress={() => setContextMenuItem(null)}>
           <View style={styles.contextMenu}>
             <Text style={styles.contextMenuTitle} numberOfLines={1}>
-              {contextMenuItem?.type === 'folder' ? '📁' : '📄'}{' '}
-              {contextMenuItem?.name}
+              {contextMenuItem?.type === 'folder' ? '📁' : '📄'} {contextMenuItem?.name}
             </Text>
-            <TouchableOpacity
-              style={styles.contextMenuItem}
-              onPress={handleOpenRename}
-            >
+            <TouchableOpacity style={styles.contextMenuItem} onPress={handleOpenRename}>
               <Text style={styles.contextMenuIcon}>✏️</Text>
               <Text style={styles.contextMenuText}>Rename</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.contextMenuItem, styles.contextMenuItemDanger]}
-              onPress={handleOpenDelete}
-            >
+              onPress={handleOpenDelete}>
               <Text style={styles.contextMenuIcon}>🗑️</Text>
-              <Text
-                style={[styles.contextMenuText, styles.contextMenuTextDanger]}
-              >
-                Delete
-              </Text>
+              <Text style={[styles.contextMenuText, styles.contextMenuTextDanger]}>Delete</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -1428,12 +1335,10 @@ export default function CodeScreen(): React.ReactElement {
         visible={createMode !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setCreateMode(null)}
-      >
+        onRequestClose={() => setCreateMode(null)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+          style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -1443,14 +1348,10 @@ export default function CodeScreen(): React.ReactElement {
             <Text style={styles.modalTitle}>
               Create New {createMode === 'file' ? 'File' : 'Folder'}
             </Text>
-            <Text style={styles.modalSubtitle}>
-              in {getSelectedFolderName()}
-            </Text>
+            <Text style={styles.modalSubtitle}>in {getSelectedFolderName()}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder={
-                createMode === 'file' ? 'filename.txt' : 'folder-name'
-              }
+              placeholder={createMode === 'file' ? 'filename.txt' : 'folder-name'}
               placeholderTextColor={darkTheme.text.disabled}
               value={createName}
               onChangeText={setCreateName}
@@ -1461,19 +1362,16 @@ export default function CodeScreen(): React.ReactElement {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
-                onPress={() => setCreateMode(null)}
-              >
+                onPress={() => setCreateMode(null)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.modalCreateButton,
-                  (!createName.trim() || isCreating) &&
-                    styles.modalButtonDisabled,
+                  (!createName.trim() || isCreating) && styles.modalButtonDisabled,
                 ]}
                 onPress={handleCreateSubmit}
-                disabled={!createName.trim() || isCreating}
-              >
+                disabled={!createName.trim() || isCreating}>
                 {isCreating ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -1490,12 +1388,10 @@ export default function CodeScreen(): React.ReactElement {
         visible={renameItem !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setRenameItem(null)}
-      >
+        onRequestClose={() => setRenameItem(null)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+          style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -1522,25 +1418,19 @@ export default function CodeScreen(): React.ReactElement {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
-                onPress={() => setRenameItem(null)}
-              >
+                onPress={() => setRenameItem(null)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.modalCreateButton,
-                  (!renameName.trim() ||
-                    isRenaming ||
-                    renameName.trim() === renameItem?.name) &&
+                  (!renameName.trim() || isRenaming || renameName.trim() === renameItem?.name) &&
                     styles.modalButtonDisabled,
                 ]}
                 onPress={handleRenameSubmit}
                 disabled={
-                  !renameName.trim() ||
-                  isRenaming ||
-                  renameName.trim() === renameItem?.name
-                }
-              >
+                  !renameName.trim() || isRenaming || renameName.trim() === renameItem?.name
+                }>
                 {isRenaming ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -1557,8 +1447,7 @@ export default function CodeScreen(): React.ReactElement {
         visible={deleteItem !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setDeleteItem(null)}
-      >
+        onRequestClose={() => setDeleteItem(null)}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
@@ -1585,18 +1474,13 @@ export default function CodeScreen(): React.ReactElement {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
-                onPress={() => setDeleteItem(null)}
-              >
+                onPress={() => setDeleteItem(null)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.modalDeleteButton,
-                  isDeleting && styles.modalButtonDisabled,
-                ]}
+                style={[styles.modalDeleteButton, isDeleting && styles.modalButtonDisabled]}
                 onPress={handleDeleteConfirm}
-                disabled={isDeleting}
-              >
+                disabled={isDeleting}>
                 {isDeleting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -1727,7 +1611,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 8,
     top: '50%',
-    transform: [{ translateY: -16 }],
+    transform: [{translateY: -16}],
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -1847,7 +1731,7 @@ const styles = StyleSheet.create({
     borderRightColor: darkTheme.border,
     zIndex: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
+    shadowOffset: {width: 4, height: 0},
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 10,

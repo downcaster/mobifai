@@ -193,6 +193,10 @@ export default function CodeScreen(): React.ReactElement {
           [activeFile]: activeFileContent,
         }));
 
+        // Increment contentVersion to force editor update with fresh content
+        // This ensures editor updates even with small content changes
+        setContentVersion(v => v + 1);
+
         // Reset edit tracking when switching to a new file
         hasUserEditedRef.current.delete(activeFile);
 
@@ -356,10 +360,6 @@ export default function CodeScreen(): React.ReactElement {
         // This handles case where file was updated while in background
         console.log('   🔄 Fetching latest content from Mac...');
         queryClient.invalidateQueries({queryKey: ['file', filePath]});
-        
-        // Increment contentVersion to force editor update when fresh content arrives
-        // This ensures editor doesn't ignore small content changes
-        setContentVersion(v => v + 1);
         
         setActiveFile(filePath);
         // Notify Mac client about active file change

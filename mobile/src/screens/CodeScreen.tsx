@@ -170,18 +170,27 @@ export default function CodeScreen(): React.ReactElement {
   );
 
   // Update file content when loaded
-  useEffect(() => {
-    // Always update content when it changes
-    // This ensures we get fresh content every time, even when reopening files
-    if (activeFile && activeFileContent !== undefined) {
-      console.log(
-        `📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`,
-      );
+  // Track last active file to detect file switches
+  const lastActiveFileRef = useRef<string | null>(null);
 
-      setFileContents(prev => ({
-        ...prev,
-        [activeFile]: activeFileContent,
-      }));
+  useEffect(() => {
+    // Update content from query only when switching files
+    // Don't update on every refetch while editing the same file
+    if (activeFile && activeFileContent !== undefined) {
+      const isFileSwitching = lastActiveFileRef.current !== activeFile;
+      
+      if (isFileSwitching) {
+        console.log(
+          `📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`,
+        );
+
+        setFileContents(prev => ({
+          ...prev,
+          [activeFile]: activeFileContent,
+        }));
+        
+        lastActiveFileRef.current = activeFile;
+      }
     }
   }, [activeFile, activeFileContent]);
 
@@ -817,24 +826,44 @@ export default function CodeScreen(): React.ReactElement {
   }, [currentProject?.path, sidebarTab]);
 
   // Listen for file updates from Mac (when file changes on disk)
-  // Listen for file updates from Mac
+  // This happens when:
+  // 1. User saves file in Mac editor
+  // 2. File is modified by external process
+  // 3. User clicks "Save" in iOS and Mac confirms the save
   useEffect(() => {
     const unsubscribe = codeService.onMessage(
       'code:fileUpdated',
       (_action, payload: {filePath: string; content: string}) => {
-        // Only update if this is the active file
-        if (payload.filePath === activeFile) {
-          console.log('📝 File updated from Mac:', payload.filePath);
-          setFileContents(prev => ({
-            ...prev,
-            [payload.filePath]: payload.content,
-          }));
-        }
+        // Update regardless of whether it's the active file
+        // This ensures background files stay in sync
+        console.log('📝 File updated from Mac:', payload.filePath);
+        
+        // Update file contents - this will trigger editor to update
+        // This OVERRIDES any unsaved local changes
+        setFileContents(prev => ({
+          ...prev,
+          [payload.filePath]: payload.content,
+        }));
+        
+        // Clear dirty flag since we're syncing with Mac version
+        setDirtyFiles(prev => {
+          const newDirty = new Set(prev);
+          newDirty.delete(payload.filePath);
+          return newDirty;
+        });
+        
+        // Update openFiles to mark as not dirty
+        setOpenFiles(prev =>
+          prev.map(f => (f.path === payload.filePath ? {...f, isDirty: false} : f)),
+        );
+        
+        // Don't invalidate query - we've already updated the content directly
+        // Query will refetch naturally on next file switch or mount
       },
     );
 
     return () => unsubscribe();
-  }, [activeFile]);
+  }, []);
 
   // Listen for diff updates from Mac (sent automatically after file changes)
   useEffect(() => {

@@ -15,7 +15,8 @@ export interface OpenFileInfo {
   projectPath: string;
   filePath: string;
   isActive: boolean;
-  watcher?: fs.FSWatcher;
+  pollingInterval?: NodeJS.Timeout;
+  lastMtime?: Date;
 }
 
 /**
@@ -156,9 +157,10 @@ export class OpenFilesManager {
 
     console.log(chalk.cyan(`📁 Closing file: ${path.basename(filePath)}`));
 
-    // Stop watching
-    if (fileInfo.watcher) {
-      fileInfo.watcher.close();
+    // Stop polling
+    if (fileInfo.pollingInterval) {
+      clearInterval(fileInfo.pollingInterval);
+      fileInfo.pollingInterval = undefined;
     }
 
     // Remove from open files
@@ -185,9 +187,9 @@ export class OpenFilesManager {
     // Stop watching previous active file
     for (const [path, fileInfo] of this.openFiles) {
       if (fileInfo.isActive && path !== filePath) {
-        if (fileInfo.watcher) {
-          fileInfo.watcher.close();
-          fileInfo.watcher = undefined;
+        if (fileInfo.pollingInterval) {
+          clearInterval(fileInfo.pollingInterval);
+          fileInfo.pollingInterval = undefined;
         }
         fileInfo.isActive = false;
       }
@@ -246,60 +248,84 @@ export class OpenFilesManager {
   }
 
   /**
-   * Start watching a file for changes
+   * Start watching a file for changes using polling
    */
   private startWatching(fileInfo: OpenFileInfo): void {
-    if (fileInfo.watcher) {
+    if (fileInfo.pollingInterval) {
       console.log(chalk.yellow(`  ⚠️ File already being watched: ${path.basename(fileInfo.filePath)}`));
       return; // Already watching
     }
 
-    console.log(chalk.cyan(`  🔍 Starting watcher for: ${path.basename(fileInfo.filePath)}`));
+    console.log(chalk.cyan(`  🔍 Starting polling watcher for: ${path.basename(fileInfo.filePath)}`));
 
     try {
+      // Get initial file state
       let lastContent = fs.readFileSync(fileInfo.filePath, "utf-8");
+      const stats = fs.statSync(fileInfo.filePath);
+      fileInfo.lastMtime = stats.mtime;
+      
       let debounceTimer: NodeJS.Timeout | null = null;
 
-      fileInfo.watcher = fs.watch(fileInfo.filePath, (eventType, filename) => {
-        console.log(chalk.gray(`    📡 fs.watch event: ${eventType} (filename: ${filename || 'N/A'})`));
-        
-        if (eventType === "change") {
-          // Debounce rapid changes (e.g., from IDE auto-save)
-          if (debounceTimer) {
-            clearTimeout(debounceTimer);
+      // Poll every 1 second for file changes
+      fileInfo.pollingInterval = setInterval(() => {
+        try {
+          // Check if file still exists
+          if (!fs.existsSync(fileInfo.filePath)) {
+            console.log(chalk.yellow(`⚠️ File no longer exists: ${path.basename(fileInfo.filePath)}`));
+            return;
           }
 
-          debounceTimer = setTimeout(() => {
-            try {
-              const newContent = fs.readFileSync(fileInfo.filePath, "utf-8");
-              
-              // Check if content actually changed
-              if (newContent !== lastContent) {
-                const oldLength = lastContent.length;
-                lastContent = newContent;
-                console.log(chalk.bold.cyan(`📝 File changed: ${path.basename(fileInfo.filePath)}`));
-                console.log(chalk.gray(`   Old length: ${oldLength}, New length: ${newContent.length}`));
-                
-                if (this.fileUpdateCallback) {
-                  console.log(chalk.green(`   ✅ Sending update to iOS`));
-                  this.fileUpdateCallback(fileInfo.filePath, newContent);
-                } else {
-                  console.log(chalk.red(`   ❌ No callback set!`));
-                }
-              } else {
-                console.log(chalk.gray(`   ⚠️ Event fired but content unchanged`));
-              }
-            } catch (error) {
-              console.error(chalk.red(`❌ Failed to read changed file:`), error);
-            }
-          }, 200); // Increased debounce to 200ms to reduce multiple triggers
-        }
-      });
+          // Check modification time
+          const currentStats = fs.statSync(fileInfo.filePath);
+          const currentMtime = currentStats.mtime;
 
-      console.log(chalk.green(`  ✅ Watcher started successfully for: ${path.basename(fileInfo.filePath)}`));
+          // If mtime changed, file was modified
+          if (fileInfo.lastMtime && currentMtime.getTime() !== fileInfo.lastMtime.getTime()) {
+            console.log(chalk.gray(`    📡 File mtime changed: ${path.basename(fileInfo.filePath)}`));
+            
+            // Update last mtime
+            fileInfo.lastMtime = currentMtime;
+
+            // Debounce rapid changes (e.g., from IDE auto-save)
+            if (debounceTimer) {
+              clearTimeout(debounceTimer);
+            }
+
+            debounceTimer = setTimeout(() => {
+              try {
+                const newContent = fs.readFileSync(fileInfo.filePath, "utf-8");
+                
+                // Check if content actually changed
+                if (newContent !== lastContent) {
+                  const oldLength = lastContent.length;
+                  lastContent = newContent;
+                  console.log(chalk.bold.cyan(`📝 File changed: ${path.basename(fileInfo.filePath)}`));
+                  console.log(chalk.gray(`   Old length: ${oldLength}, New length: ${newContent.length}`));
+                  
+                  if (this.fileUpdateCallback) {
+                    console.log(chalk.green(`   ✅ Sending update to iOS`));
+                    this.fileUpdateCallback(fileInfo.filePath, newContent);
+                  } else {
+                    console.log(chalk.red(`   ❌ No callback set!`));
+                  }
+                } else {
+                  console.log(chalk.gray(`   ⚠️ mtime changed but content unchanged`));
+                }
+              } catch (error) {
+                console.error(chalk.red(`❌ Failed to read changed file:`), error);
+              }
+            }, 200); // Debounce to 200ms to reduce multiple triggers
+          }
+        } catch (error) {
+          console.error(chalk.red(`❌ Failed to check file stats:`), error);
+        }
+      }, 1000); // Poll every 1 second
+
+      console.log(chalk.green(`  ✅ Polling watcher started successfully for: ${path.basename(fileInfo.filePath)}`));
       console.log(chalk.gray(`     Full path: ${fileInfo.filePath}`));
+      console.log(chalk.gray(`     Polling interval: 1000ms`));
     } catch (error) {
-      console.error(chalk.red(`❌ Failed to watch file: ${fileInfo.filePath}`), error);
+      console.error(chalk.red(`❌ Failed to start polling watcher: ${fileInfo.filePath}`), error);
     }
   }
 
@@ -432,8 +458,8 @@ export class OpenFilesManager {
     console.log(chalk.yellow("🧹 Cleaning up OpenFilesManager..."));
 
     for (const [_, fileInfo] of this.openFiles) {
-      if (fileInfo.watcher) {
-        fileInfo.watcher.close();
+      if (fileInfo.pollingInterval) {
+        clearInterval(fileInfo.pollingInterval);
       }
     }
 

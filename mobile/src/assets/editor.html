@@ -140,11 +140,20 @@
     
     .diff-deleted-lines {
       background-color: rgba(244, 67, 54, 0.15);
-      border-left: 4px solid #F44336;
-      margin-left: 0;
-      padding-left: 4px;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      position: relative;
+    }
+    
+    /* Add a red bar on the left side for deleted lines, matching the gutter width */
+    .diff-deleted-lines::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background-color: #F44336;
     }
     
     .diff-deleted-line {

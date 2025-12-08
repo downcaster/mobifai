@@ -844,6 +844,10 @@ async function handleCodeGetFile(payload: {
     try {
       await openFilesManager.openFile(payload.projectPath, payload.filePath);
       console.log(chalk.green(`  ✅ Registered file with OpenFilesManager`));
+      
+      // Set as active file to start watching for changes
+      await openFilesManager.setActiveFile(payload.filePath);
+      console.log(chalk.green(`  ✅ Set as active file - polling watcher started`));
     } catch (error) {
       console.warn(chalk.yellow(`  ⚠️ Failed to register file:`, error));
     }
@@ -1180,6 +1184,13 @@ async function handleCodeSetActiveFile(payload: {
   );
   try {
     const content = await openFilesManager.setActiveFile(payload.filePath);
+    
+    // Always send a response, even if file wasn't open yet
+    // If content is null, it means file will be opened via getFile
+    if (content === null && payload.filePath) {
+      console.log(chalk.gray(`  ℹ️ File will be opened via getFile request`));
+    }
+    
     sendToClient("code:activeFileSet", {
       filePath: payload.filePath,
       content,

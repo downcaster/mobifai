@@ -50,9 +50,11 @@ Execute these phases systematically:
 
 ## Output Requirements
 
-After completing your research, create a file at `.cursor/research/research.md` with the following structure:
+After completing your research, create a file at `.cursor/research/<research-title>.md` where `<research-title>` is a kebab-case slug derived from your research topic (e.g., `webrtc-signaling.md`, `terminal-rendering-flow.md`, `authentication-patterns.md`).
 
-```markdown
+Use the following structure:
+
+````markdown
 # Research: [Brief Topic Title]
 
 > Research Date: [Current Date]
@@ -64,9 +66,9 @@ After completing your research, create a file at `.cursor/research/research.md` 
 
 ## File Inventory
 
-| File Path | Purpose | Key Exports/Functions |
-|-----------|---------|----------------------|
-| path/to/file.ts | Description | function1, function2 |
+| File Path       | Purpose     | Key Exports/Functions |
+| --------------- | ----------- | --------------------- |
+| path/to/file.ts | Description | function1, function2  |
 
 ## Architecture & Data Flow
 
@@ -81,12 +83,15 @@ After completing your research, create a file at `.cursor/research/research.md` 
 **Purpose:** [What this does]
 
 **Key Functions:**
+
 - `functionName(params)`: [What it does]
 
 **Code Snippet:** (if particularly relevant)
+
 ```language
 // relevant code snippet
 ```
+````
 
 [Repeat for each major component]
 
@@ -101,9 +106,11 @@ After completing your research, create a file at `.cursor/research/research.md` 
 ## Dependencies
 
 ### Internal Dependencies
+
 - Module A depends on Module B for [reason]
 
 ### External Dependencies
+
 - `package-name`: Used for [purpose]
 
 ## Patterns & Conventions
@@ -115,7 +122,9 @@ After completing your research, create a file at `.cursor/research/research.md` 
 [Factual summary of the current state - what exists, what works, what the current behavior is]
 
 ---
-*This research document was auto-generated. It represents a snapshot of the codebase at the time of research.*
+
+_This research document was auto-generated. It represents a snapshot of the codebase at the time of research._
+
 ```
 
 ## Execution Instructions
@@ -124,7 +133,8 @@ After completing your research, create a file at `.cursor/research/research.md` 
 2. **Be thorough** - read all relevant files, don't skip or assume
 3. **Stay factual** - if you're unsure about something, say so rather than guessing
 4. **No recommendations** - do NOT include "suggestions", "improvements", or "could be better" sections
-5. **Write the output** - create the research.md file in `.cursor/research/research.md`
+5. **Write the output** - create the research file in `.cursor/research/<research-title>.md` using a descriptive kebab-case filename
 
 Begin your research now based on the prompt provided.
 
+```

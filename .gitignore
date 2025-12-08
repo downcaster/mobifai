@@ -44,3 +44,6 @@ mobile/web-build/
 Thumbs.db
 .device_id
 .token
+
+# Cursor
+.cursor/research/**/*.md

@@ -285,14 +285,7 @@ export class CodeManager {
     console.log(chalk.cyan(`💾 Saving file: ${filePath}`));
 
     try {
-      // Create backup if file exists
-      if (fs.existsSync(filePath)) {
-        const backupPath = `${filePath}.backup`;
-        fs.copyFileSync(filePath, backupPath);
-        console.log(chalk.gray(`  └─ Backup created: ${backupPath}`));
-      }
-
-      // Write the file
+      // Write the file directly (no backup)
       fs.writeFileSync(filePath, newContent, "utf-8");
 
       console.log(chalk.green(`✅ File saved: ${filePath}`));

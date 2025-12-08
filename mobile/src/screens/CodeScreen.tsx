@@ -173,6 +173,9 @@ export default function CodeScreen(): React.ReactElement {
   // Update file content when loaded
   // Track last active file to detect file switches
   const lastActiveFileRef = useRef<string | null>(null);
+  
+  // Track if user has made edits (to avoid marking as dirty during initialization)
+  const hasUserEditedRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     // Update content from query only when switching files
@@ -189,6 +192,9 @@ export default function CodeScreen(): React.ReactElement {
           ...prev,
           [activeFile]: activeFileContent,
         }));
+
+        // Reset edit tracking when switching to a new file
+        hasUserEditedRef.current.delete(activeFile);
 
         lastActiveFileRef.current = activeFile;
       }
@@ -451,34 +457,53 @@ export default function CodeScreen(): React.ReactElement {
     }
   };
 
-  // Handle content change
+  // Handle content change from editor
   const handleContentChange = useCallback(
     (content: string) => {
       if (!activeFile) {
         return;
       }
 
+      const previousContent = fileContents[activeFile];
+      const originalContent = activeFileContent || '';
+      
+      // Mark as dirty only if:
+      // 1. Content actually changed from what we had before (user typed something)
+      // 2. Content differs from original disk content
+      // This prevents marking as dirty during initialization or Mac updates
+      const contentChanged = previousContent !== undefined && content !== previousContent;
+      const isDirty = content !== originalContent;
+
       setFileContents(prev => ({
         ...prev,
         [activeFile]: content,
       }));
 
-      const originalContent = activeFileContent || '';
-      const isDirty = content !== originalContent;
-
+      // Only mark as dirty if user actually changed something
+      if (contentChanged) {
+        hasUserEditedRef.current.set(activeFile, true);
+      }
+      
+      // Update dirty state only if user has edited or content matches original
       setDirtyFiles(prev => {
         const newDirty = new Set(prev);
-        if (isDirty) {
+        const hasEdited = hasUserEditedRef.current.get(activeFile);
+        
+        if (isDirty && (hasEdited || contentChanged)) {
+          // Mark dirty only if user has typed something
           newDirty.add(activeFile);
         } else {
+          // Clear dirty if content matches original
           newDirty.delete(activeFile);
         }
         return newDirty;
       });
 
-      setOpenFiles(prev => prev.map(f => (f.path === activeFile ? {...f, isDirty} : f)));
+      setOpenFiles(prev =>
+        prev.map(f => (f.path === activeFile ? {...f, isDirty: isDirty && (hasUserEditedRef.current.get(activeFile) || contentChanged)} : f)),
+      );
     },
-    [activeFile, activeFileContent],
+    [activeFile, activeFileContent, fileContents],
   );
 
   // Handle save
@@ -499,6 +524,9 @@ export default function CodeScreen(): React.ReactElement {
           filePath: pathToSave,
           content,
         });
+
+        // Reset edit tracking after successful save
+        hasUserEditedRef.current.delete(pathToSave);
 
         setDirtyFiles(prev => {
           const newDirty = new Set(prev);
@@ -849,15 +877,13 @@ export default function CodeScreen(): React.ReactElement {
         // Increment content version to force editor update (bypasses fast-typing protection)
         setContentVersion(v => v + 1);
 
-        // Clear dirty flag since we're syncing with Mac version
+        // Clear dirty flag and reset edit tracking since we're syncing with Mac version
         // This overrides any unsaved local changes
+        hasUserEditedRef.current.delete(payload.filePath);
+        
         setDirtyFiles(prev => {
           const newDirty = new Set(prev);
-          const wasDirty = newDirty.has(payload.filePath);
           newDirty.delete(payload.filePath);
-          if (wasDirty) {
-            console.log('   🧹 Cleared unsaved state - Mac version now active');
-          }
           return newDirty;
         });
 

@@ -87,6 +87,7 @@ export default function CodeScreen(): React.ReactElement {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set());
+  const [contentVersion, setContentVersion] = useState(0); // Increment to force editor update
 
   // Selected item state (for file/folder creation)
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
@@ -178,7 +179,7 @@ export default function CodeScreen(): React.ReactElement {
     // Don't update on every refetch while editing the same file
     if (activeFile && activeFileContent !== undefined) {
       const isFileSwitching = lastActiveFileRef.current !== activeFile;
-      
+
       if (isFileSwitching) {
         console.log(
           `📄 Received content for: ${activeFile.split('/').pop()} (${activeFileContent.length} bytes)`,
@@ -188,7 +189,7 @@ export default function CodeScreen(): React.ReactElement {
           ...prev,
           [activeFile]: activeFileContent,
         }));
-        
+
         lastActiveFileRef.current = activeFile;
       }
     }
@@ -837,26 +838,29 @@ export default function CodeScreen(): React.ReactElement {
         // Update regardless of whether it's the active file
         // This ensures background files stay in sync
         console.log('📝 File updated from Mac:', payload.filePath);
-        
+
         // Update file contents - this will trigger editor to update
         // This OVERRIDES any unsaved local changes
         setFileContents(prev => ({
           ...prev,
           [payload.filePath]: payload.content,
         }));
-        
+
+        // Increment content version to force editor update (bypasses fast-typing protection)
+        setContentVersion(v => v + 1);
+
         // Clear dirty flag since we're syncing with Mac version
         setDirtyFiles(prev => {
           const newDirty = new Set(prev);
           newDirty.delete(payload.filePath);
           return newDirty;
         });
-        
+
         // Update openFiles to mark as not dirty
         setOpenFiles(prev =>
           prev.map(f => (f.path === payload.filePath ? {...f, isDirty: false} : f)),
         );
-        
+
         // Don't invalidate query - we've already updated the content directly
         // Query will refetch naturally on next file switch or mount
       },
@@ -1160,6 +1164,7 @@ export default function CodeScreen(): React.ReactElement {
             diffData={diffData}
             fontSize={editorFontSize}
             theme={editorTheme}
+            contentVersion={contentVersion}
           />
         ) : (
           <View style={styles.noFileSelected}>

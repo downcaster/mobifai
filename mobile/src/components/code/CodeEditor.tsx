@@ -34,6 +34,7 @@ interface CodeEditorProps {
   diffData?: FileDiff | null;
   fontSize?: number;
   theme?: TerminalTheme | null;
+  contentVersion?: number; // Increment this to force content update (e.g., from Mac)
 }
 
 interface EditorMessage {
@@ -54,6 +55,7 @@ export function CodeEditor({
   diffData = null,
   fontSize = 14,
   theme = null,
+  contentVersion = 0,
 }: CodeEditorProps): React.ReactElement {
   const webviewRef = useRef<WebView>(null);
   const [isReady, setIsReady] = useState(false);
@@ -63,6 +65,7 @@ export function CodeEditor({
   const lastEditorContentRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
   const lastContentPropRef = useRef<string>(''); // Track the last content prop we received
+  const lastContentVersionRef = useRef<number>(0); // Track last content version
 
   const getLanguage = (lang: string): string => {
     const langMap: Record<string, string> = {
@@ -128,31 +131,39 @@ export function CodeEditor({
   // NOT when it's the same content we just received from the editor
   useEffect(() => {
     if (isReady) {
-      // Detect if this is a different file (content prop changed to something completely different)
-      const isDifferentFile =
-        lastContentPropRef.current !== '' &&
-        content !== lastContentPropRef.current &&
-        content !== lastEditorContentRef.current;
-
-      // Only send setContent if:
-      // 1. We haven't initialized yet (first load)
-      // 2. Content differs from what the editor last sent us (external change)
-      // 3. This is a different file (file switch detected)
-      const isExternalChange = content !== lastEditorContentRef.current;
       const isFirstLoad = !hasInitializedRef.current;
+      const isExternalChange = content !== lastEditorContentRef.current;
+      const isVersionChanged = contentVersion !== lastContentVersionRef.current;
+      
+      // Detect file switch: significant content difference suggests different file
+      const contentLengthDiff = Math.abs(content.length - (lastContentPropRef.current?.length || 0));
+      const isLikelyFileSwitch = contentLengthDiff > 100;
+      
+      // Update if:
+      // 1. First load
+      // 2. Version changed (forced update from Mac)
+      // 3. Likely file switch (large content change)
+      const shouldUpdate = isFirstLoad || isVersionChanged || (isExternalChange && isLikelyFileSwitch);
 
-      if (isFirstLoad || isExternalChange || isDifferentFile) {
+      if (shouldUpdate) {
         console.log(`📝 Updating editor content (${content.length} bytes)`);
-        if (isDifferentFile) {
+        if (isLikelyFileSwitch && !isFirstLoad && !isVersionChanged) {
           console.log('   Detected file switch - forcing content update');
+        } else if (isVersionChanged && !isFirstLoad) {
+          console.log('   External update (from Mac) - forcing content update');
         }
         sendMessage('setContent', {content});
         lastEditorContentRef.current = content;
         lastContentPropRef.current = content;
+        lastContentVersionRef.current = contentVersion;
         hasInitializedRef.current = true;
+      } else if (isExternalChange && !isLikelyFileSwitch) {
+        // Small change during fast typing - just update refs to stay in sync
+        lastEditorContentRef.current = content;
+        lastContentPropRef.current = content;
       }
     }
-  }, [content, isReady, sendMessage]);
+  }, [content, contentVersion, isReady, sendMessage]);
 
   useEffect(() => {
     if (isReady) {

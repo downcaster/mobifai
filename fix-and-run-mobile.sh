@@ -3,7 +3,7 @@
 echo "🔧 MobiFai Mobile App - Fix and Run"
 echo "===================================="
 echo ""
-asdsadsdasd
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

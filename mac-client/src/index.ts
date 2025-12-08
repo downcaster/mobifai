@@ -275,7 +275,7 @@ function setupGitWatcherCallbacks(): void {
   console.log(chalk.cyan(`🔧 Setting up GitWatcher callbacks...`));
 
   // Handle git changes detected
-  gitWatcher.onChanges((projectPath, changes) => {
+  gitWatcher.onChanges(async (projectPath, changes) => {
     console.log(
       chalk.bold.cyan(`📝 Git changes detected: ${path.basename(projectPath)}`)
     );
@@ -293,6 +293,27 @@ function setupGitWatcherCallbacks(): void {
     });
 
     console.log(chalk.green(`   ✅ Sent project changes to iOS`));
+    
+    // Re-send diff for active file since git HEAD might have changed (commit, checkout, etc.)
+    const activeFilePath = openFilesManager.getActiveFilePath();
+    if (activeFilePath && activeFilePath.startsWith(projectPath)) {
+      console.log(chalk.gray(`   📊 Re-computing diff for active file after git change`));
+      try {
+        const diff = await codeManager.getFileDiff(activeFilePath);
+        sendToClient("code:fileDiff", diff);
+        if (diff.hasChanges) {
+          console.log(
+            chalk.green(
+              `   ✅ Sent updated diff to iOS (added=${diff.addedLines.length}, deleted=${diff.deletedLines.length})`
+            )
+          );
+        } else {
+          console.log(chalk.gray(`   ✅ Sent cleared diff to iOS (file now matches HEAD)`));
+        }
+      } catch (error: any) {
+        console.error(chalk.red(`   ❌ Failed to compute diff:`, error.message));
+      }
+    }
   });
 
   console.log(chalk.green(`✅ GitWatcher callbacks set up`));

@@ -107,14 +107,16 @@ export class GitWatcher {
           // Parse the changes
           const changes = this.parseGitStatus(projectPath, stdout);
           
-          // Only notify if there are actual changes (not just initial state)
-          if (lastState !== undefined && this.callback) {
-            console.log(chalk.green(`📝 Git changes detected in ${path.basename(projectPath)}`));
+          // Always notify, including initial state
+          // This ensures iOS gets the current state even if project already has changes
+          if (this.callback) {
+            if (lastState !== undefined) {
+              console.log(chalk.green(`📝 Git changes detected in ${path.basename(projectPath)}`));
+            } else {
+              console.log(chalk.gray(`📊 Initial git state: ${changes.staged.length} staged, ${changes.unstaged.length} unstaged`));
+            }
             console.log(chalk.gray(`   Staged: ${changes.staged.length}, Unstaged: ${changes.unstaged.length}`));
             this.callback(projectPath, changes);
-          } else if (lastState === undefined) {
-            // Initial state - just store it, don't notify
-            console.log(chalk.gray(`📊 Initial git state: ${changes.staged.length} staged, ${changes.unstaged.length} unstaged`));
           }
         }
       }

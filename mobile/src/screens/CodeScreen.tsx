@@ -351,6 +351,12 @@ export default function CodeScreen(): React.ReactElement {
       const existingFile = openFiles.find(f => f.path === filePath);
       if (existingFile) {
         console.log('   File already open, switching to it');
+        
+        // Force refresh content from Mac to ensure latest version
+        // This handles case where file was updated while in background
+        console.log('   🔄 Fetching latest content from Mac...');
+        queryClient.invalidateQueries({queryKey: ['file', filePath]});
+        
         setActiveFile(filePath);
         // Notify Mac client about active file change
         try {

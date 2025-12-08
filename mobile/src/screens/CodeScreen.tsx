@@ -357,6 +357,10 @@ export default function CodeScreen(): React.ReactElement {
         console.log('   🔄 Fetching latest content from Mac...');
         queryClient.invalidateQueries({queryKey: ['file', filePath]});
         
+        // Increment contentVersion to force editor update when fresh content arrives
+        // This ensures editor doesn't ignore small content changes
+        setContentVersion(v => v + 1);
+        
         setActiveFile(filePath);
         // Notify Mac client about active file change
         try {

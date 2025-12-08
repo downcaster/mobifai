@@ -850,9 +850,14 @@ export default function CodeScreen(): React.ReactElement {
         setContentVersion(v => v + 1);
 
         // Clear dirty flag since we're syncing with Mac version
+        // This overrides any unsaved local changes
         setDirtyFiles(prev => {
           const newDirty = new Set(prev);
+          const wasDirty = newDirty.has(payload.filePath);
           newDirty.delete(payload.filePath);
+          if (wasDirty) {
+            console.log('   🧹 Cleared unsaved state - Mac version now active');
+          }
           return newDirty;
         });
 

@@ -214,9 +214,6 @@ function setupProcessManagerCallbacks(): void {
 function setupOpenFilesManagerCallbacks(): void {
   console.log(chalk.cyan(`🔧 Setting up OpenFilesManager callbacks...`));
 
-  // Track last sent content per file to avoid duplicate sends
-  const lastSentContent = new Map<string, string>();
-
   // Handle file updates from file watcher
   openFilesManager.onFileUpdate(async (filePath, content) => {
     console.log(
@@ -225,23 +222,15 @@ function setupOpenFilesManagerCallbacks(): void {
       )
     );
 
-    // Check if content actually changed from what we last sent
-    const previousContent = lastSentContent.get(filePath);
-    const contentChanged = content !== previousContent;
+    // Always send content when watcher detects change
+    // Watcher already has debouncing and content comparison
+    // Don't second-guess it here - trust the watcher's detection
+    console.log(chalk.gray(`   Sending updated content to iOS...`));
+    sendToClient("code:fileUpdated", { filePath, content });
+    console.log(chalk.green(`   ✅ Sent content to iOS (${content.length} bytes)`));
 
-    if (contentChanged) {
-      console.log(chalk.gray(`   Content changed, sending to iOS...`));
-      sendToClient("code:fileUpdated", { filePath, content });
-      lastSentContent.set(filePath, content);
-      console.log(chalk.green(`   ✅ Sent content to iOS`));
-    } else {
-      console.log(
-        chalk.yellow(`   ⚠️ Content unchanged from last send, skipping`)
-      );
-    }
-
-    // Always compute and send updated diff (even if content didn't change from our perspective,
-    // the diff might have changed due to git operations)
+    // Always compute and send updated diff
+    // iOS needs both content and diff to stay in sync
     try {
       console.log(chalk.gray(`   Computing updated diff...`));
       const diff = await codeManager.getFileDiff(filePath);
